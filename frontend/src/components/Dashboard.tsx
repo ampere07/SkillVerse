@@ -189,32 +189,20 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="lg:pl-56">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
-          <div className="flex items-center justify-between h-12 px-4">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-gray-600 hover:text-gray-900"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex-1 lg:flex-none">
-              <h1 className="text-sm font-semibold text-gray-900">
-                {filteredNavigation.find(item => item.href === activeNav)?.label || 'Dashboard'}
-              </h1>
-            </div>
-            <div className="px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-600 uppercase tracking-wide">
-              {user.role}
-            </div>
-          </div>
-        </header>
-
         {/* Page Content */}
         <main className={activeNav === '/compiler' ? '' : 'p-4'}>
           {activeNav === '/compiler' ? (
-            <Compiler />
+            <Compiler onMenuClick={() => setSidebarOpen(true)} />
           ) : (
             <>
+              {/* Mobile Menu Button for non-compiler pages */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              
               {/* Welcome Section */}
               <div className="mb-4">
                 <h2 className="text-lg font-medium text-gray-900 mb-1">
