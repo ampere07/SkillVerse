@@ -3,10 +3,11 @@ import { useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
+import OnboardingSurveyModal from './components/OnboardingSurveyModal';
 
 function App() {
   const [showLogin, setShowLogin] = useState(true);
-  const { user, loading } = useAuth();
+  const { user, loading, isNewStudent, completeSurvey } = useAuth();
 
   if (loading) {
     return (
@@ -17,7 +18,17 @@ function App() {
   }
 
   if (user) {
-    return <Dashboard />;
+    return (
+      <>
+        <Dashboard />
+        {isNewStudent && user.role === 'student' && (
+          <OnboardingSurveyModal 
+            isOpen={true} 
+            onClose={completeSurvey} 
+          />
+        )}
+      </>
+    );
   }
 
   return showLogin ? (

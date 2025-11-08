@@ -26,7 +26,38 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Name is required'],
     trim: true
-  }
+  },
+  onboardingSurvey: {
+    surveyCompleted: {
+      type: Boolean,
+      default: false
+    }
+  },
+  enrolledCourses: [{
+    courseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Course'
+    },
+    enrolledAt: {
+      type: Date,
+      default: Date.now
+    },
+    progress: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
+    completedLessons: [{
+      moduleIndex: Number,
+      lessonIndex: Number,
+      completedAt: Date
+    }],
+    lastAccessedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import Compiler from '../pages/Compiler';
+import MyCourses from '../pages/MyCourses';
 
 interface NavItem {
   icon: any;
@@ -193,6 +194,16 @@ export default function Dashboard() {
         <main className={activeNav === '/compiler' ? '' : 'p-4'}>
           {activeNav === '/compiler' ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
+          ) : activeNav === '/courses' ? (
+            <>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <MyCourses />
+            </>
           ) : (
             <>
               {/* Mobile Menu Button for non-compiler pages */}

@@ -5,6 +5,7 @@ interface User {
   email: string;
   name: string;
   role: 'teacher' | 'student';
+  surveyCompleted?: boolean;
 }
 
 interface AuthContextType {
@@ -14,6 +15,8 @@ interface AuthContextType {
   register: (email: string, password: string, name: string, role: 'teacher' | 'student') => Promise<void>;
   logout: () => void;
   loading: boolean;
+  isNewStudent: boolean;
+  completeSurvey: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,14 +25,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNewStudent, setIsNewStudent] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
     if (storedToken && storedUser) {
+      const parsedUser = JSON.parse(storedUser);
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      setUser(parsedUser);
+      
+      // Check if student hasn't completed survey
+      if (parsedUser.role === 'student' && !parsedUser.surveyCompleted) {
+        setIsNewStudent(true);
+      }
     }
     setLoading(false);
   }, []);
@@ -51,6 +61,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(data.user);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    
+    // Check if student hasn't completed survey
+    if (data.user.role === 'student' && !data.user.surveyCompleted) {
+      setIsNewStudent(true);
+    }
   };
 
   const register = async (email: string, password: string, name: string, role: 'teacher' | 'student') => {
@@ -70,6 +85,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(data.user);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    
+    if (role === 'student') {
+      setIsNewStudent(true);
+    }
+  };
+
+  const completeSurvey = () => {
+    setIsNewStudent(false);
+    if (user) {
+      const updatedUser = { ...user, surveyCompleted: true };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
   };
 
   const logout = () => {
@@ -80,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, loading, isNewStudent, completeSurvey }}>
       {children}
     </AuthContext.Provider>
   );
