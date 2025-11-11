@@ -8,9 +8,12 @@ const router = express.Router();
 
 router.post('/register', async (req, res) => {
   try {
+    console.log('Registration request received:', { email: req.body.email, role: req.body.role, name: req.body.name });
+    
     const { email, password, role, name } = req.body;
 
     if (!email || !password || !role || !name) {
+      console.log('Missing required fields');
       return res.status(400).json({ message: 'All fields are required' });
     }
 
@@ -48,7 +51,9 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    console.log('Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('Password hashed successfully');
 
     const user = new User({
       email: email.toLowerCase(),
@@ -57,7 +62,13 @@ router.post('/register', async (req, res) => {
       name: name.trim()
     });
 
+    console.log('Saving user to database...');
     await user.save();
+    console.log('User saved successfully');
+
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not defined in environment variables');
+    }
 
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email, role: user.role },
@@ -74,17 +85,29 @@ router.post('/register', async (req, res) => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
       }
     });
   } catch (error) {
     console.error('Registration error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     
     if (error.code === 11000) {
       return res.status(400).json({ message: 'Email already registered' });
     }
     
-    res.status(500).json({ message: 'Server error during registration' });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ message: messages.join(', ') });
+    }
+    
+    res.status(500).json({ 
+      message: 'Server error during registration',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -123,7 +146,8 @@ router.post('/login', async (req, res) => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
       }
     });
   } catch (error) {
@@ -145,7 +169,8 @@ router.get('/me', authenticateToken, async (req, res) => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
       }
     });
   } catch (error) {
