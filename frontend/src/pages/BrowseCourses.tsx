@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, Users, Star, BookOpen } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 
 interface Course {
   _id: string;
@@ -9,10 +9,8 @@ interface Course {
   category: string;
   level: string;
   duration: number;
-  price: number;
   rating: number;
   enrolledStudents: number;
-  thumbnail: string;
 }
 
 const allCourses: Course[] = [
@@ -24,10 +22,8 @@ const allCourses: Course[] = [
     category: 'Programming',
     level: 'Beginner',
     duration: 480,
-    price: 89.99,
     rating: 4.8,
-    enrolledStudents: 12543,
-    thumbnail: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400'
+    enrolledStudents: 12543
   },
   {
     _id: '2',
@@ -37,10 +33,8 @@ const allCourses: Course[] = [
     category: 'Programming',
     level: 'Advanced',
     duration: 360,
-    price: 119.99,
     rating: 4.9,
-    enrolledStudents: 8234,
-    thumbnail: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=400'
+    enrolledStudents: 8234
   },
   {
     _id: '3',
@@ -50,10 +44,8 @@ const allCourses: Course[] = [
     category: 'Design',
     level: 'Intermediate',
     duration: 300,
-    price: 79.99,
     rating: 4.7,
-    enrolledStudents: 9876,
-    thumbnail: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400'
+    enrolledStudents: 9876
   },
   {
     _id: '4',
@@ -63,10 +55,8 @@ const allCourses: Course[] = [
     category: 'Data Science',
     level: 'Intermediate',
     duration: 420,
-    price: 99.99,
     rating: 4.8,
-    enrolledStudents: 11234,
-    thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400'
+    enrolledStudents: 11234
   },
   {
     _id: '5',
@@ -76,10 +66,8 @@ const allCourses: Course[] = [
     category: 'Marketing',
     level: 'Beginner',
     duration: 240,
-    price: 69.99,
     rating: 4.6,
-    enrolledStudents: 15678,
-    thumbnail: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400'
+    enrolledStudents: 15678
   },
   {
     _id: '6',
@@ -89,10 +77,8 @@ const allCourses: Course[] = [
     category: 'Programming',
     level: 'Intermediate',
     duration: 400,
-    price: 109.99,
     rating: 4.7,
-    enrolledStudents: 7456,
-    thumbnail: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400'
+    enrolledStudents: 7456
   },
   {
     _id: '7',
@@ -102,10 +88,8 @@ const allCourses: Course[] = [
     category: 'Data Science',
     level: 'Advanced',
     duration: 480,
-    price: 129.99,
     rating: 4.9,
-    enrolledStudents: 6543,
-    thumbnail: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400'
+    enrolledStudents: 6543
   },
   {
     _id: '8',
@@ -115,10 +99,8 @@ const allCourses: Course[] = [
     category: 'Design',
     level: 'Beginner',
     duration: 280,
-    price: 74.99,
     rating: 4.5,
-    enrolledStudents: 10234,
-    thumbnail: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400'
+    enrolledStudents: 10234
   },
   {
     _id: '9',
@@ -128,10 +110,8 @@ const allCourses: Course[] = [
     category: 'Personal Development',
     level: 'Beginner',
     duration: 180,
-    price: 49.99,
     rating: 4.8,
-    enrolledStudents: 18765,
-    thumbnail: 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=400'
+    enrolledStudents: 18765
   },
   {
     _id: '10',
@@ -141,10 +121,8 @@ const allCourses: Course[] = [
     category: 'Business',
     level: 'Intermediate',
     duration: 350,
-    price: 94.99,
     rating: 4.7,
-    enrolledStudents: 7890,
-    thumbnail: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400'
+    enrolledStudents: 7890
   },
   {
     _id: '11',
@@ -154,10 +132,8 @@ const allCourses: Course[] = [
     category: 'Programming',
     level: 'Intermediate',
     duration: 320,
-    price: 109.99,
     rating: 4.6,
-    enrolledStudents: 5432,
-    thumbnail: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400'
+    enrolledStudents: 5432
   },
   {
     _id: '12',
@@ -167,10 +143,8 @@ const allCourses: Course[] = [
     category: 'Marketing',
     level: 'Beginner',
     duration: 200,
-    price: 59.99,
     rating: 4.4,
-    enrolledStudents: 12456,
-    thumbnail: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400'
+    enrolledStudents: 12456
   }
 ];
 
@@ -296,24 +270,15 @@ interface CourseCardProps {
 
 function CourseCard({ course, onEnroll }: CourseCardProps) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative h-40 bg-gray-200">
-        <img
-          src={course.thumbnail}
-          alt={course.title}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute top-3 right-3">
-          <span className="px-2 py-1 bg-white text-xs font-medium text-gray-900 rounded">
-            {course.level}
-          </span>
-        </div>
-      </div>
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
 
-      <div className="p-4">
-        <div className="mb-2">
+      <div className="p-4 flex flex-col flex-1">
+        <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
             {course.category}
+          </span>
+          <span className="px-2 py-1 bg-gray-100 text-xs font-medium text-gray-900 rounded">
+            {course.level}
           </span>
         </div>
 
@@ -323,30 +288,14 @@ function CourseCard({ course, onEnroll }: CourseCardProps) {
 
         <p className="text-sm text-gray-600 mb-3">by {course.instructor}</p>
 
-        <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+        <p className="text-sm text-gray-600 mb-6 line-clamp-2 flex-1">
           {course.description}
         </p>
 
-        <div className="flex items-center gap-4 mb-4 text-xs text-gray-500">
-          <div className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{Math.floor(course.duration / 60)}h {course.duration % 60}m</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-            <span>{course.rating}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5" />
-            <span>{course.enrolledStudents.toLocaleString()}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <span className="text-xl font-bold text-gray-900">${course.price}</span>
+        <div className="mt-auto">
           <button
             onClick={() => onEnroll(course)}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+            className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
           >
             Enroll Now
           </button>
@@ -377,10 +326,6 @@ function EnrollModal({ course, onConfirm, onCancel }: EnrollModalProps) {
         </div>
         
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-gray-600">Course Price</span>
-            <span className="text-lg font-bold text-gray-900">${course.price}</span>
-          </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Duration</span>
             <span className="text-sm font-medium text-gray-900">

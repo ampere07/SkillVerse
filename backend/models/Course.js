@@ -28,10 +28,7 @@ const courseSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  price: {
-    type: Number,
-    required: true
-  },
+
   rating: {
     type: Number,
     default: 0,
@@ -42,10 +39,7 @@ const courseSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  thumbnail: {
-    type: String,
-    required: true
-  },
+
   modules: [{
     title: String,
     lessons: [{
