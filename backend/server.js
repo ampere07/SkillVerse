@@ -11,6 +11,7 @@ import surveyRoutes from './routes/survey.js';
 import coursesRoutes from './routes/courses.js';
 import miniProjectsRoutes from './routes/miniProjects.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
+import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
 import { initializeCronJobs } from './services/cronService.js';
 
 const app = express();
@@ -34,6 +35,7 @@ app.use('/api/courses', coursesRoutes);
 app.use('/api/mini-projects', miniProjectsRoutes);
 
 setupCompilerSocket(io);
+setupPythonCompilerSocket(io);
 
 app.get('/api/health', (req, res) => {
   res.json({ 

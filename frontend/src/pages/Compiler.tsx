@@ -8,8 +8,15 @@ import {
   findLinesWithMissingImports,
   findUnusedImports,
   MissingImport,
-  CompilationError
+  CompilationError as JavaCompilationError
 } from '../utils/javaUtils';
+import {
+  PYTHON_SUGGESTIONS,
+  highlightPythonCode,
+  CompilationError as PythonCompilationError
+} from '../utils/pythonUtils';
+
+type CompilationError = JavaCompilationError | PythonCompilationError;
 
 const LANGUAGE_OPTIONS = [
   { value: 'python', label: 'Python' },
@@ -62,6 +69,10 @@ const highlightCode = (code: string, language: string, errors: CompilationError[
     return highlightJavaCode(code, errors, warningLines);
   }
   
+  if (language === 'python') {
+    return highlightPythonCode(code, errors);
+  }
+  
   return code.split('\n').map((line, index) => (
     <div key={index} style={{ height: '24px', minHeight: '24px' }}>
       {line || '\u00A0'}
@@ -99,10 +110,13 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
     const lines = code.split('\n').length;
     setLineNumbers(Array.from({ length: lines }, (_, i) => i + 1));
     
-    // Check for missing imports
-    const missing = findMissingImports(code);
-    setMissingImports(missing);
-  }, [code]);
+    if (language === 'java') {
+      const missing = findMissingImports(code);
+      setMissingImports(missing);
+    } else {
+      setMissingImports([]);
+    }
+  }, [code, language]);
 
   useEffect(() => {
     fetchLibraries();
@@ -179,21 +193,25 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
       return;
     }
 
-    if (language !== 'java') {
-      setOutput('Python compiler is not yet implemented.\nCurrently only Java compilation is supported.');
-      return;
-    }
-
     setOutput('');
     setCurrentInput('');
     setCompilationErrors([]);
     setIsRunning(true);
-    socket.emit('compile-and-run', { code, sessionId });
+    
+    if (language === 'java') {
+      socket.emit('compile-and-run', { code, sessionId });
+    } else if (language === 'python') {
+      socket.emit('compile-and-run-python', { code, sessionId });
+    }
   };
 
   const handleStop = () => {
     if (socket && isRunning) {
-      socket.emit('kill-process', { sessionId });
+      if (language === 'java') {
+        socket.emit('kill-process', { sessionId });
+      } else if (language === 'python') {
+        socket.emit('kill-process-python', { sessionId });
+      }
       setIsRunning(false);
     }
   };
@@ -204,7 +222,11 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (socket && currentInput.trim()) {
-        socket.emit('stdin-input', { sessionId, input: currentInput });
+        if (language === 'java') {
+          socket.emit('stdin-input', { sessionId, input: currentInput });
+        } else if (language === 'python') {
+          socket.emit('stdin-input-python', { sessionId, input: currentInput });
+        }
         setOutput(prev => prev + currentInput + '\n');
         setCurrentInput('');
       }
@@ -222,10 +244,13 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
     const currentLine = beforeCursor.split('\n').pop() || '';
     
     const allSuggestions: Suggestion[] = [];
+    const suggestions = language === 'java' ? JAVA_SUGGESTIONS : PYTHON_SUGGESTIONS;
 
-    if (currentLine.trim().startsWith('import ') || currentLine.includes('import ')) {
-      const importText = currentLine.substring(currentLine.lastIndexOf('import ') + 7);
-      JAVA_SUGGESTIONS.imports.forEach(imp => {
+    if (currentLine.trim().startsWith('import ') || currentLine.includes('import ') || currentLine.includes('from ')) {
+      const importText = currentLine.includes('import ') 
+        ? currentLine.substring(currentLine.lastIndexOf('import ') + 7)
+        : currentLine.substring(currentLine.lastIndexOf('from ') + 5);
+      suggestions.imports.forEach(imp => {
         if (imp.toLowerCase().includes(importText.toLowerCase())) {
           allSuggestions.push({
             text: imp,
@@ -236,10 +261,10 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
       });
     }
 
-    const lastWord = currentLine.split(/[\s\(\)\{\}\[\];,]/).pop() || '';
+    const lastWord = currentLine.split(/[\s\(\)\{\}\[\];,:]/).pop() || '';
     
     if (lastWord.length >= 2) {
-      JAVA_SUGGESTIONS.keywords.forEach(keyword => {
+      suggestions.keywords.forEach(keyword => {
         if (keyword.toLowerCase().startsWith(lastWord.toLowerCase())) {
           allSuggestions.push({
             text: keyword,
@@ -249,8 +274,7 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
         }
       });
 
-      JAVA_SUGGESTIONS.methods.forEach(method => {
-        // Only suggest if method starts with the typed text
+      suggestions.methods.forEach(method => {
         if (method.toLowerCase().startsWith(lastWord.toLowerCase())) {
           allSuggestions.push({
             text: method,
@@ -361,33 +385,35 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
     if ((e.ctrlKey || e.metaKey) && e.key === '/') {
       e.preventDefault();
       
+      const commentPrefix = language === 'python' ? '#' : '//';
+      const commentRegex = language === 'python' ? /^(\s*)?#\s?/ : /^(\s*)?\/\/\s?/;
+      const commentCheck = language === 'python' 
+        ? (line: string) => line.trim().startsWith('#')
+        : (line: string) => line.trim().startsWith('//');
+      
       const hasSelection = cursorPos !== selectionEnd;
       const selectedText = code.substring(cursorPos, selectionEnd);
       
       if (hasSelection) {
-        // Comment/uncomment selected lines
         const beforeSelection = code.substring(0, cursorPos);
         const afterSelection = code.substring(selectionEnd);
         
         const lines = selectedText.split('\n');
         const nonEmptyLines = lines.filter(line => line.trim().length > 0);
-        const allCommented = nonEmptyLines.length > 0 && nonEmptyLines.every(line => line.trim().startsWith('//'));
+        const allCommented = nonEmptyLines.length > 0 && nonEmptyLines.every(commentCheck);
         
         const newLines = lines.map(line => {
-          // Skip empty lines
           if (line.trim().length === 0) {
             return line;
           }
           
           if (allCommented) {
-            // Uncomment: remove // from the beginning
-            return line.replace(/^(\s*)?\/\/\s?/, '$1');
+            return line.replace(commentRegex, '$1');
           } else {
-            // Comment: add // at the beginning (preserving indentation)
             const match = line.match(/^(\s*)/);
             const indent = match ? match[1] : '';
             const restOfLine = line.substring(indent.length);
-            return indent + '// ' + restOfLine;
+            return indent + commentPrefix + ' ' + restOfLine;
           }
         });
         
@@ -399,31 +425,27 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
           textarea.setSelectionRange(cursorPos, cursorPos + newSelectedText.length);
         }, 0);
       } else {
-        // Comment/uncomment current line
         const lines = code.split('\n');
         const beforeCursor = code.substring(0, cursorPos);
         const currentLineIndex = beforeCursor.split('\n').length - 1;
         const currentLine = lines[currentLineIndex];
         
-        const isCommented = currentLine.trim().startsWith('//');
+        const isCommented = commentCheck(currentLine);
         
         let newLine;
         if (isCommented) {
-          // Uncomment
-          newLine = currentLine.replace(/^(\s*)?\/\/\s?/, '$1');
+          newLine = currentLine.replace(commentRegex, '$1');
         } else {
-          // Comment
           const match = currentLine.match(/^(\s*)/);
           const indent = match ? match[1] : '';
           const restOfLine = currentLine.substring(indent.length);
-          newLine = indent + '// ' + restOfLine;
+          newLine = indent + commentPrefix + ' ' + restOfLine;
         }
         
         lines[currentLineIndex] = newLine;
         const newCode = lines.join('\n');
         setCode(newCode);
         
-        // Maintain cursor position
         setTimeout(() => {
           const linesBefore = lines.slice(0, currentLineIndex).join('\n');
           const newCursorPos = linesBefore.length + (linesBefore ? 1 : 0) + newLine.length;
@@ -693,7 +715,7 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       {/* Missing Imports Banner */}
-      {missingImports.length > 0 && (
+      {language === 'java' && missingImports.length > 0 && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -752,7 +774,7 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
         <div className="flex flex-col border-r border-gray-200 bg-white overflow-hidden h-full">
           <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-              Code Editor <span className="text-gray-500 font-normal">(Auto-import suggestions enabled)</span>
+              Code Editor {language === 'java' && <span className="text-gray-500 font-normal">(Auto-import suggestions enabled)</span>}
             </h3>
           </div>
           <div className="flex-1 flex overflow-hidden min-h-0 relative">
