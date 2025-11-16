@@ -12,12 +12,14 @@ import {
   BarChart3,
   Menu,
   X,
-  Code
+  Code,
+  FolderKanban
 } from 'lucide-react';
 import { useState } from 'react';
 import Compiler from '../pages/Compiler';
 import MyCourses from '../pages/MyCourses';
 import TeacherClassrooms from '../pages/TeacherClassrooms';
+import MiniProjects from '../pages/MiniProjects';
 
 interface NavItem {
   icon: any;
@@ -55,6 +57,12 @@ const navigationItems: NavItem[] = [
     icon: Code,
     label: 'Compiler',
     href: '/compiler',
+    roles: ['student']
+  },
+  {
+    icon: FolderKanban,
+    label: 'Mini Projects',
+    href: '/mini-projects',
     roles: ['student']
   },
   {
@@ -214,6 +222,16 @@ export default function Dashboard() {
                 <Menu className="w-5 h-5" />
               </button>
               <TeacherClassrooms />
+            </>
+          ) : activeNav === '/mini-projects' ? (
+            <>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <MiniProjects />
             </>
           ) : (
             <>

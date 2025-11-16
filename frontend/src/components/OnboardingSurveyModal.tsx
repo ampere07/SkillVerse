@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { javaQuestions, pythonQuestions } from '../data/surveyQuestions';
 
 interface OnboardingSurveyModalProps {
   isOpen: boolean;
@@ -8,13 +9,25 @@ interface OnboardingSurveyModalProps {
 
 const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) => {
   const { user } = useAuth();
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     primaryLanguage: [] as string[],
     javaExpertise: '',
-    pythonExpertise: ''
+    pythonExpertise: '',
+    courseInterest: '',
+    learningGoals: ''
   });
+  const [javaAnswers, setJavaAnswers] = useState<number[]>(Array(10).fill(-1));
+  const [pythonAnswers, setPythonAnswers] = useState<number[]>(Array(10).fill(-1));
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [validationError, setValidationError] = useState('');
+  const [isValidating, setIsValidating] = useState(false);
+  const [unansweredQuestions, setUnansweredQuestions] = useState<{java: number[], python: number[]}>({java: [], python: []});
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
@@ -33,9 +46,118 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleQuestionAnswer = (language: 'java' | 'python', questionIndex: number, answerIndex: number) => {
+    if (language === 'java') {
+      const newAnswers = [...javaAnswers];
+      newAnswers[questionIndex] = answerIndex;
+      setJavaAnswers(newAnswers);
+      
+      if (unansweredQuestions.java.includes(questionIndex)) {
+        setUnansweredQuestions(prev => ({
+          ...prev,
+          java: prev.java.filter(i => i !== questionIndex)
+        }));
+      }
+    } else {
+      const newAnswers = [...pythonAnswers];
+      newAnswers[questionIndex] = answerIndex;
+      setPythonAnswers(newAnswers);
+      
+      if (unansweredQuestions.python.includes(questionIndex)) {
+        setUnansweredQuestions(prev => ({
+          ...prev,
+          python: prev.python.filter(i => i !== questionIndex)
+        }));
+      }
+    }
+    
+    if (validationError && unansweredQuestions.java.length === 0 && unansweredQuestions.python.length === 0) {
+      setValidationError('');
+    }
+  };
+
+  const calculateScore = (answers: number[], questions: typeof javaQuestions) => {
+    let correct = 0;
+    let easyCorrect = 0;
+    let mediumCorrect = 0;
+    let hardCorrect = 0;
+
+    answers.forEach((answer, index) => {
+      if (answer === questions[index].correctAnswer) {
+        correct++;
+        if (questions[index].difficulty === 'easy') easyCorrect++;
+        if (questions[index].difficulty === 'medium') mediumCorrect++;
+        if (questions[index].difficulty === 'hard') hardCorrect++;
+      }
+    });
+
+    return {
+      total: correct,
+      easy: easyCorrect,
+      medium: mediumCorrect,
+      hard: hardCorrect,
+      percentage: Math.round((correct / questions.length) * 100)
+    };
+  };
+
+  const handleNextStep = async () => {
+    if (step === 1) {
+      if (formData.primaryLanguage.length === 0) {
+        setError('Please select at least one programming language');
+        return;
+      }
+      if (formData.primaryLanguage.includes('java') && !formData.javaExpertise) {
+        setError('Please select your Java expertise level');
+        return;
+      }
+      if (formData.primaryLanguage.includes('python') && !formData.pythonExpertise) {
+        setError('Please select your Python expertise level');
+        return;
+      }
+      if (!formData.courseInterest.trim()) {
+        setError('Please enter your course interest');
+        return;
+      }
+      if (!formData.learningGoals.trim()) {
+        setError('Please tell us what you want to learn');
+        return;
+      }
+
+      setError('');
+      setIsValidating(true);
+
+      try {
+        const response = await fetch('http://localhost:5000/api/survey/validate-inputs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            courseInterest: formData.courseInterest,
+            learningGoals: formData.learningGoals
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.valid) {
+          setError('');
+          setStep(2);
+        } else {
+          setError(data.message || 'Please provide genuine responses related to programming and learning.');
+        }
+      } catch (error) {
+        setError('Unable to validate your responses. Please try again.');
+      } finally {
+        setIsValidating(false);
+      }
+    }
+  };
+
+  const handleSubmit = async () => {
     setError('');
+    setValidationError('');
+    setUnansweredQuestions({java: [], python: []});
     setIsSubmitting(true);
     
     if (!user?.id) {
@@ -44,33 +166,166 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
       return;
     }
 
+    const unanswered = {java: [] as number[], python: [] as number[]};
+    
+    if (formData.primaryLanguage.includes('java')) {
+      javaAnswers.forEach((answer, index) => {
+        if (answer === -1) {
+          unanswered.java.push(index);
+        }
+      });
+    }
+    
+    if (formData.primaryLanguage.includes('python')) {
+      pythonAnswers.forEach((answer, index) => {
+        if (answer === -1) {
+          unanswered.python.push(index);
+        }
+      });
+    }
+    
+    if (unanswered.java.length > 0 || unanswered.python.length > 0) {
+      setUnansweredQuestions(unanswered);
+      setValidationError('Please answer all questions before submitting.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const javaScore = formData.primaryLanguage.includes('java') 
+      ? calculateScore(javaAnswers, javaQuestions) 
+      : null;
+    const pythonScore = formData.primaryLanguage.includes('python') 
+      ? calculateScore(pythonAnswers, pythonQuestions) 
+      : null;
+
+    const requestData: any = {
+      userId: user.id,
+      primaryLanguage: formData.primaryLanguage,
+      courseInterest: formData.courseInterest,
+      learningGoals: formData.learningGoals
+    };
+    
+    if (formData.primaryLanguage.includes('java')) {
+      requestData.javaExpertise = formData.javaExpertise;
+      requestData.javaQuestions = {
+        answers: javaAnswers,
+        score: javaScore
+      };
+    }
+    
+    if (formData.primaryLanguage.includes('python')) {
+      requestData.pythonExpertise = formData.pythonExpertise;
+      requestData.pythonQuestions = {
+        answers: pythonAnswers,
+        score: pythonScore
+      };
+    }
+
     try {
       const response = await fetch('http://localhost:5000/api/survey/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userId: user.id,
-          ...formData
-        }),
+        body: JSON.stringify(requestData),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        onClose();
+        if (data.survey.aiAnalysis) {
+          setAiAnalysis(data.survey.aiAnalysis);
+          setShowAnalysis(true);
+          setDisplayedText('');
+          setIsTyping(true);
+        } else {
+          setError('AI analysis was not generated. Please try again.');
+        }
       } else {
-        setError(data.message || 'Failed to submit survey');
+        if (response.status === 503) {
+          setError('AI analysis service is currently unavailable. Please try again in a few moments.');
+        } else {
+          setError(data.message || 'Failed to submit survey');
+        }
       }
     } catch (error) {
-      setError('Network error. Please try again.');
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (!isOpen) return null;
+
+  if (showAnalysis && aiAnalysis) {
+    const startTypingAnimation = () => {
+      if (!isTyping) return;
+      
+      let currentIndex = 0;
+      const text = aiAnalysis;
+      const typingSpeed = 15;
+      
+      const typeNextCharacter = () => {
+        if (currentIndex < text.length) {
+          setDisplayedText(text.substring(0, currentIndex + 1));
+          currentIndex++;
+          setTimeout(typeNextCharacter, typingSpeed);
+        } else {
+          setIsTyping(false);
+        }
+      };
+      
+      typeNextCharacter();
+    };
+
+    if (isTyping && displayedText === '') {
+      setTimeout(startTypingAnimation, 100);
+    }
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+          
+          <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
+              <h2 className="text-2xl font-bold text-gray-900">Your Skills Analysis</h2>
+              <p className="text-sm text-gray-600 mt-1">AI-powered recommendations for your learning path</p>
+            </div>
+
+            <div className="px-6 py-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <h3 className="text-sm font-medium text-blue-900">Analysis Generated</h3>
+                    <div className="mt-2 text-sm text-blue-800 whitespace-pre-line">
+                      {displayedText}
+                      {isTyping && <span className="inline-block w-1 h-4 ml-1 bg-blue-600 animate-pulse"></span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={onClose}
+                  disabled={isTyping}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isTyping ? 'Analyzing...' : 'Get Started'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -89,7 +344,13 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
           `}</style>
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
             <h2 className="text-2xl font-bold text-gray-900">Welcome to SkillVerse</h2>
-            <p className="text-sm text-gray-600 mt-1">Help us personalize your learning experience</p>
+            <p className="text-sm text-gray-600 mt-1">
+              {step === 1 ? 'Help us personalize your learning experience' : 'Answer 10 questions to assess your skills'}
+            </p>
+            <div className="mt-3 flex items-center space-x-2">
+              <div className={`h-2 flex-1 rounded-full ${step >= 1 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+              <div className={`h-2 flex-1 rounded-full ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+            </div>
           </div>
 
           <div className="px-6 py-6">
@@ -99,209 +360,317 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  What language do you use? (Select all that apply)
-                </label>
-                <div className="flex space-x-6">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.primaryLanguage.includes('java')}
-                      onChange={() => handleMultiSelect('primaryLanguage', 'java')}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">Java</span>
+            {step === 1 && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    What language do you use? (Select all that apply)
                   </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.primaryLanguage.includes('python')}
-                      onChange={() => handleMultiSelect('primaryLanguage', 'python')}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">Python</span>
-                  </label>
+                  <div className="flex space-x-6">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.primaryLanguage.includes('java')}
+                        onChange={() => handleMultiSelect('primaryLanguage', 'java')}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Java</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.primaryLanguage.includes('python')}
+                        onChange={() => handleMultiSelect('primaryLanguage', 'python')}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Python</span>
+                    </label>
+                  </div>
+
+                  {formData.primaryLanguage.includes('java') && (
+                    <div className="mt-6 px-8 pb-6 border-b border-gray-200">
+                      <label className="block text-sm font-semibold text-gray-900 mb-4">
+                        Java expertise level
+                      </label>
+                      <div className="relative">
+                        <div className="relative px-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="4"
+                            step="1"
+                            value={['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.javaExpertise) - 1}
+                            onChange={(e) => {
+                              const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
+                              handleInputChange('javaExpertise', levels[parseInt(e.target.value)]);
+                            }}
+                            className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer java-slider"
+                            style={{
+                              WebkitAppearance: 'none',
+                            }}
+                          />
+                        </div>
+                        <style>{`
+                          .java-slider::-webkit-slider-thumb {
+                            -webkit-appearance: none;
+                            appearance: none;
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 50%;
+                            background: #3b82f6;
+                            cursor: pointer;
+                            border: 2px solid white;
+                            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                            margin-top: -8.5px;
+                          }
+                          .java-slider::-moz-range-thumb {
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 50%;
+                            background: #3b82f6;
+                            cursor: pointer;
+                            border: 2px solid white;
+                            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                          }
+                        `}</style>
+                        <div className="relative mt-3 px-2">
+                          <div className="absolute left-0 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.javaExpertise === 'no-experience' ? 'font-medium text-gray-900' : ''}>No experience</span>
+                          </div>
+                          <div className="absolute left-1/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.javaExpertise === 'beginner' ? 'font-medium text-gray-900' : ''}>Beginner</span>
+                          </div>
+                          <div className="absolute left-1/2 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.javaExpertise === 'intermediate' ? 'font-medium text-gray-900' : ''}>Intermediate</span>
+                          </div>
+                          <div className="absolute left-3/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.javaExpertise === 'advanced' ? 'font-medium text-gray-900' : ''}>Advanced</span>
+                          </div>
+                          <div className="absolute right-0 text-xs text-gray-500" style={{ transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.javaExpertise === 'expert' ? 'font-medium text-gray-900' : ''}>Expert</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.primaryLanguage.includes('python') && (
+                    <div className="mt-6 px-8 pb-6">
+                      <label className="block text-sm font-semibold text-gray-900 mb-4">
+                        Python expertise level
+                      </label>
+                      <div className="relative">
+                        <div className="relative px-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="4"
+                            step="1"
+                            value={['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.pythonExpertise) - 1}
+                            onChange={(e) => {
+                              const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
+                              handleInputChange('pythonExpertise', levels[parseInt(e.target.value)]);
+                            }}
+                            className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer python-slider"
+                            style={{
+                              WebkitAppearance: 'none',
+                            }}
+                          />
+                        </div>
+                        <style>{`
+                          .python-slider::-webkit-slider-thumb {
+                            -webkit-appearance: none;
+                            appearance: none;
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 50%;
+                            background: #eab308;
+                            cursor: pointer;
+                            border: 2px solid white;
+                            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                            margin-top: -8.5px;
+                          }
+                          .python-slider::-moz-range-thumb {
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 50%;
+                            background: #eab308;
+                            cursor: pointer;
+                            border: 2px solid white;
+                            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                          }
+                        `}</style>
+                        <div className="relative mt-3 px-2">
+                          <div className="absolute left-0 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.pythonExpertise === 'no-experience' ? 'font-medium text-gray-900' : ''}>No experience</span>
+                          </div>
+                          <div className="absolute left-1/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.pythonExpertise === 'beginner' ? 'font-medium text-gray-900' : ''}>Beginner</span>
+                          </div>
+                          <div className="absolute left-1/2 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.pythonExpertise === 'intermediate' ? 'font-medium text-gray-900' : ''}>Intermediate</span>
+                          </div>
+                          <div className="absolute left-3/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.pythonExpertise === 'advanced' ? 'font-medium text-gray-900' : ''}>Advanced</span>
+                          </div>
+                          <div className="absolute right-0 text-xs text-gray-500" style={{ transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>
+                            <span className={formData.pythonExpertise === 'expert' ? 'font-medium text-gray-900' : ''}>Expert</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    What are you interested in learning? *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.courseInterest}
+                    onChange={(e) => handleInputChange('courseInterest', e.target.value)}
+                    placeholder="e.g., Web Development, Mobile Apps, 'diko pa alam', or any language (Answer in any language you're comfortable with)"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    What do you want to achieve with programming? *
+                  </label>
+                  <textarea
+                    value={formData.learningGoals}
+                    onChange={(e) => handleInputChange('learningGoals', e.target.value)}
+                    placeholder="e.g., Build a website, Gumawa ng apps, 'wala pa kong idea', or any language"
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-4 border-t">
+                  <button
+                    onClick={handleNextStep}
+                    disabled={isValidating}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isValidating ? 'Validating...' : 'Next'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-8">
                 {formData.primaryLanguage.includes('java') && (
-                  <div className="mt-6 px-8 pb-6 border-b border-gray-200">
-                    <label className="block text-sm font-semibold text-gray-900 mb-4">
-                      Java expertise level
-                    </label>
-                    <div className="relative">
-                      <div className="relative px-2">
-                        <input
-                          type="range"
-                          min="0"
-                          max="4"
-                          step="1"
-                          value={['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.javaExpertise) - 1}
-                          onChange={(e) => {
-                            const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
-                            handleInputChange('javaExpertise', levels[parseInt(e.target.value)]);
-                          }}
-                          className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer java-slider"
-                          style={{
-                            WebkitAppearance: 'none',
-                          }}
-                          required
-                        />
-                      </div>
-                      <style>{`
-                        .java-slider {
-                          padding: 0;
-                          margin: 0;
-                          width: 100%;
-                        }
-                        .java-slider::-webkit-slider-thumb {
-                          -webkit-appearance: none;
-                          appearance: none;
-                          width: 18px;
-                          height: 18px;
-                          border-radius: 50%;
-                          background: #3b82f6;
-                          cursor: pointer;
-                          border: 2px solid white;
-                          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                          margin-top: -8.5px;
-                        }
-                        .java-slider::-moz-range-thumb {
-                          width: 18px;
-                          height: 18px;
-                          border-radius: 50%;
-                          background: #3b82f6;
-                          cursor: pointer;
-                          border: 2px solid white;
-                          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                        }
-                        .java-slider::-webkit-slider-runnable-track {
-                          width: 100%;
-                          height: 1px;
-                          cursor: pointer;
-                        }
-                        .java-slider::-moz-range-track {
-                          width: 100%;
-                          height: 1px;
-                          cursor: pointer;
-                        }
-                      `}</style>
-                      <div className="relative mt-3 px-2">
-                        <div className="absolute left-0 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.javaExpertise === 'no-experience' ? 'font-medium text-gray-900' : ''}>No experience</span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm mr-3">Java</span>
+                      Knowledge Assessment
+                    </h3>
+                    <div className="space-y-6">
+                      {javaQuestions.map((question, index) => (
+                        <div key={question.id} className={`border rounded-lg p-4 ${
+                          unansweredQuestions.java.includes(index) ? 'border-red-500 border-2' : 'border-gray-200'
+                        }`}>
+                          <div className="mb-3">
+                            <p className="text-sm font-medium text-gray-900">
+                              {index + 1}. {question.question}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            {question.options.map((option, optionIndex) => (
+                              <label
+                                key={optionIndex}
+                                className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
+                                  javaAnswers[index] === optionIndex
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`java-q${index}`}
+                                  checked={javaAnswers[index] === optionIndex}
+                                  onChange={() => handleQuestionAnswer('java', index, optionIndex)}
+                                  className="w-4 h-4 text-blue-600"
+                                />
+                                <span className="ml-3 text-sm text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                        <div className="absolute left-1/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.javaExpertise === 'beginner' ? 'font-medium text-gray-900' : ''}>Beginner</span>
-                        </div>
-                        <div className="absolute left-1/2 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.javaExpertise === 'intermediate' ? 'font-medium text-gray-900' : ''}>Intermediate</span>
-                        </div>
-                        <div className="absolute left-3/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.javaExpertise === 'advanced' ? 'font-medium text-gray-900' : ''}>Advanced</span>
-                        </div>
-                        <div className="absolute right-0 text-xs text-gray-500" style={{ transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.javaExpertise === 'expert' ? 'font-medium text-gray-900' : ''}>Expert</span>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 )}
 
                 {formData.primaryLanguage.includes('python') && (
-                  <div className="mt-6 px-8 pb-6">
-                    <label className="block text-sm font-semibold text-gray-900 mb-4">
-                      Python expertise level
-                    </label>
-                    <div className="relative">
-                      <div className="relative px-2">
-                        <input
-                          type="range"
-                          min="0"
-                          max="4"
-                          step="1"
-                          value={['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.pythonExpertise) - 1}
-                          onChange={(e) => {
-                            const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
-                            handleInputChange('pythonExpertise', levels[parseInt(e.target.value)]);
-                          }}
-                          className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer python-slider"
-                          style={{
-                            WebkitAppearance: 'none',
-                          }}
-                          required
-                        />
-                      </div>
-                      <style>{`
-                        .python-slider {
-                          padding: 0;
-                          margin: 0;
-                          width: 100%;
-                        }
-                        .python-slider::-webkit-slider-thumb {
-                          -webkit-appearance: none;
-                          appearance: none;
-                          width: 18px;
-                          height: 18px;
-                          border-radius: 50%;
-                          background: #eab308;
-                          cursor: pointer;
-                          border: 2px solid white;
-                          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                          margin-top: -8.5px;
-                        }
-                        .python-slider::-moz-range-thumb {
-                          width: 18px;
-                          height: 18px;
-                          border-radius: 50%;
-                          background: #eab308;
-                          cursor: pointer;
-                          border: 2px solid white;
-                          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-                        }
-                        .python-slider::-webkit-slider-runnable-track {
-                          width: 100%;
-                          height: 1px;
-                          cursor: pointer;
-                        }
-                        .python-slider::-moz-range-track {
-                          width: 100%;
-                          height: 1px;
-                          cursor: pointer;
-                        }
-                      `}</style>
-                      <div className="relative mt-3 px-2">
-                        <div className="absolute left-0 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.pythonExpertise === 'no-experience' ? 'font-medium text-gray-900' : ''}>No experience</span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm mr-3">Python</span>
+                      Knowledge Assessment
+                    </h3>
+                    <div className="space-y-6">
+                      {pythonQuestions.map((question, index) => (
+                        <div key={question.id} className={`border rounded-lg p-4 ${
+                          unansweredQuestions.python.includes(index) ? 'border-red-500 border-2' : 'border-gray-200'
+                        }`}>
+                          <div className="mb-3">
+                            <p className="text-sm font-medium text-gray-900">
+                              {index + 1}. {question.question}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            {question.options.map((option, optionIndex) => (
+                              <label
+                                key={optionIndex}
+                                className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
+                                  pythonAnswers[index] === optionIndex
+                                    ? 'border-yellow-500 bg-yellow-50'
+                                    : 'border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`python-q${index}`}
+                                  checked={pythonAnswers[index] === optionIndex}
+                                  onChange={() => handleQuestionAnswer('python', index, optionIndex)}
+                                  className="w-4 h-4 text-yellow-600"
+                                />
+                                <span className="ml-3 text-sm text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                        <div className="absolute left-1/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.pythonExpertise === 'beginner' ? 'font-medium text-gray-900' : ''}>Beginner</span>
-                        </div>
-                        <div className="absolute left-1/2 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.pythonExpertise === 'intermediate' ? 'font-medium text-gray-900' : ''}>Intermediate</span>
-                        </div>
-                        <div className="absolute left-3/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.pythonExpertise === 'advanced' ? 'font-medium text-gray-900' : ''}>Advanced</span>
-                        </div>
-                        <div className="absolute right-0 text-xs text-gray-500" style={{ transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>
-                          <span className={formData.pythonExpertise === 'expert' ? 'font-medium text-gray-900' : ''}>Expert</span>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 )}
-              </div>
 
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 pt-6 pb-2 -mx-6 px-6 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Survey'}
-                </button>
+                {validationError && (
+                  <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-red-600 text-sm font-medium">{validationError}</p>
+                  </div>
+                )}
+
+                <div className="flex justify-between pt-4 border-t">
+                  <button
+                    onClick={() => setStep(1)}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit'}
+                  </button>
+                </div>
               </div>
-            </form>
+            )}
           </div>
         </div>
       </div>

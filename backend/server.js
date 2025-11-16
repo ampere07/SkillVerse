@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
@@ -11,9 +11,9 @@ import surveyRoutes from './routes/survey.js';
 import coursesRoutes from './routes/courses.js';
 import classroomRoutes from './routes/classroom.js';
 import assignmentRoutes from './routes/assignment.js';
+import miniProjectsRoutes from './routes/miniProjects.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
-
-dotenv.config();
+import { initializeCronJobs } from './services/cronService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,6 +35,7 @@ app.use('/api/survey', surveyRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/classrooms', classroomRoutes);
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api/mini-projects', miniProjectsRoutes);
 
 setupCompilerSocket(io);
 
@@ -62,4 +63,6 @@ httpServer.listen(PORT, async () => {
   console.log(`WebSocket server running`);
   
   await connectDB();
+  
+  initializeCronJobs();
 });

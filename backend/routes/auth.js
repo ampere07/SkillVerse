@@ -2,9 +2,18 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import MiniProject from '../models/MiniProject.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+const toTitleCase = (str) => {
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
 
 router.post('/register', async (req, res) => {
   try {
@@ -55,16 +64,35 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
     console.log('Password hashed successfully');
 
+    const formattedName = toTitleCase(name.trim());
+
     const user = new User({
       email: email.toLowerCase(),
       password: hashedPassword,
       role,
-      name: name.trim()
+      name: formattedName
     });
 
     console.log('Saving user to database...');
     await user.save();
     console.log('User saved successfully');
+
+    if (role === 'student') {
+      console.log('Creating mini project document for student...');
+      const miniProject = new MiniProject({
+        userId: user._id,
+        completedTasks: [],
+        availableProjects: [],
+        weekStartDate: null,
+        lastWeekCompletedCount: 0,
+        generationEnabled: false,
+        lastGenerationDate: null,
+        currentWeekNumber: 0,
+        weeklyProjectHistory: []
+      });
+      await miniProject.save();
+      console.log('Mini project document created successfully (awaiting survey completion)');
+    }
 
     if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET is not defined in environment variables');
