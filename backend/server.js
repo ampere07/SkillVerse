@@ -9,6 +9,8 @@ import authRoutes from './routes/auth.js';
 import compilerRoutes from './routes/compiler.js';
 import surveyRoutes from './routes/survey.js';
 import coursesRoutes from './routes/courses.js';
+import classroomRoutes from './routes/classroom.js';
+import assignmentRoutes from './routes/assignment.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
 
 dotenv.config();
@@ -31,6 +33,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/compiler', compilerRoutes);
 app.use('/api/survey', surveyRoutes);
 app.use('/api/courses', coursesRoutes);
+app.use('/api/classrooms', classroomRoutes);
+app.use('/api/assignments', assignmentRoutes);
 
 setupCompilerSocket(io);
 
