@@ -13,17 +13,57 @@ const surveySchema = new mongoose.Schema({
     enum: ['java', 'python'],
     required: true
   }],
+  courseInterest: {
+    type: String,
+    required: true
+  },
+  learningGoals: {
+    type: String,
+    required: true
+  },
   javaExpertise: {
     type: String,
-    enum: ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert']
+    enum: ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'],
+    required: false,
+    default: undefined
   },
   pythonExpertise: {
     type: String,
-    enum: ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert']
+    enum: ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'],
+    required: false,
+    default: undefined
+  },
+  javaQuestions: {
+    answers: [Number],
+    score: {
+      total: Number,
+      easy: Number,
+      medium: Number,
+      hard: Number,
+      percentage: Number
+    }
+  },
+  pythonQuestions: {
+    answers: [Number],
+    score: {
+      total: Number,
+      easy: Number,
+      medium: Number,
+      hard: Number,
+      percentage: Number
+    }
   },
   completed: {
     type: Boolean,
     default: true
+  },
+  aiAnalysis: {
+    type: String,
+    default: null
+  },
+  analysisGeneratedAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true
