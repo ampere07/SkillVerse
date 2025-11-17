@@ -18,6 +18,7 @@ import {
 import { useState } from 'react';
 import Compiler from '../pages/Compiler';
 import MyCourses from '../pages/MyCourses';
+import TeacherClassrooms from '../pages/TeacherClassrooms';
 import MiniProjects from '../pages/MiniProjects';
 
 interface NavItem {
@@ -66,8 +67,8 @@ const navigationItems: NavItem[] = [
   },
   {
     icon: GraduationCap,
-    label: 'Manage Courses',
-    href: '/manage-courses',
+    label: 'My Classrooms',
+    href: '/classrooms',
     roles: ['teacher']
   },
   {
@@ -211,6 +212,16 @@ export default function Dashboard() {
                 <Menu className="w-5 h-5" />
               </button>
               <MyCourses />
+            </>
+          ) : activeNav === '/classrooms' ? (
+            <>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <TeacherClassrooms />
             </>
           ) : activeNav === '/mini-projects' ? (
             <>
