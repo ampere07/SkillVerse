@@ -10,7 +10,7 @@ export const generateWeeklyProjects = async (userId) => {
   try {
     if (!HUGGINGFACE_API_KEY || !hf) {
       console.error('Hugging Face API key is not configured');
-      return [];
+      return generateFallbackProjects(userId);
     }
 
     const survey = await Survey.findOne({ userId }).sort({ createdAt: -1 });
@@ -37,26 +37,35 @@ export const generateWeeklyProjects = async (userId) => {
     
     const prompt = constructPersonalizedPrompt(survey);
     
-    const response = await hf.chatCompletion({
-      model: MODEL_NAME,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 3000,
-      temperature: 0.9
-    });
+    try {
+      const response = await hf.chatCompletion({
+        model: MODEL_NAME,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 3000,
+        temperature: 0.9
+      });
 
-    const projectsText = response.choices[0].message.content;
-    const projects = parseProjectsFromAI(projectsText);
+      const projectsText = response.choices[0].message.content;
+      const projects = parseProjectsFromAI(projectsText);
 
-    if (projects.length < 6) {
-      console.error(`Only generated ${projects.length} projects, expected 6`);
-      return projects;
+      if (projects.length < 6) {
+        console.error(`Only generated ${projects.length} projects, expected 6`);
+        return projects.length > 0 ? projects : generateFallbackProjects(userId);
+      }
+
+      console.log(`[ProjectGen] Successfully generated ${projects.length} personalized projects`);
+      return projects.slice(0, 6);
+    } catch (apiError) {
+      console.error('[ProjectGen] API Error:', apiError.message);
+      if (apiError.httpResponse?.status === 429 || apiError.message.includes('HTTP error')) {
+        console.log('[ProjectGen] Using fallback projects due to API unavailability');
+        return generateFallbackProjects(userId);
+      }
+      throw apiError;
     }
-
-    console.log(`[ProjectGen] Successfully generated ${projects.length} personalized projects`);
-    return projects.slice(0, 6);
   } catch (error) {
     console.error('Generate projects error:', error);
-    return [];
+    return generateFallbackProjects(userId);
   }
 };
 
@@ -102,6 +111,9 @@ Create: "Student Record Manager - Learn collections which databases use internal
 Instead of: "React component" (impossible - needs React)
 Create: "Component State Manager - Learn objects and state which React uses"
 
+Instead of: "Log Viewer reading from file" (impossible - needs file system)
+Create: "Log Entry Manager - Learn arrays and data structures used in logging systems"
+
 PERSONALIZATION REQUIREMENTS:
 1. Each project teaches a DIFFERENT programming concept
 2. Each concept is RELEVANT to "${courseInterest}"
@@ -127,6 +139,9 @@ TECHNICAL CONSTRAINTS:
 - NO DATABASES - Use arrays/lists to store data
 - NO GUI - Text-based console only
 - NO EXTERNAL LIBRARIES - Use standard library only
+- NO FILE I/O - No reading/writing files (use in-memory data only)
+- NO FILE UPLOAD/DOWNLOAD - All data must be entered via console
+- NO EXTERNAL FILES - Everything must be in one code file
 
 CRITICAL SKILL LEVEL REQUIREMENT:
 Student Skill Level: ${skillLevel}
@@ -177,6 +192,35 @@ Status: 200 OK
 Timestamp: 2025-11-15 10:30:45
 Data retrieved successfully
 
+EXAMPLE FOR DATA ANALYTICS STUDENT:
+
+PROJECT 1:
+Title: Collections - Student Records Manager
+Description: This project teaches Collections which are essential for Data Analytics. In data systems, collections like ArrayList and HashMap are used to store and manage records efficiently. You will create a console program that manages student records using collections. This helps you understand how databases and analytics tools organize data internally.
+Language: Java
+Requirements:
+- Use ArrayList to store multiple student records
+- Use HashMap to index students by ID for fast lookup
+- Implement add, search, and display operations
+- Calculate statistics (average grade, highest score)
+- All data entered through console (no file reading)
+Sample Output:
+=== Student Records Manager ===
+1. Add student
+2. Search by ID
+3. Display all
+4. Calculate average grade
+5. Exit
+Enter choice: 1
+Enter student ID: 1001
+Enter name: Juan Dela Cruz
+Enter grade: 85
+Student added successfully!
+
+Enter choice: 4
+Average grade: 85.0
+Total students: 1
+
 IMPORTANT REMINDERS:
 - Connect EVERY project to "${courseInterest}"
 - Teach programming concepts that matter for their goal
@@ -186,6 +230,9 @@ IMPORTANT REMINDERS:
 - Show realistic console interaction
 - All at ${skillLevel} level
 - DO NOT use asterisks ** in titles
+- NO FILE I/O OPERATIONS - Use in-memory data only (arrays, lists, maps)
+- NO FILE READING/WRITING - All data via Scanner/input()
+- Users enter data through console, not files
 
 Generate 6 CONCEPT-FOCUSED projects for ${courseInterest}:`;
 };
@@ -200,21 +247,21 @@ const getConceptsForGoal = (interest, goals, skillLevel) => {
 - String manipulation (used for processing form inputs)
 - Loops and conditionals (used for validation logic)
 - Methods and functions (used to organize web app code)
-- Basic file handling (used for reading configuration files)`;
+- Simple console menus (simulating user interfaces)`;
     } else if (skillLevel === 'Intermediate') {
       return `- Inheritance (used in Spring MVC controllers and request handlers)
 - Interfaces and Polymorphism (used in service layers and dependency injection)
 - Collections and Maps (used for session management and caching)
 - Exception handling (used for error handling in web apps)
-- File I/O (used for logging and reading properties files)
-- String parsing and validation (used for processing HTTP requests)`;
+- String parsing and validation (used for processing HTTP requests)
+- Data structures for routing (HashMaps for URL mapping)`;
     } else {
       return `- Design Patterns (Factory, Singleton used in Spring framework)
 - Advanced OOP (Abstract classes used in framework design)
 - Data structures (HashMaps used for routing and middleware)
-- Stream processing (used in RESTful API data transformations)
-- Concurrency basics (used in handling multiple web requests)
-- Algorithm optimization (used in web app performance tuning)`;
+- Algorithm optimization (used in web app performance tuning)
+- State management patterns (used in web applications)
+- Advanced collections (used for caching and session management)`;
     }
   }
   
@@ -247,24 +294,24 @@ const getConceptsForGoal = (interest, goals, skillLevel) => {
     if (skillLevel === 'Beginner') {
       return `- Arrays and Lists (foundation for data storage)
 - Loops (used for processing multiple records)
-- Basic file reading (used for importing data)
-- String parsing (used for CSV and data formats)
+- String parsing (used for data input and formatting)
 - Variables (used for data calculations)
-- Simple sorting (used for organizing data)`;
+- Simple sorting (used for organizing data)
+- Console input (simulating data entry)`;
     } else if (skillLevel === 'Intermediate') {
       return `- Collections (ArrayList, HashMap used in data management)
-- File I/O (reading and writing CSV, JSON data files)
 - Sorting algorithms (used for data organization)
 - Search algorithms (used for querying data)
 - Data validation (used for ensuring data quality)
-- Aggregation logic (used for calculating statistics)`;
+- Aggregation logic (used for calculating statistics)
+- Data structures for indexing (used in databases)`;
     } else {
       return `- Advanced data structures (trees, graphs for complex queries)
 - Algorithm optimization (efficient searching and sorting)
-- Data parsing (handling JSON, XML, CSV formats)
-- Stream processing (processing large datasets efficiently)
 - Indexing algorithms (used in database internals)
-- Query optimization patterns`;
+- Query optimization patterns
+- Advanced collections (used for data caching)
+- Statistical algorithms (used in analytics)`;
     }
   }
   
@@ -305,16 +352,16 @@ const getConceptsForGoal = (interest, goals, skillLevel) => {
       return `- Object-oriented design (used for activities and fragments)
 - State management (used for app lifecycle)
 - Event handling (used for user interactions)
-- Data persistence (file I/O for app data)
 - Collections (used for lists and adapters)
-- Validation patterns (used in forms)`;
+- Validation patterns (used in forms)
+- Data structures for UI (used in mobile apps)`;
     } else {
       return `- Design patterns (MVC, MVVM used in mobile apps)
 - Advanced state management (handling complex app states)
 - Data structures for efficient UI (RecyclerView patterns)
-- Concurrency (async operations in mobile apps)
 - Performance optimization (efficient data loading)
-- Architecture patterns (clean architecture)`;
+- Architecture patterns (clean architecture)
+- Advanced collections (used for caching)`;
     }
   }
   
@@ -333,21 +380,21 @@ const getConcepts = (skillLevel) => {
 - Conditionals (if-else, switch)
 - Arrays and basic collections
 - Functions and methods
-- Basic file operations`;
+- Console input/output`;
   } else if (skillLevel === 'Intermediate') {
     return `- Inheritance and polymorphism
 - Interfaces and abstract classes
 - Collections (List, Set, Map)
 - Exception handling
-- File I/O operations
-- Sorting and searching algorithms`;
+- Sorting and searching algorithms
+- String manipulation and parsing`;
   } else {
     return `- Design patterns (Factory, Singleton, Observer)
 - Advanced OOP (abstraction, encapsulation)
 - Complex data structures (trees, graphs, heaps)
 - Algorithm optimization
 - Recursion and dynamic programming
-- Stream processing and functional concepts`;
+- Advanced collections and generics`;
   }
 };
 

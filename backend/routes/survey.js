@@ -30,7 +30,11 @@ router.post('/validate-inputs', async (req, res) => {
     }
   } catch (error) {
     console.error('Validation error:', error);
-    res.status(200).json({ valid: true });
+    res.status(500).json({ 
+      valid: false,
+      message: 'AI validation service failed. Please try again.',
+      error: error.message
+    });
   }
 });
 

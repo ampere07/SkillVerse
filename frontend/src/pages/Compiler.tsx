@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Menu, BookOpen, X, Square, Lightbulb, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Play, Menu, BookOpen, X, Square, Lightbulb, AlertCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import {
   JAVA_SUGGESTIONS,
@@ -80,7 +80,20 @@ const highlightCode = (code: string, language: string, errors: CompilationError[
   ));
 };
 
-export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
+interface ProjectDetails {
+  title: string;
+  description: string;
+  language: string;
+  requirements: string;
+}
+
+interface CompilerProps {
+  onMenuClick: () => void;
+  projectDetails?: ProjectDetails;
+  onBack?: () => void;
+}
+
+export default function Compiler({ onMenuClick, projectDetails, onBack }: CompilerProps) {
   const [language, setLanguage] = useState('java');
   const [code, setCode] = useState(DEFAULT_CODE.java);
   const [output, setOutput] = useState('');
@@ -99,12 +112,67 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
   const [missingImports, setMissingImports] = useState<MissingImport[]>([]);
   const [compilationErrors, setCompilationErrors] = useState<CompilationError[]>([]);
   const [lineSuggestions, setLineSuggestions] = useState<Map<number, { suggestions: Suggestion[], cursorPos: { top: number, left: number } }>>(new Map());
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [isGrading, setIsGrading] = useState(false);
+  const [gradingResult, setGradingResult] = useState<any>(null);
+  const [showGradingModal, setShowGradingModal] = useState(false);
+  const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState(false);
+  const [highlightedBrackets, setHighlightedBrackets] = useState<{start: number, end: number} | null>(null);
+  const [typedFeedback, setTypedFeedback] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [aiMessages, setAiMessages] = useState<Array<{type: 'ai' | 'user', text: string}>>([]);
+  const [isAiThinking, setIsAiThinking] = useState(false);
+  const [lastHintTime, setLastHintTime] = useState<number>(0);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const consoleRef = useRef<HTMLDivElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const bracketHighlightRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (projectDetails) {
+      const projectLang = projectDetails.language.toLowerCase();
+      setLanguage(projectLang);
+      loadSavedProgress();
+      
+      // Send initial AI greeting
+      setTimeout(() => {
+        sendAiGreeting();
+      }, 1000);
+    }
+  }, [projectDetails]);
+
+  const loadSavedProgress = async () => {
+    if (!projectDetails) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/mini-projects/project-progress/${encodeURIComponent(projectDetails.title)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = await response.json();
+      if (data.found && data.task.codeBase) {
+        setCode(data.task.codeBase);
+      } else {
+        const projectLang = projectDetails.language.toLowerCase();
+        setCode(DEFAULT_CODE[projectLang] || DEFAULT_CODE.java);
+      }
+    } catch (error) {
+      const projectLang = projectDetails.language.toLowerCase();
+      setCode(DEFAULT_CODE[projectLang] || DEFAULT_CODE.java);
+    }
+  };
 
   useEffect(() => {
     const lines = code.split('\n').length;
@@ -140,6 +208,14 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
 
     newSocket.on('execution-complete', () => {
       setIsRunning(false);
+      
+      // Restore AI assistant after execution completes
+      if (projectDetails) {
+        setTimeout(() => {
+          setAiMessages([{ type: 'ai', text: 'Great! Your code finished running. I\'m here if you need help with anything else!' }]);
+          setLastHintTime(Date.now());
+        }, 500);
+      }
     });
 
     newSocket.on('compilation-error', (data: { errors: CompilationError[] }) => {
@@ -152,6 +228,68 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
       newSocket.close();
     };
   }, []);
+
+  // AI Hint Timer - runs every 30 seconds when not running code
+  useEffect(() => {
+    if (!projectDetails || isRunning) return;
+    
+    const interval = setInterval(() => {
+      const now = Date.now();
+      if (now - lastHintTime >= 30000) {
+        analyzeCodeAndGiveHint();
+        setLastHintTime(now);
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [projectDetails, isRunning, code, lastHintTime]);
+
+  const sendAiGreeting = () => {
+    const greeting = `Hello! I'm your AI coding assistant. I'll analyze your code and provide hints to help you complete the project. Let me know if you need help!`;
+    setAiMessages([{ type: 'ai', text: greeting }]);
+  };
+
+  const analyzeCodeAndGiveHint = async () => {
+    if (!projectDetails || isRunning || isAiThinking) return;
+    
+    setIsAiThinking(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/compiler/analyze-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          code,
+          projectTitle: projectDetails.title,
+          requirements: projectDetails.requirements,
+          language: projectDetails.language
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.hint) {
+        setAiMessages(prev => [...prev, { type: 'ai', text: data.hint }]);
+        
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          if (consoleRef.current) {
+            consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.error('AI analysis error:', error);
+    } finally {
+      setIsAiThinking(false);
+    }
+  };
 
   useEffect(() => {
     if (isRunning && consoleRef.current) {
@@ -198,6 +336,11 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
     setCompilationErrors([]);
     setIsRunning(true);
     
+    // Clear AI messages when running code
+    if (projectDetails) {
+      setAiMessages([]);
+    }
+    
     if (language === 'java') {
       socket.emit('compile-and-run', { code, sessionId });
     } else if (language === 'python') {
@@ -213,6 +356,14 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
         socket.emit('kill-process-python', { sessionId });
       }
       setIsRunning(false);
+      
+      // Restore AI assistant after stopping
+      if (projectDetails) {
+        setTimeout(() => {
+          setAiMessages([{ type: 'ai', text: 'Code execution stopped. I\'m back to help! Ask me anything or I\'ll analyze your code in 30 seconds.' }]);
+          setLastHintTime(Date.now());
+        }, 500);
+      }
     }
   };
 
@@ -312,6 +463,9 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
     const newCode = e.target.value;
     setCode(newCode);
     
+    // Clear bracket highlighting when typing
+    setHighlightedBrackets(null);
+    
     const cursorPos = e.target.selectionStart;
     const textBeforeCursor = newCode.substring(0, cursorPos);
     const lines = textBeforeCursor.split('\n');
@@ -373,6 +527,11 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!textareaRef.current) return;
+
+    // Clear bracket highlighting on any key press
+    if (highlightedBrackets) {
+      setHighlightedBrackets(null);
+    }
 
     const textarea = textareaRef.current;
     const cursorPos = textarea.selectionStart;
@@ -655,26 +814,244 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
       lineNumbersRef.current.scrollTop = scrollTop;
       highlightRef.current.scrollTop = scrollTop;
       highlightRef.current.scrollLeft = scrollLeft;
+      
+      if (bracketHighlightRef.current) {
+        bracketHighlightRef.current.scrollTop = scrollTop;
+        bracketHighlightRef.current.scrollLeft = scrollLeft;
+      }
+    }
+  };
+
+  const findMatchingBracket = (text: string, clickPos: number): {start: number, end: number} | null => {
+    const char = text[clickPos];
+    const bracketPairs: Record<string, string> = {
+      '{': '}',
+      '}': '{',
+      '[': ']',
+      ']': '[',
+      '(': ')',
+      ')': '('
+    };
+
+    if (!bracketPairs[char]) return null;
+
+    const isOpening = ['{', '[', '('].includes(char);
+    const matchChar = bracketPairs[char];
+    const direction = isOpening ? 1 : -1;
+    let count = 1;
+    let pos = clickPos + direction;
+
+    while (pos >= 0 && pos < text.length) {
+      const currentChar = text[pos];
+      
+      if (currentChar === char) {
+        count++;
+      } else if (currentChar === matchChar) {
+        count--;
+        if (count === 0) {
+          return isOpening 
+            ? {start: clickPos, end: pos}
+            : {start: pos, end: clickPos};
+        }
+      }
+      
+      pos += direction;
+    }
+
+    return null;
+  };
+
+  const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    if (!textareaRef.current) return;
+
+    const clickPos = textareaRef.current.selectionStart;
+    const matched = findMatchingBracket(code, clickPos);
+    
+    setHighlightedBrackets(matched);
+  };
+
+  const handleSaveProgress = async () => {
+    if (!projectDetails || isSaving) return;
+
+    setIsSaving(true);
+    setSaveMessage('');
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setSaveMessage('Error: Not authenticated');
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/save-progress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          projectTitle: projectDetails.title,
+          codeBase: code
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSaveMessage('Progress saved successfully');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage(data.message || 'Error saving progress');
+      }
+    } catch (error) {
+      setSaveMessage('Error saving progress');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmitProject = async () => {
+    if (!projectDetails || isSaving || isGrading) return;
+    setShowSubmitConfirmModal(true);
+  };
+
+  const confirmSubmitProject = async () => {
+    setShowSubmitConfirmModal(false);
+    setIsSaving(true);
+    setIsGrading(true);
+    setSaveMessage('Submitting and grading your project...');
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setSaveMessage('Error: Not authenticated');
+        setIsGrading(false);
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/submit-project`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          projectTitle: projectDetails.title,
+          codeBase: code
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setGradingResult(data.gradingResult);
+        setShowGradingModal(true);
+        setSaveMessage('');
+        
+        // Start typing effect
+        setTypedFeedback('');
+        setIsTyping(true);
+        const fullText = data.gradingResult.feedback || '';
+        let currentIndex = 0;
+        
+        const typingInterval = setInterval(() => {
+          if (currentIndex < fullText.length) {
+            setTypedFeedback(fullText.substring(0, currentIndex + 1));
+            currentIndex++;
+          } else {
+            setIsTyping(false);
+            clearInterval(typingInterval);
+          }
+        }, 20);
+      } else {
+        setSaveMessage(data.message || 'Error submitting project');
+      }
+    } catch (error) {
+      setSaveMessage('Error submitting project');
+    } finally {
+      setIsSaving(false);
+      setIsGrading(false);
     }
   };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      {/* Project Details Banner */}
+      {projectDetails && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex-shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-base font-semibold text-gray-900">{projectDetails.title}</h2>
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                  {projectDetails.language}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">{projectDetails.description}</p>
+              {projectDetails.requirements && (
+                <div className="bg-white border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-1">Requirements:</p>
+                  <div className="text-xs text-gray-600 whitespace-pre-line">
+                    {projectDetails.requirements}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveProgress}
+                disabled={isSaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={handleSubmitProject}
+                disabled={isSaving || isGrading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGrading ? 'Grading...' : isSaving ? 'Submitting...' : 'Submit'}
+              </button>
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex-shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+              )}
+            </div>
+          </div>
+          {saveMessage && (
+            <div className={`mt-2 px-4 py-2 rounded-lg text-sm font-medium ${
+              saveMessage.includes('Error') 
+                ? 'bg-red-100 text-red-700' 
+                : 'bg-green-100 text-green-700'
+            }`}>
+              {saveMessage}
+            </div>
+          )}
+        </div>
+      )}
+      
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <button
-              onClick={onMenuClick}
-              className="lg:hidden text-gray-600 hover:text-gray-900"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+            {!projectDetails && (
+              <button
+                onClick={onMenuClick}
+                className="lg:hidden text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
             <select
               value={language}
               onChange={(e) => handleLanguageChange(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-              disabled={isRunning}
+              className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isRunning || !!projectDetails}
             >
               {LANGUAGE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -840,6 +1217,50 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
                   new Set([...findLinesWithMissingImports(code, missingImports), ...findUnusedImports(code)])
                 )}
               </div>
+              
+              {/* Bracket Matching Highlights */}
+              {highlightedBrackets && (
+                <div
+                  ref={bracketHighlightRef}
+                  className="absolute inset-0 px-4 py-3 text-sm font-mono overflow-hidden whitespace-pre pointer-events-none"
+                  style={{ lineHeight: '24px' }}
+                >
+                  {(() => {
+                    const beforeStart = code.substring(0, highlightedBrackets.start);
+                    const startChar = code[highlightedBrackets.start];
+                    const betweenBrackets = code.substring(highlightedBrackets.start + 1, highlightedBrackets.end);
+                    const endChar = code[highlightedBrackets.end];
+                    const afterEnd = code.substring(highlightedBrackets.end + 1);
+                    
+                    return (
+                      <>
+                        <span style={{ color: 'transparent' }}>{beforeStart}</span>
+                        <span style={{
+                          backgroundColor: '#fbbf24',
+                          color: '#000000',
+                          fontWeight: 'bold',
+                          borderRadius: '2px',
+                          padding: '0 1px'
+                        }}>
+                          {startChar}
+                        </span>
+                        <span style={{ color: 'transparent' }}>{betweenBrackets}</span>
+                        <span style={{
+                          backgroundColor: '#fbbf24',
+                          color: '#000000',
+                          fontWeight: 'bold',
+                          borderRadius: '2px',
+                          padding: '0 1px'
+                        }}>
+                          {endChar}
+                        </span>
+                        <span style={{ color: 'transparent' }}>{afterEnd}</span>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+              
               {/* Input Textarea */}
               <textarea
                 ref={textareaRef}
@@ -848,10 +1269,10 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
                 onKeyDown={handleKeyDown}
                 onKeyUp={handleCursorMove}
                 onScroll={handleScroll}
-                onClick={() => {
+                onClick={(e) => {
+                  handleTextareaClick(e);
                   handleCursorMove();
                   updateCursorPosition();
-                  // Hide suggestions when clicking to a different location
                   setShowSuggestions(false);
                 }}
                 className="absolute inset-0 px-4 py-3 bg-transparent text-sm font-mono text-transparent caret-black resize-none focus:outline-none overflow-auto whitespace-pre"
@@ -908,7 +1329,9 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
         {/* Interactive Console */}
         <div className="flex flex-col bg-gray-900 overflow-hidden h-full">
           <div className="px-4 py-2 bg-gray-800 border-b border-gray-700 flex-shrink-0">
-            <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">Interactive Console</h3>
+            <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
+              {projectDetails && !isRunning ? '🤖 AI Coding Assistant' : 'Interactive Console'}
+            </h3>
           </div>
           
           {/* Console Area */}
@@ -919,14 +1342,139 @@ export default function Compiler({ onMenuClick }: { onMenuClick: () => void }) {
             onKeyDown={handleConsoleKeyDown}
             style={{ cursor: isRunning ? 'text' : 'default' }}
           >
-            <pre className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
-              {output || 'Click "Run Code" to execute your program.\n\nMissing imports are automatically detected!\nWhen the program asks for input, type directly here and press Enter.'}
-              {isRunning && <span className="text-green-400">{currentInput}</span>}
-              {isRunning && <span className="animate-pulse text-green-400">█</span>}
-            </pre>
+            {projectDetails && !isRunning ? (
+              // AI Assistant Mode
+              <div className="space-y-4">
+                {aiMessages.length === 0 ? (
+                  <div className="text-sm text-gray-400 font-mono">
+                    AI Assistant is analyzing your code...
+                  </div>
+                ) : (
+                  aiMessages.map((msg, index) => (
+                    <div key={index} className={`flex ${msg.type === 'ai' ? 'justify-start' : 'justify-end'}`}>
+                      <div className={`max-w-[80%] rounded-lg p-3 ${
+                        msg.type === 'ai' 
+                          ? 'bg-blue-900 text-blue-100' 
+                          : 'bg-gray-700 text-gray-100'
+                      }`}>
+                        <div className="text-xs font-semibold mb-1">
+                          {msg.type === 'ai' ? '🤖 AI Assistant' : 'You'}
+                        </div>
+                        <div className="text-sm font-mono whitespace-pre-wrap">
+                          {msg.text}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {isAiThinking && (
+                  <div className="flex justify-start">
+                    <div className="bg-blue-900 text-blue-100 rounded-lg p-3">
+                      <div className="text-xs font-semibold mb-1">🤖 AI Assistant</div>
+                      <div className="text-sm font-mono">
+                        Analyzing your code<span className="animate-pulse">...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Regular Console Mode
+              <pre className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
+                {output || 'Click "Run Code" to execute your program.\n\nMissing imports are automatically detected!\nWhen the program asks for input, type directly here and press Enter.'}
+                {isRunning && <span className="text-green-400">{currentInput}</span>}
+                {isRunning && <span className="animate-pulse text-green-400">█</span>}
+              </pre>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Submit Confirmation Modal */}
+      {showSubmitConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Confirm Submission</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-700">
+                Are you sure you want to submit this project? The AI will grade your submission and you cannot edit it after submission.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowSubmitConfirmModal(false)}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSubmitProject}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grading Results Modal */}
+      {showGradingModal && gradingResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Grading Results</h2>
+                <button
+                  onClick={() => {
+                    setShowGradingModal(false);
+                    if (onBack) onBack();
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Score Section */}
+              <div className="text-center py-4">
+                <div className="text-6xl font-bold text-black mb-2">
+                  {gradingResult.score}/100
+                </div>
+                <div className="text-lg font-semibold text-gray-600">
+                  {gradingResult.passed ? 'You Passed!' : 'Keep Practicing!'}
+                </div>
+              </div>
+
+              {/* AI Feedback with Typing Effect */}
+              <div className="border border-gray-300 rounded-lg p-6 bg-gray-50">
+                <div className="text-sm text-gray-800 whitespace-pre-line font-mono">
+                  {typedFeedback}
+                  {isTyping && <span className="animate-pulse">|</span>}
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => {
+                  setShowGradingModal(false);
+                  if (onBack) onBack();
+                }}
+                className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+              >
+                Back to Projects
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

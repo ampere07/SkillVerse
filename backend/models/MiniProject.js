@@ -20,9 +20,18 @@ const completedTaskSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  status: {
+    type: String,
+    enum: ['paused', 'submitted', 'completed'],
+    default: 'completed'
+  },
   completedAt: {
     type: Date,
     default: Date.now
+  },
+  lastSavedAt: {
+    type: Date,
+    default: null
   }
 }, { _id: true });
 

@@ -30,7 +30,7 @@ Educational platform for learning Java and Python programming with interactive c
 
 2. **Python** (v3.8 or higher)
    - Download: https://www.python.org/downloads/
-   - **IMPORTANT:** Check "Add Python to PATH" during installation
+   - **IMPORTANT:** Check "Add Python to PATH" during installation sa environmnental variables
 
 3. **Eclipse Temurin JDK** (Java 11 or higher)
    - Download: https://adoptium.net/

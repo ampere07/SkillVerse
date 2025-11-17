@@ -12,7 +12,7 @@ const hf = HUGGINGFACE_API_KEY ? new HfInference(HUGGINGFACE_API_KEY) : null;
 export const validateLearningInputs = async (courseInterest, learningGoals) => {
   try {
     if (!HUGGINGFACE_API_KEY || !hf) {
-      return { valid: true };
+      throw new Error('Hugging Face API key is not configured');
     }
 
     const prompt = `You are validating student responses. Accept ANY language including mixed English-Tagalog (Taglish), shortcuts, and slang.
@@ -75,7 +75,7 @@ Validate now:`;
     };
   } catch (error) {
     console.error('Validation error:', error.message);
-    return { valid: true };
+    throw new Error(`AI validation failed: ${error.message}`);
   }
 };
 
@@ -96,7 +96,15 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
     }
 
     console.log('Starting AI analysis for student skills...');
-    const prompt = constructPrompt(surveyData, fullName);
+    
+    // Check if student is uncertain about their interests
+    const uncertainPhrases = ['dont know', 'diko alam', 'di ko alam', 'wala pa', 'not sure', 'idk', 'dunno', 'hindi ko alam'];
+    const isUncertain = uncertainPhrases.some(phrase => 
+      surveyData.courseInterest.toLowerCase().includes(phrase) || 
+      surveyData.learningGoals.toLowerCase().includes(phrase)
+    );
+    
+    const prompt = constructPrompt(surveyData, fullName, isUncertain);
     
     const response = await hf.chatCompletion({
       model: MODEL_NAME,
@@ -133,7 +141,7 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
   }
 };
 
-const constructPrompt = (surveyData, fullName = 'Student') => {
+const constructPrompt = (surveyData, fullName = 'Student', isUncertain = false) => {
   const { primaryLanguage, courseInterest, learningGoals, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = surveyData;
   
   const languages = primaryLanguage.join(' and ');
@@ -152,6 +160,12 @@ Java Level (Self-Assessment): ${javaLevel}
 Python Level (Self-Assessment): ${pythonLevel}
 
 `;
+
+  if (isUncertain) {
+    prompt += `NOTE: This student is UNSURE about what they want to learn (they said things like "I don't know" or "diko alam"). Do NOT say their interest is "awesome" or treat uncertainty as a valid interest. Instead, acknowledge that it's okay to be unsure and focus on helping them explore.
+
+`;
+  }
 
   if (javaQuestions?.score) {
     const score = javaQuestions.score;
@@ -180,23 +194,24 @@ Python Level (Self-Assessment): ${pythonLevel}
 
 Welcome to SkillVerse!"
 
-This greeting is required as the very first lines. After the greeting, continue with the analysis.
+This greeting is required as the very first lines. After the greeting, continue with ONE SHORT PARAGRAPH.
 
-Write a brief message to the student about their skill level. Talk to them like a friend, not like a teacher.
+Write a friendly, conversational message about their programming skills. Keep it to ONE paragraph only (3-5 sentences maximum).
 
-STRUCTURE (must follow exactly):
+FORMAT (must follow exactly):
 1. FIRST: Start with "Hi ${fullName},\n\nWelcome to SkillVerse!"
-2. Then write about their skill level and what they want to learn
-3. Mention 1-2 things they are good at
-4. Mention 1-2 things they need to practice
-5. End with "Keep practicing!" or similar encouragement
+2. Then write ONE paragraph covering:
+   - Their current skill level in simple terms
+   - What they want to learn
+   - One thing they're doing well
+   - One thing to focus on improving
+   - Brief encouragement
 
-CRITICAL LANGUAGE RULES:
-- Write like you are talking to a 12 year old
-- Use words a middle school student knows
-- If you would not say it in casual conversation, do not write it
-- Maximum 100 words total
-- DO NOT use any markdown formatting (no **, no ##, no ###)
+CRITICAL RULES:
+- Write like talking to a friend, not a formal report
+- ONE paragraph only after the greeting (3-5 sentences)
+- Use simple, everyday words
+- NO markdown formatting (no **, no ##, no ###)
 - Write in plain text only
 
 WORDS YOU MUST NEVER USE:
@@ -208,35 +223,15 @@ WORDS YOU MUST NEVER USE:
 WORDS YOU SHOULD USE:
 ✓ learn, practice, good, need, know, understand, work on
 ✓ build, make, create, help, use, get better at
-✓ basic, simple, hard, easy, important
+✓ basic, simple, important, great, awesome
 
-BAD EXAMPLES (too complex):
-❌ "delve deeper into object-oriented programming concepts"
-❌ "your Java skills will be beneficial as you explore"
-❌ "fundamental for creating web applications"
-❌ "enhance your proficiency in frameworks like Spring Boot"
+Example format:
+"Hi ${fullName},\n\nWelcome to SkillVerse! Based on your answers, you're at a beginner level in Java and want to learn Web Development. That's great! You know the basic syntax which is super important for building web apps. Keep practicing object-oriented programming to make better web systems. You're on the right track!"
 
-GOOD EXAMPLES (simple):
-✓ "learn more about object-oriented programming"
-✓ "your Java skills will help you a lot"
-✓ "important for making web apps"
-✓ "practice using tools like Spring Boot"
+Example for UNCERTAIN student:
+"Hi ${fullName},\n\nWelcome to SkillVerse! No worries if you're still figuring out what you want to learn - that's completely normal! You're at a beginner level in Java right now. We'll help you explore different areas through fun projects, and you'll discover what interests you as you practice. Let's get started!"
 
-Write ONLY about:
-- Current skill level
-- Their interests and goals
-- What they know well
-- What they need to practice
-
-Do NOT write about:
-- Next steps or what to do next
-- Suggestions or recommendations
-- Building projects
-- Asking for help
-
-Example format: "Hi ${fullName},\n\nWelcome to SkillVerse! Based on your assessment, you are at a beginner level in Java. You want to learn Web Development and are still finding out what you want to do, which is great. Your Java knowledge will help you. You know basic syntax well, which is important for making web apps. You need to work on object-oriented programming to build better web systems. Keep practicing!"
-
-Now write the analysis. REMEMBER: Start with "Hi ${fullName},\n\nWelcome to SkillVerse!" and use SIMPLE, EASY English:`;
+Now write the analysis. REMEMBER: Start with "Hi ${fullName},\n\nWelcome to SkillVerse!" then ONE short paragraph:`;
 
   return prompt;
 };
