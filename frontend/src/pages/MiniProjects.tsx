@@ -1,8 +1,16 @@
-import { FolderKanban, Clock, CheckCircle, PlayCircle } from 'lucide-react';
+import { FolderKanban, Clock, CheckCircle, PlayCircle, ArrowLeft, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import Compiler from './Compiler';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+interface ProjectDetails {
+  title: string;
+  description: string;
+  language: string;
+  requirements: string;
+}
 
 export default function MiniProjects() {
   const [projects, setProjects] = useState([]);
@@ -11,6 +19,12 @@ export default function MiniProjects() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [completedTitles, setCompletedTitles] = useState(new Set());
+  const [selectedProject, setSelectedProject] = useState<ProjectDetails | null>(null);
+  const [projectStatuses, setProjectStatuses] = useState<Map<string, string>>(new Map());
+  const [projectScores, setProjectScores] = useState<Map<string, number>>(new Map());
+  const [projectFeedback, setProjectFeedback] = useState<Map<string, string>>(new Map());
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] = useState<{title: string, score: number, feedback: string} | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -64,13 +78,31 @@ export default function MiniProjects() {
         response.data.completedThisWeek.map(task => task.projectTitle.toLowerCase())
       );
       setCompletedTitles(completedThisWeekTitles);
+
+      const statusMap = new Map<string, string>();
+      const scoreMap = new Map<string, number>();
+      const feedbackMap = new Map<string, string>();
+      response.data.completedTasks.forEach(task => {
+        statusMap.set(task.projectTitle.toLowerCase(), task.status);
+        scoreMap.set(task.projectTitle.toLowerCase(), task.score || 0);
+        feedbackMap.set(task.projectTitle.toLowerCase(), task.aiAnalyization || '');
+      });
+      setProjectStatuses(statusMap);
+      setProjectScores(scoreMap);
+      setProjectFeedback(feedbackMap);
     } catch (error) {
       console.error('[MiniProjects] Error fetching completed tasks:', error);
     }
   };
 
   const getProjectStatus = (projectTitle) => {
-    return completedTitles.has(projectTitle.toLowerCase()) ? 'completed' : 'not-started';
+    const titleLower = projectTitle.toLowerCase();
+    const status = projectStatuses.get(titleLower);
+    
+    if (status === 'paused') return 'paused';
+    if (status === 'submitted') return 'submitted';
+    if (status === 'completed' || completedTitles.has(titleLower)) return 'completed';
+    return 'not-started';
   };
 
   const getStatusBadge = (status) => {
@@ -80,6 +112,20 @@ export default function MiniProjects() {
           <div className="flex items-center gap-1 text-green-600">
             <CheckCircle className="w-4 h-4" />
             <span className="text-xs font-medium">Completed</span>
+          </div>
+        );
+      case 'submitted':
+        return (
+          <div className="flex items-center gap-1 text-blue-600">
+            <CheckCircle className="w-4 h-4" />
+            <span className="text-xs font-medium">Submitted</span>
+          </div>
+        );
+      case 'paused':
+        return (
+          <div className="flex items-center gap-1 text-yellow-600">
+            <PlayCircle className="w-4 h-4" />
+            <span className="text-xs font-medium">Paused</span>
           </div>
         );
       case 'in-progress':
@@ -130,6 +176,21 @@ export default function MiniProjects() {
 
   console.log('[MiniProjects] Rendering with projects:', projects);
   console.log('[MiniProjects] Projects length:', projects.length);
+
+  if (selectedProject) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <Compiler 
+          onMenuClick={() => {}}
+          projectDetails={selectedProject}
+          onBack={() => {
+            setSelectedProject(null);
+            fetchCompletedTasks();
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -205,16 +266,59 @@ export default function MiniProjects() {
                 )}
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  {getStatusBadge(status)}
+                  <div className="flex items-center gap-3">
+                    {getStatusBadge(status)}
+                    {(status === 'submitted' || status === 'completed') && projectScores.get(project.title.toLowerCase()) !== undefined && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className="font-medium text-gray-700">Score:</span>
+                          <span className={`font-bold ${
+                            projectScores.get(project.title.toLowerCase())! >= 70 
+                              ? 'text-green-600' 
+                              : 'text-red-600'
+                          }`}>
+                            {projectScores.get(project.title.toLowerCase())}/100
+                          </span>
+                        </div>
+                        {projectFeedback.get(project.title.toLowerCase()) && (
+                          <button
+                            onClick={() => {
+                              setSelectedFeedback({
+                                title: project.title,
+                                score: projectScores.get(project.title.toLowerCase())!,
+                                feedback: projectFeedback.get(project.title.toLowerCase())!
+                              });
+                              setShowFeedbackModal(true);
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                          >
+                            View Feedback
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <button 
                     className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      status === 'completed'
+                      status === 'completed' || status === 'submitted'
                         ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                         : 'bg-gray-900 text-white hover:bg-gray-800'
                     }`}
-                    disabled={status === 'completed'}
+                    disabled={status === 'completed' || status === 'submitted'}
+                    onClick={() => {
+                      if (status !== 'completed' && status !== 'submitted') {
+                        setSelectedProject({
+                          title: project.title,
+                          description: project.description,
+                          language: project.language,
+                          requirements: project.requirements
+                        });
+                      }
+                    }}
                   >
-                    {status === 'completed' ? 'Completed' : 'Start'}
+                    {status === 'completed' ? 'Completed' : 
+                     status === 'submitted' ? 'Submitted' :
+                     status === 'paused' ? 'Continue' : 'Start'}
                   </button>
                 </div>
               </div>
@@ -223,7 +327,68 @@ export default function MiniProjects() {
         </div>
       )}
 
+      {/* Feedback Modal */}
+      {showFeedbackModal && selectedFeedback && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Grading Feedback</h2>
+                <button
+                  onClick={() => setShowFeedbackModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
 
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">{selectedFeedback.title}</h3>
+                <div className={`text-3xl font-bold ${
+                  selectedFeedback.score >= 70 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {selectedFeedback.score}/100
+                </div>
+              </div>
+
+              <div className={`text-center py-3 rounded-lg ${
+                selectedFeedback.score >= 70 ? 'bg-green-50' : 'bg-red-50'
+              }`}>
+                <span className={`text-base font-semibold ${
+                  selectedFeedback.score >= 70 ? 'text-green-700' : 'text-red-700'
+                }`}>
+                  {selectedFeedback.score >= 70 ? 'You Passed!' : 'Keep Practicing!'}
+                </span>
+              </div>
+
+              <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+                {selectedFeedback.feedback.split('\n').map((line, index) => {
+                  if (line.startsWith('**') && line.endsWith('**')) {
+                    const text = line.replace(/\*\*/g, '');
+                    return (
+                      <div key={index} className="font-semibold text-gray-900 mt-3 mb-1">
+                        {text}
+                      </div>
+                    );
+                  }
+                  return line ? <div key={index}>{line}</div> : <div key={index} className="h-2" />;
+                })}
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticateToken } from '../middleware/auth.js';
+import { HfInference } from '@huggingface/inference';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -11,6 +12,9 @@ const __dirname = path.dirname(__filename);
 
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 const LIBS_DIR = path.join(__dirname, '..', 'libs');
+
+const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
+const hf = HUGGINGFACE_API_KEY ? new HfInference(HUGGINGFACE_API_KEY) : null;
 
 async function ensureDirectories() {
   try {
@@ -189,5 +193,71 @@ router.get('/libraries', authenticateToken, async (req, res) => {
     });
   }
 });
+
+router.post('/analyze-code', authenticateToken, async (req, res) => {
+  try {
+    const { code, projectTitle, requirements, language } = req.body;
+
+    if (!code || !projectTitle || !requirements) {
+      return res.status(400).json({ hint: 'Missing required information for analysis.' });
+    }
+
+    if (!HUGGINGFACE_API_KEY || !hf) {
+      return res.status(503).json({ 
+        error: 'AI hint service is not available. Hugging Face API key is not configured.',
+        hint: null 
+      });
+    }
+
+    const prompt = `You are a helpful coding tutor analyzing a student's code.
+
+PROJECT: ${projectTitle}
+LANGUAGE: ${language}
+
+REQUIREMENTS:
+${requirements}
+
+STUDENT'S CODE:
+${code}
+
+ANALYZE the code and provide ONE helpful hint. Your hint should:
+- Be short (1-2 sentences maximum)
+- Be encouraging and friendly
+- Point out ONE specific thing to work on next
+- Be actionable (tell them what to do, not what's wrong)
+
+If the code is empty or very basic:
+- Suggest starting with the first requirement
+- Give a simple example of what to write
+
+If the code has some progress:
+- Acknowledge what they've done well
+- Suggest the next requirement to implement
+
+If the code looks complete:
+- Praise their work
+- Suggest testing edge cases or improving code quality
+
+RESPONSE (plain text, no formatting):`;
+
+    const response = await hf.chatCompletion({
+      model: 'Qwen/Qwen2.5-Coder-7B-Instruct',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 150,
+      temperature: 0.7
+    });
+
+    const hint = response.choices[0].message.content.trim();
+    res.json({ hint });
+  } catch (error) {
+    console.error('[AI Hint] Error:', error);
+    res.status(500).json({ 
+      error: `AI hint service failed: ${error.message}`,
+      hint: null 
+    });
+  }
+});
+
+
 
 export default router;
