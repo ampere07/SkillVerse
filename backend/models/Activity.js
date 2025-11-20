@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const assignmentSchema = new mongoose.Schema({
+const activitySchema = new mongoose.Schema({
   classroom: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Classroom',
@@ -15,19 +15,20 @@ const assignmentSchema = new mongoose.Schema({
   },
   title: {
     type: String,
-    required: [true, 'Assignment title is required'],
+    required: [true, 'Activity title is required'],
     trim: true,
     maxlength: [200, 'Title cannot exceed 200 characters']
   },
   description: {
     type: String,
-    required: [true, 'Assignment description is required'],
+    required: [true, 'Activity description is required'],
     trim: true,
     maxlength: [2000, 'Description cannot exceed 2000 characters']
   },
-  type: {
+  instructions: {
     type: String,
-    default: null
+    trim: true,
+    maxlength: [5000, 'Instructions cannot exceed 5000 characters']
   },
   dueDate: {
     type: Date,
@@ -35,8 +36,12 @@ const assignmentSchema = new mongoose.Schema({
   },
   points: {
     type: Number,
-    default: 0,
+    default: 100,
     min: [0, 'Points cannot be negative']
+  },
+  requiresCompiler: {
+    type: Boolean,
+    default: false
   },
   attachments: [{
     fileName: String,
@@ -49,11 +54,6 @@ const assignmentSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  instructions: {
-    type: String,
-    trim: true,
-    maxlength: [5000, 'Instructions cannot exceed 5000 characters']
-  },
   students: [{
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -111,25 +111,22 @@ const assignmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for efficient queries
-assignmentSchema.index({ classroom: 1, isPublished: 1 });
-assignmentSchema.index({ teacher: 1, createdAt: -1 });
-assignmentSchema.index({ dueDate: 1 });
+activitySchema.index({ classroom: 1, isPublished: 1 });
+activitySchema.index({ teacher: 1, createdAt: -1 });
+activitySchema.index({ dueDate: 1 });
 
-// Virtual to check if assignment is overdue
-assignmentSchema.virtual('isOverdue').get(function() {
+activitySchema.virtual('isOverdue').get(function() {
   if (!this.dueDate) return false;
   return new Date() > this.dueDate;
 });
 
-// Method to submit assignment
-assignmentSchema.methods.submitAssignment = function(studentId, content, attachments = []) {
+activitySchema.methods.submitActivity = function(studentId, content, attachments = []) {
   const existingSubmission = this.submissions.find(
     s => s.student.toString() === studentId.toString()
   );
 
   if (existingSubmission) {
-    throw new Error('Assignment already submitted');
+    throw new Error('Activity already submitted');
   }
 
   this.submissions.push({
@@ -141,8 +138,7 @@ assignmentSchema.methods.submitAssignment = function(studentId, content, attachm
   return this.save();
 };
 
-// Method to grade submission
-assignmentSchema.methods.gradeSubmission = function(studentId, grade, feedback) {
+activitySchema.methods.gradeSubmission = function(studentId, grade, feedback) {
   const submission = this.submissions.find(
     s => s.student.toString() === studentId.toString()
   );
@@ -158,4 +154,4 @@ assignmentSchema.methods.gradeSubmission = function(studentId, grade, feedback) 
   return this.save();
 };
 
-export default mongoose.model('Assignment', assignmentSchema);
+export default mongoose.model('Activity', activitySchema);

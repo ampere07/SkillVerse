@@ -4,6 +4,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.js';
 import compilerRoutes from './routes/compiler.js';
@@ -11,6 +13,9 @@ import surveyRoutes from './routes/survey.js';
 import coursesRoutes from './routes/courses.js';
 import classroomRoutes from './routes/classroom.js';
 import assignmentRoutes from './routes/assignment.js';
+import activityRoutes from './routes/activity.js';
+import moduleRoutes from './routes/module.js';
+import uploadRoutes from './routes/upload.js';
 import miniProjectsRoutes from './routes/miniProjects.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
 import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
@@ -36,6 +41,9 @@ app.use('/api/survey', surveyRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/classrooms', classroomRoutes);
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/modules', moduleRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/api/mini-projects', miniProjectsRoutes);
 
 setupCompilerSocket(io);
@@ -63,6 +71,12 @@ httpServer.listen(PORT, async () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`API Health: http://localhost:${PORT}/api/health`);
   console.log(`WebSocket server running`);
+  
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir);
+    console.log('Created uploads directory');
+  }
   
   await connectDB();
   

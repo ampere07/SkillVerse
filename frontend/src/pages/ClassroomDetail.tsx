@@ -7,25 +7,24 @@ import {
   FileText,
   MoreVertical,
   Trash2,
-  Edit,
   Eye,
   CheckCircle,
-  Clock,
   AlertCircle
 } from 'lucide-react';
-import { classroomAPI, assignmentAPI } from '../utils/api';
-import CreateAssignmentModal from '../components/CreateAssignmentModal';
+import { classroomAPI, activityAPI, moduleAPI } from '../utils/api';
+import CreatePostModal from '../components/CreatePostModal';
 import AssignmentDetail from './AssignmentDetail';
 
-interface Assignment {
+interface Post {
   _id: string;
   title: string;
   description: string;
-  type: string;
+  postType: 'activity' | 'module';
   dueDate?: string;
-  points: number;
+  points?: number;
+  requiresCompiler?: boolean;
   isPublished: boolean;
-  submissions: any[];
+  submissions?: any[];
   createdAt: string;
 }
 
@@ -36,11 +35,11 @@ interface ClassroomDetailProps {
 
 export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetailProps) {
   const [classroom, setClassroom] = useState<any>(null);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [viewingAssignmentId, setViewingAssignmentId] = useState<string | null>(null);
+  const [viewingPostId, setViewingPostId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchClassroomData();
@@ -49,13 +48,29 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
   const fetchClassroomData = async () => {
     try {
       setLoading(true);
-      const [classroomRes, assignmentsRes] = await Promise.all([
+      const [classroomRes, activitiesRes, modulesRes] = await Promise.all([
         classroomAPI.getClassroom(classroomId),
-        assignmentAPI.getClassroomAssignments(classroomId)
+        activityAPI.getClassroomActivities(classroomId),
+        moduleAPI.getClassroomModules(classroomId)
       ]);
       
       setClassroom(classroomRes.classroom);
-      setAssignments(assignmentsRes.assignments || []);
+      
+      const activities = (activitiesRes.activities || []).map((activity: any) => ({
+        ...activity,
+        postType: 'activity' as const
+      }));
+      
+      const modules = (modulesRes.modules || []).map((module: any) => ({
+        ...module,
+        postType: 'module' as const
+      }));
+      
+      const allPosts = [...activities, ...modules].sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      setPosts(allPosts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -63,29 +78,32 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
     }
   };
 
-  const handleDeleteAssignment = async (assignmentId: string) => {
-    if (!confirm('Are you sure you want to delete this assignment?')) return;
+  const handleDeletePost = async (postId: string, postType: 'activity' | 'module') => {
+    if (!confirm(`Are you sure you want to delete this ${postType}?`)) return;
     
     try {
-      await assignmentAPI.deleteAssignment(assignmentId);
+      if (postType === 'activity') {
+        await activityAPI.deleteActivity(postId);
+      } else {
+        await moduleAPI.deleteModule(postId);
+      }
       await fetchClassroomData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete assignment');
+      alert(err instanceof Error ? err.message : `Failed to delete ${postType}`);
     }
   };
 
-  const handleCreateAssignment = async () => {
+  const handleCreatePost = async () => {
     await fetchClassroomData();
     setShowCreateModal(false);
   };
 
-  // If viewing a specific assignment, show detail view
-  if (viewingAssignmentId) {
+  if (viewingPostId) {
     return (
       <AssignmentDetail
-        assignmentId={viewingAssignmentId}
+        assignmentId={viewingPostId}
         onBack={() => {
-          setViewingAssignmentId(null);
+          setViewingPostId(null);
           fetchClassroomData();
         }}
       />
@@ -113,7 +131,6 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <button
           onClick={onBack}
@@ -136,7 +153,7 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <FileText className="w-4 h-4" />
-                <span>{assignments.length} assignment{assignments.length !== 1 ? 's' : ''}</span>
+                <span>{posts.length} post{posts.length !== 1 ? 's' : ''}</span>
               </div>
             </div>
           </div>
@@ -146,12 +163,11 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
             className="flex items-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span className="text-sm font-medium">New Assignment</span>
+            <span className="text-sm font-medium">New Post</span>
           </button>
         </div>
       </div>
 
-      {/* Classroom Code Card */}
       <div className="bg-gradient-to-r from-gray-900 to-gray-700 text-white p-6 rounded-lg">
         <p className="text-sm opacity-90 mb-2">Classroom Code</p>
         <div className="flex items-center justify-between">
@@ -175,75 +191,70 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
         </div>
       )}
 
-      {/* Assignments Section */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Assignments</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Posts</h2>
         
-        {assignments.length === 0 ? (
+        {posts.length === 0 ? (
           <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No assignments yet</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No posts yet</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Create your first assignment to get started
+              Create your first post to get started
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span className="text-sm font-medium">Create Assignment</span>
+              <span className="text-sm font-medium">Create Post</span>
             </button>
           </div>
         ) : (
           <div className="space-y-3">
-            {assignments.map((assignment) => (
-              <AssignmentCard
-                key={assignment._id}
-                assignment={assignment}
-                onDelete={handleDeleteAssignment}
-                onView={() => setViewingAssignmentId(assignment._id)}
+            {posts.map((post) => (
+              <PostCard
+                key={post._id}
+                post={post}
+                onDelete={handleDeletePost}
+                onView={() => setViewingPostId(post._id)}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Create Assignment Modal */}
       {showCreateModal && (
-        <CreateAssignmentModal
+        <CreatePostModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           classroomId={classroomId}
           classroomName={classroom.name}
-          onSuccess={handleCreateAssignment}
+          onSuccess={handleCreatePost}
         />
       )}
     </div>
   );
 }
 
-interface AssignmentCardProps {
-  assignment: Assignment;
-  onDelete: (id: string) => void;
+interface PostCardProps {
+  post: Post;
+  onDelete: (id: string, postType: 'activity' | 'module') => void;
   onView: () => void;
 }
 
-function AssignmentCard({ assignment, onDelete, onView }: AssignmentCardProps) {
+function PostCard({ post, onDelete, onView }: PostCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   
-  const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
+  const dueDate = post.dueDate ? new Date(post.dueDate) : null;
   const isOverdue = dueDate && dueDate < new Date();
-  const isDueSoon = dueDate && !isOverdue && (dueDate.getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000; // 7 days
+  const isDueSoon = dueDate && !isOverdue && (dueDate.getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000;
 
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {
-      assignment: 'bg-blue-100 text-blue-700',
-      module: 'bg-purple-100 text-purple-700',
-      quiz: 'bg-green-100 text-green-700',
-      project: 'bg-orange-100 text-orange-700',
-      announcement: 'bg-gray-100 text-gray-700'
+      activity: 'bg-blue-100 text-blue-700',
+      module: 'bg-purple-100 text-purple-700'
     };
-    return colors[type] || colors.assignment;
+    return colors[type] || colors.activity;
   };
 
   const formatDueDate = (date: Date) => {
@@ -267,22 +278,27 @@ function AssignmentCard({ assignment, onDelete, onView }: AssignmentCardProps) {
           className="flex-1 min-w-0 text-left"
         >
           <div className="flex items-center space-x-2 mb-2">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(assignment.type)}`}>
-              {assignment.type.charAt(0).toUpperCase() + assignment.type.slice(1)}
+            <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(post.postType)}`}>
+              {post.postType.charAt(0).toUpperCase() + post.postType.slice(1)}
             </span>
-            {!assignment.isPublished && (
+            {!post.isPublished && (
               <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
                 Draft
+              </span>
+            )}
+            {post.requiresCompiler && (
+              <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                Compiler
               </span>
             )}
           </div>
           
           <h3 className="text-base font-semibold text-gray-900 mb-1 hover:text-gray-700 transition-colors">
-            {assignment.title}
+            {post.title}
           </h3>
           
           <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-            {assignment.description}
+            {post.description}
           </p>
 
           <div className="flex items-center space-x-4 text-xs text-gray-500">
@@ -297,18 +313,20 @@ function AssignmentCard({ assignment, onDelete, onView }: AssignmentCardProps) {
               </div>
             )}
             
-            <div className="flex items-center space-x-1">
-              <CheckCircle className="w-4 h-4" />
-              <span>{assignment.submissions.length} submission{assignment.submissions.length !== 1 ? 's' : ''}</span>
-            </div>
-            
-            {assignment.points > 0 && (
+            {post.postType === 'activity' && post.submissions && (
               <div className="flex items-center space-x-1">
-                <span className="font-medium">{assignment.points} pts</span>
-                </div>
-                )}
-                </div>
-                </button>
+                <CheckCircle className="w-4 h-4" />
+                <span>{post.submissions.length} submission{post.submissions.length !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+            
+            {post.points && post.points > 0 && (
+              <div className="flex items-center space-x-1">
+                <span className="font-medium">{post.points} pts</span>
+              </div>
+            )}
+          </div>
+        </button>
 
         <div className="relative ml-4">
           <button
@@ -337,7 +355,7 @@ function AssignmentCard({ assignment, onDelete, onView }: AssignmentCardProps) {
                 </button>
                 <button
                   onClick={() => {
-                    onDelete(assignment._id);
+                    onDelete(post._id, post.postType);
                     setShowMenu(false);
                   }}
                   className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
