@@ -1,7 +1,8 @@
 import { Ollama } from 'ollama';
+import OLLAMA_CONFIG from '../config/ollamaConfig.js';
 
-const MODEL_NAME = process.env.OLLAMA_MODEL_NAME || 'qwen2.5:3b';
-const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
+const MODEL_NAME = OLLAMA_CONFIG.model;
+const OLLAMA_URL = OLLAMA_CONFIG.url;
 
 const ollama = new Ollama({ host: OLLAMA_URL });
 
