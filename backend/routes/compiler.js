@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticateToken } from '../middleware/auth.js';
 import { Ollama } from 'ollama';
+import OLLAMA_CONFIG from '../config/ollamaConfig.js';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -13,10 +14,14 @@ const __dirname = path.dirname(__filename);
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 const LIBS_DIR = path.join(__dirname, '..', 'libs');
 
-const MODEL_NAME = process.env.OLLAMA_MODEL_NAME || 'qwen2.5:3b';
-const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
+const MODEL_NAME = OLLAMA_CONFIG.model;
+const OLLAMA_URL = OLLAMA_CONFIG.url;
 
 const ollama = new Ollama({ host: OLLAMA_URL });
+
+console.log('Compiler Route - Ollama Config:');
+console.log('Model:', MODEL_NAME);
+console.log('URL:', OLLAMA_URL);
 
 async function ensureDirectories() {
   try {
