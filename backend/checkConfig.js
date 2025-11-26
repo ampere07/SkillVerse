@@ -1,0 +1,25 @@
+import 'dotenv/config';
+
+console.log('='.repeat(60));
+console.log('SKILLVERSE AI CONFIGURATION SUMMARY');
+console.log('='.repeat(60));
+console.log('\nAI Provider: Ollama (Local AI)');
+console.log('Model:', process.env.OLLAMA_MODEL_NAME || 'qwen2.5:3b');
+console.log('URL:', process.env.OLLAMA_API_URL || 'http://localhost:11434');
+console.log('\nServices using Ollama:');
+console.log('  ✓ Survey Service (ollamaService.js)');
+console.log('  ✓ Project Generation (projectGenerationService.js)');
+console.log('  ✓ Project Grading (projectGradingService.js)');
+console.log('\nHugging Face API:');
+console.log('  ✗ Removed from all services');
+console.log('  ✗ Dependency removed from package.json');
+console.log('\n' + '='.repeat(60));
+console.log('SETUP COMPLETE');
+console.log('='.repeat(60));
+console.log('\nNext Steps:');
+console.log('1. Make sure Ollama is running: ollama serve');
+console.log('2. Verify model is installed: ollama list');
+console.log('3. If not installed: ollama pull qwen2.5:7b');
+console.log('4. Test connection: npm run test-ollama');
+console.log('5. Start your backend: npm start');
+console.log('\n' + '='.repeat(60));

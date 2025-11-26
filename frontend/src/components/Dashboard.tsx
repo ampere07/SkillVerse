@@ -15,11 +15,12 @@ import {
   Code,
   FolderKanban
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Compiler from '../pages/Compiler';
 import MyCourses from '../pages/MyCourses';
 import TeacherClassrooms from '../pages/TeacherClassrooms';
 import MiniProjects from '../pages/MiniProjects';
+import UnsavedChangesModal from './UnsavedChangesModal';
 
 interface NavItem {
   icon: any;
@@ -101,6 +102,10 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('/dashboard');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const miniProjectsRef = useRef<any>(null);
 
   if (!user) {
     return null;
@@ -109,6 +114,42 @@ export default function Dashboard() {
   const filteredNavigation = navigationItems.filter(item => 
     item.roles.includes(user.role)
   );
+
+  const handleNavigation = (href: string) => {
+    if (hasUnsavedChanges && activeNav === '/mini-projects') {
+      setPendingNavigation(href);
+      setShowNavigationWarning(true);
+    } else {
+      setActiveNav(href);
+      setHasUnsavedChanges(false);
+    }
+  };
+
+  const handleCancelNavigation = () => {
+    setShowNavigationWarning(false);
+    setPendingNavigation(null);
+  };
+
+  const handleConfirmNavigation = () => {
+    setShowNavigationWarning(false);
+    if (pendingNavigation) {
+      setActiveNav(pendingNavigation);
+      setHasUnsavedChanges(false);
+    }
+    setPendingNavigation(null);
+  };
+
+  const handleSaveAndNavigate = async () => {
+    if (miniProjectsRef.current && miniProjectsRef.current.saveProgress) {
+      await miniProjectsRef.current.saveProgress();
+    }
+    setShowNavigationWarning(false);
+    if (pendingNavigation) {
+      setActiveNav(pendingNavigation);
+      setHasUnsavedChanges(false);
+    }
+    setPendingNavigation(null);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -168,7 +209,7 @@ export default function Dashboard() {
               return (
                 <button
                   key={item.href}
-                  onClick={() => setActiveNav(item.href)}
+                  onClick={() => handleNavigation(item.href)}
                   className={`
                     w-full flex items-center space-x-2 px-3 py-2 rounded transition-colors
                     ${isActive 
@@ -231,7 +272,10 @@ export default function Dashboard() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <MiniProjects />
+              <MiniProjects 
+                ref={miniProjectsRef}
+                onHasUnsavedChanges={setHasUnsavedChanges}
+              />
             </>
           ) : (
             <>
@@ -320,6 +364,15 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* Unsaved Changes Warning Modal */}
+      <UnsavedChangesModal
+        isOpen={showNavigationWarning}
+        onCancel={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        onSaveAndLeave={handleSaveAndNavigate}
+        isSaving={false}
+      />
     </div>
   );
 }

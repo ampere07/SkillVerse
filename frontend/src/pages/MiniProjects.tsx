@@ -1,5 +1,5 @@
 import { FolderKanban, Clock, CheckCircle, PlayCircle, ArrowLeft, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import axios from 'axios';
 import Compiler from './Compiler';
 
@@ -12,7 +12,11 @@ interface ProjectDetails {
   requirements: string;
 }
 
-export default function MiniProjects() {
+interface MiniProjectsProps {
+  onHasUnsavedChanges?: (hasChanges: boolean) => void;
+}
+
+const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }, ref) => {
   const [projects, setProjects] = useState([]);
   const [completedThisWeek, setCompletedThisWeek] = useState(0);
   const [allCompleted, setAllCompleted] = useState(false);
@@ -25,11 +29,20 @@ export default function MiniProjects() {
   const [projectFeedback, setProjectFeedback] = useState<Map<string, string>>(new Map());
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState<{title: string, score: number, feedback: string} | null>(null);
+  const compilerRef = useRef<any>(null);
 
   useEffect(() => {
     fetchProjects();
     fetchCompletedTasks();
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    saveProgress: async () => {
+      if (compilerRef.current && compilerRef.current.saveProgress) {
+        await compilerRef.current.saveProgress();
+      }
+    }
+  }));
 
   const fetchProjects = async () => {
     try {
@@ -181,12 +194,14 @@ export default function MiniProjects() {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <Compiler 
+          ref={compilerRef}
           onMenuClick={() => {}}
           projectDetails={selectedProject}
           onBack={() => {
             setSelectedProject(null);
             fetchCompletedTasks();
           }}
+          onHasUnsavedChanges={onHasUnsavedChanges}
         />
       </div>
     );
@@ -391,4 +406,8 @@ export default function MiniProjects() {
       )}
     </div>
   );
-}
+});
+
+MiniProjects.displayName = 'MiniProjects';
+
+export default MiniProjects;

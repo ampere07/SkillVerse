@@ -1,20 +1,16 @@
-import { HfInference } from '@huggingface/inference';
+import { Ollama } from 'ollama';
 
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const MODEL_NAME = 'Qwen/Qwen2.5-Coder-7B-Instruct';
+const MODEL_NAME = process.env.OLLAMA_MODEL_NAME || 'qwen2.5:3b';
+const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 
-console.log('HuggingFace Service Initialized');
-console.log('API Key present:', HUGGINGFACE_API_KEY ? 'Yes' : 'No');
-console.log('API Key length:', HUGGINGFACE_API_KEY?.length || 0);
+const ollama = new Ollama({ host: OLLAMA_URL });
 
-const hf = HUGGINGFACE_API_KEY ? new HfInference(HUGGINGFACE_API_KEY) : null;
+console.log('Ollama Service Initialized');
+console.log('Model:', MODEL_NAME);
+console.log('URL:', OLLAMA_URL);
 
 export const validateLearningInputs = async (courseInterest, learningGoals) => {
   try {
-    if (!HUGGINGFACE_API_KEY || !hf) {
-      throw new Error('Hugging Face API key is not configured');
-    }
-
     const prompt = `You are validating student responses. Accept ANY language including mixed English-Tagalog (Taglish), shortcuts, and slang.
 
 Question 1: "What are you interested in learning?"
@@ -45,14 +41,16 @@ Be specific about what confused you. Examples:
 
 Validate now:`;
 
-    const response = await hf.chatCompletion({
+    const response = await ollama.chat({
       model: MODEL_NAME,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 100,
-      temperature: 0.3
+      messages: [{ role: 'user', content: prompt }],
+      options: {
+        temperature: 0.3,
+        num_predict: 100
+      }
     });
 
-    const result = response.choices[0].message.content.trim();
+    const result = response.message.content.trim();
     const isValid = result.toUpperCase().includes('VALID') && !result.toUpperCase().includes('INVALID');
     
     let reason = result
@@ -81,23 +79,8 @@ Validate now:`;
 
 export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => {
   try {
-    if (!HUGGINGFACE_API_KEY) {
-      console.error('HUGGINGFACE_API_KEY is undefined or empty');
-      console.error('Environment check:', {
-        NODE_ENV: process.env.NODE_ENV,
-        PORT: process.env.PORT,
-        HF_KEY_EXISTS: !!process.env.HUGGINGFACE_API_KEY
-      });
-      throw new Error('Hugging Face API key is not configured');
-    }
-
-    if (!hf) {
-      throw new Error('Hugging Face client not initialized');
-    }
-
     console.log('Starting AI analysis for student skills...');
     
-    // Check if student is uncertain about their interests
     const uncertainPhrases = ['dont know', 'diko alam', 'di ko alam', 'wala pa', 'not sure', 'idk', 'dunno', 'hindi ko alam'];
     const isUncertain = uncertainPhrases.some(phrase => 
       surveyData.courseInterest.toLowerCase().includes(phrase) || 
@@ -106,23 +89,20 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
     
     const prompt = constructPrompt(surveyData, fullName, isUncertain);
     
-    const response = await hf.chatCompletion({
+    const response = await ollama.chat({
       model: MODEL_NAME,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.7,
-      top_p: 0.95
+      messages: [{ role: 'user', content: prompt }],
+      options: {
+        temperature: 0.7,
+        top_p: 0.95,
+        num_predict: 1000
+      }
     });
 
-    const analysis = response.choices[0].message.content;
+    const analysis = response.message.content;
     
     if (!analysis || analysis.trim().length === 0) {
-      throw new Error('Empty analysis received from API');
+      throw new Error('Empty analysis received from Ollama');
     }
 
     console.log('AI analysis completed successfully');
@@ -131,7 +111,7 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
       analysis: analysis.trim()
     };
   } catch (error) {
-    console.error('Hugging Face API Error:', error.message);
+    console.error('Ollama API Error:', error.message);
     console.error('Error stack:', error.stack);
     return {
       success: false,
@@ -234,4 +214,14 @@ Example for UNCERTAIN student:
 Now write the analysis. REMEMBER: Start with "Hi ${fullName},\n\nWelcome to SkillVerse!" then ONE short paragraph:`;
 
   return prompt;
+};
+
+export const checkOllamaConnection = async () => {
+  try {
+    await ollama.list();
+    return { connected: true, model: MODEL_NAME };
+  } catch (error) {
+    console.error('Ollama connection failed:', error.message);
+    return { connected: false, error: error.message };
+  }
 };

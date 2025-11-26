@@ -658,7 +658,7 @@ router.post('/clear-and-regenerate', authenticateToken, async (req, res) => {
     
     if (projects.length === 0) {
       return res.status(500).json({ 
-        message: 'Failed to generate projects. Check Hugging Face API configuration.' 
+        message: 'Failed to generate projects. AI service is unavailable.' 
       });
     }
 
