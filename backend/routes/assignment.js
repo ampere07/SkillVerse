@@ -5,6 +5,83 @@ import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Get all assignments for the logged-in student
+router.get('/student/my-assignments', authenticateToken, authorizeRole('student'), async (req, res) => {
+  try {
+    // Find all classrooms the student is enrolled in
+    const classrooms = await Classroom.find({
+      'students.studentId': req.user.userId
+    });
+
+    if (!classrooms || classrooms.length === 0) {
+      return res.json({
+        success: true,
+        activeCount: 0,
+        upcomingCount: 0,
+        activeAssignments: [],
+        upcomingAssignments: []
+      });
+    }
+
+    const classroomIds = classrooms.map(c => c._id);
+
+    // Find all published assignments for those classrooms
+    const assignments = await Assignment.find({
+      classroom: { $in: classroomIds },
+      isPublished: true
+    })
+      .populate('teacher', 'name email')
+      .populate('classroom', 'name code')
+      .sort({ dueDate: 1, createdAt: -1 });
+
+    // Categorize assignments
+    const now = new Date();
+    const activeAssignments = [];
+    const upcomingAssignments = [];
+
+    assignments.forEach(assignment => {
+      const hasSubmitted = assignment.submissions.some(
+        s => s.student.toString() === req.user.userId
+      );
+
+      if (!hasSubmitted) {
+        if (assignment.dueDate) {
+          const dueDate = new Date(assignment.dueDate);
+          const daysUntilDue = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+          if (daysUntilDue <= 7 && daysUntilDue >= 0) {
+            upcomingAssignments.push({
+              ...assignment.toObject(),
+              daysUntilDue
+            });
+          }
+          
+          if (dueDate >= now || assignment.allowLateSubmission) {
+            activeAssignments.push(assignment);
+          }
+        } else {
+          activeAssignments.push(assignment);
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      activeCount: activeAssignments.length,
+      upcomingCount: upcomingAssignments.length,
+      activeAssignments,
+      upcomingAssignments: upcomingAssignments.slice(0, 5)
+    });
+  } catch (error) {
+    console.error('Get student assignments error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch assignments',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Get all assignments for a classroom
 router.get('/classroom/:classroomId', authenticateToken, async (req, res) => {
   try {

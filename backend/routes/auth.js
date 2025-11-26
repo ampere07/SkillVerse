@@ -194,15 +194,130 @@ router.get('/me', authenticateToken, async (req, res) => {
     
     res.json({ 
       user: {
+        _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
         name: user.name,
         role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
         surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
       }
     });
   } catch (error) {
     console.error('Get user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/update-profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, email } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({ message: 'Name and email are required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    // Check if email is already taken by another user
+    const existingUser = await User.findOne({ 
+      email: email.toLowerCase(),
+      _id: { $ne: req.user.userId }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    const formattedName = toTitleCase(name.trim());
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      { 
+        name: formattedName,
+        email: email.toLowerCase()
+      },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log(`Profile updated for user: ${user.email}`);
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        _id: user._id.toString(),
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+
+    if (!hasUpperCase) {
+      return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+    }
+
+    if (!hasNumber) {
+      return res.status(400).json({ message: 'Password must contain at least one number' });
+    }
+
+    if (!hasSpecialChar) {
+      return res.status(400).json({ message: 'Password must contain at least one special character' });
+    }
+
+    const user = await User.findById(req.user.userId).select('+password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    user.password = hashedPassword;
+    await user.save();
+
+    console.log(`Password changed for user: ${user.email}`);
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
