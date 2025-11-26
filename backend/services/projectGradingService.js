@@ -1,17 +1,16 @@
-import { HfInference } from '@huggingface/inference';
+import { Ollama } from 'ollama';
 
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const MODEL_NAME = 'Qwen/Qwen2.5-Coder-7B-Instruct';
+const MODEL_NAME = process.env.OLLAMA_MODEL_NAME || 'qwen2.5:3b';
+const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 
-const hf = HUGGINGFACE_API_KEY ? new HfInference(HUGGINGFACE_API_KEY) : null;
+const ollama = new Ollama({ host: OLLAMA_URL });
+
+console.log(`Project Grading Service using Ollama`);
+console.log(`Model: ${MODEL_NAME}`);
+console.log(`URL: ${OLLAMA_URL}`);
 
 export const gradeProject = async (projectDetails, submittedCode) => {
   try {
-    if (!HUGGINGFACE_API_KEY || !hf) {
-      console.error('[Grading] Hugging Face API key is not configured');
-      throw new Error('Hugging Face API key is not configured');
-    }
-
     console.log(`[Grading] Evaluating project: ${projectDetails.title}`);
     console.log(`[Grading] Code length: ${submittedCode.length} characters`);
     console.log(`[Grading] Language: ${projectDetails.language}`);
@@ -21,15 +20,17 @@ export const gradeProject = async (projectDetails, submittedCode) => {
     
     console.log('[Grading] Sending code analysis request to AI...');
     
-    const response = await hf.chatCompletion({
+    const response = await ollama.chat({
       model: MODEL_NAME,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 2000,
-      temperature: 0.3
+      messages: [{ role: 'user', content: prompt }],
+      options: {
+        temperature: 0.3,
+        num_predict: 2000
+      }
     });
 
     console.log('[Grading] AI analysis completed');
-    const gradingText = response.choices[0].message.content;
+    const gradingText = response.message.content;
     console.log('[Grading] AI Response length:', gradingText.length);
     console.log('[Grading] AI Response preview:', gradingText.substring(0, 200) + '...');
     
@@ -44,7 +45,6 @@ export const gradeProject = async (projectDetails, submittedCode) => {
     throw error;
   }
 };
-
 
 const constructGradingPrompt = (projectDetails, code) => {
   return `You are an expert programming instructor evaluating a student's project submission.
@@ -104,30 +104,24 @@ const parseGradingResponse = (text) => {
   try {
     console.log('[Grading] Parsing AI response...');
     
-    // Extract score
     const scoreMatch = text.match(/Score:\s*(\d+)\/100/i) || text.match(/Grade:\s*(\d+)\/100/i);
     const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
     const passed = score >= 70;
     
     console.log(`[Grading] Extracted score: ${score}`);
     
-    // Extract feedback section
     const feedbackMatch = text.match(/Feedback:([\s\S]*?)(?:$)/i);
     const feedback = feedbackMatch ? feedbackMatch[1].trim() : text;
     
-    // Extract congratulations
     const congratsMatch = feedback.match(/(Congratulations[^!.]*[!.])/i);
     const congratsMessage = congratsMatch ? congratsMatch[0].trim() : 'Congratulations on completing your project!';
     
-    // Extract strengths
     const strengthsMatch = feedback.match(/What you did well:([\s\S]*?)(?=What needs improvement:|Status:|$)/i);
     const strengths = strengthsMatch ? strengthsMatch[1].trim() : 'You completed the project successfully.';
     
-    // Extract improvements
     const improvementsMatch = feedback.match(/What needs improvement:([\s\S]*?)(?=Status:|$)/i);
     const improvements = improvementsMatch ? improvementsMatch[1].trim() : 'Continue practicing to improve your skills.';
     
-    // Clean feedback text
     const cleanFeedback = `${congratsMessage}\n\n${strengths}\n\n${improvements}\n\nGrade: ${score}/100 - ${passed ? 'You passed!' : 'Keep practicing!'}`;
     
     return {

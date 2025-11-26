@@ -1,18 +1,17 @@
-import { HfInference } from '@huggingface/inference';
+import { Ollama } from 'ollama';
 import Survey from '../models/Survey.js';
 
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const MODEL_NAME = 'Qwen/Qwen2.5-Coder-7B-Instruct';
+const MODEL_NAME = process.env.OLLAMA_MODEL_NAME || 'qwen2.5:3b';
+const OLLAMA_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 
-const hf = HUGGINGFACE_API_KEY ? new HfInference(HUGGINGFACE_API_KEY) : null;
+const ollama = new Ollama({ host: OLLAMA_URL });
+
+console.log(`Project Generation Service using Ollama`);
+console.log(`Model: ${MODEL_NAME}`);
+console.log(`URL: ${OLLAMA_URL}`);
 
 export const generateWeeklyProjects = async (userId) => {
   try {
-    if (!HUGGINGFACE_API_KEY || !hf) {
-      console.error('Hugging Face API key is not configured');
-      return generateFallbackProjects(userId);
-    }
-
     const survey = await Survey.findOne({ userId }).sort({ createdAt: -1 });
     
     if (!survey) {
@@ -38,14 +37,16 @@ export const generateWeeklyProjects = async (userId) => {
     const prompt = constructPersonalizedPrompt(survey);
     
     try {
-      const response = await hf.chatCompletion({
+      const response = await ollama.chat({
         model: MODEL_NAME,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 3000,
-        temperature: 0.9
+        messages: [{ role: 'user', content: prompt }],
+        options: {
+          temperature: 0.9,
+          num_predict: 3000
+        }
       });
 
-      const projectsText = response.choices[0].message.content;
+      const projectsText = response.message.content;
       const projects = parseProjectsFromAI(projectsText);
 
       if (projects.length < 6) {
@@ -56,12 +57,8 @@ export const generateWeeklyProjects = async (userId) => {
       console.log(`[ProjectGen] Successfully generated ${projects.length} personalized projects`);
       return projects.slice(0, 6);
     } catch (apiError) {
-      console.error('[ProjectGen] API Error:', apiError.message);
-      if (apiError.httpResponse?.status === 429 || apiError.message.includes('HTTP error')) {
-        console.log('[ProjectGen] Using fallback projects due to API unavailability');
-        return generateFallbackProjects(userId);
-      }
-      throw apiError;
+      console.error('[ProjectGen] Ollama Error:', apiError.message);
+      return generateFallbackProjects(userId);
     }
   } catch (error) {
     console.error('Generate projects error:', error);
@@ -448,7 +445,6 @@ const getSkillLevelExamples = (level, interest) => {
 - Include error handling and file operations`;
   }
   
-  // Advanced
   if (isWeb) {
     return `- Design Patterns Example: Factory pattern for creating different handler types, Singleton for configuration
 - Use generics with collections, lambda expressions
@@ -580,4 +576,53 @@ const parseProjectsFromAI = (text) => {
   }
   
   return projects;
+};
+
+const generateFallbackProjects = (userId) => {
+  console.log(`[ProjectGen] Using fallback projects for user ${userId}`);
+  
+  return [
+    {
+      title: 'Simple Calculator',
+      description: 'Create a console calculator that performs basic arithmetic operations.',
+      language: 'Java',
+      requirements: '- Support addition, subtraction, multiplication, division\n- Handle user input\n- Display results',
+      sampleOutput: 'Enter operation: 5 + 3\nResult: 8'
+    },
+    {
+      title: 'Student Grade Manager',
+      description: 'Build a program to manage student grades and calculate averages.',
+      language: 'Java',
+      requirements: '- Store student names and grades\n- Calculate average grade\n- Display all students',
+      sampleOutput: 'Add student: John 85\nAverage: 85.0'
+    },
+    {
+      title: 'Number Guessing Game',
+      description: 'Create a game where the user guesses a random number.',
+      language: 'Java',
+      requirements: '- Generate random number\n- Accept user guesses\n- Provide hints',
+      sampleOutput: 'Guess: 50\nHigher!'
+    },
+    {
+      title: 'Temperature Converter',
+      description: 'Convert temperatures between Celsius and Fahrenheit.',
+      language: 'Java',
+      requirements: '- Convert C to F and F to C\n- Handle user input\n- Display results',
+      sampleOutput: 'Enter temp: 32F\nResult: 0C'
+    },
+    {
+      title: 'Task List Manager',
+      description: 'Manage a simple to-do list with console commands.',
+      language: 'Java',
+      requirements: '- Add tasks\n- Mark as complete\n- Display list',
+      sampleOutput: 'Task added: Buy groceries'
+    },
+    {
+      title: 'Prime Number Finder',
+      description: 'Find all prime numbers in a given range.',
+      language: 'Java',
+      requirements: '- Check if number is prime\n- Find primes in range\n- Display results',
+      sampleOutput: 'Primes: 2, 3, 5, 7, 11'
+    }
+  ];
 };

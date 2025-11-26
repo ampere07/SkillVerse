@@ -2,7 +2,7 @@ import express from 'express';
 import User from '../models/User.js';
 import Survey from '../models/Survey.js';
 import MiniProject from '../models/MiniProject.js';
-import { analyzeStudentSkills, validateLearningInputs } from '../services/huggingfaceService.js';
+import { analyzeStudentSkills, validateLearningInputs } from '../services/ollamaService.js';
 import { generateWeeklyProjects } from '../services/projectGenerationService.js';
 
 const router = express.Router();

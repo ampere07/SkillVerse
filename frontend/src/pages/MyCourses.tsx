@@ -204,7 +204,7 @@ export default function MyCourses() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">My Courses</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">My Classes</h2>
           <p className="text-sm text-gray-600">
             Continue learning and track your progress across all enrolled courses
           </p>

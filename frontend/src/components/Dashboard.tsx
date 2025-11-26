@@ -4,8 +4,6 @@ import {
   LayoutDashboard, 
   BookOpen, 
   FileText, 
-  Calendar,
-  Settings,
   Users,
   GraduationCap,
   ClipboardList,
@@ -13,13 +11,18 @@ import {
   Menu,
   X,
   Code,
-  FolderKanban
+  FolderKanban,
+  CheckCircle2,
+  Circle,
+  Settings as SettingsIcon
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Compiler from '../pages/Compiler';
 import MyCourses from '../pages/MyCourses';
 import TeacherClassrooms from '../pages/TeacherClassrooms';
 import MiniProjects from '../pages/MiniProjects';
+import Settings from '../pages/Settings';
+import UnsavedChangesModal from './UnsavedChangesModal';
 
 interface NavItem {
   icon: any;
@@ -37,7 +40,7 @@ const navigationItems: NavItem[] = [
   },
   {
     icon: BookOpen,
-    label: 'My Courses',
+    label: 'My Class',
     href: '/courses',
     roles: ['student']
   },
@@ -45,12 +48,6 @@ const navigationItems: NavItem[] = [
     icon: FileText,
     label: 'Assignments',
     href: '/assignments',
-    roles: ['student']
-  },
-  {
-    icon: Calendar,
-    label: 'Schedule',
-    href: '/schedule',
     roles: ['student']
   },
   {
@@ -90,7 +87,7 @@ const navigationItems: NavItem[] = [
     roles: ['teacher']
   },
   {
-    icon: Settings,
+    icon: SettingsIcon,
     label: 'Settings',
     href: '/settings',
     roles: ['student', 'teacher']
@@ -101,6 +98,60 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('/dashboard');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const miniProjectsRef = useRef<any>(null);
+  const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
+  const [completedProjectsCount, setCompletedProjectsCount] = useState(0);
+  const [activeAssignmentsCount, setActiveAssignmentsCount] = useState(0);
+  const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user?.role === 'student') {
+      fetchDashboardStats();
+    }
+  }, [user]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      // Fetch enrolled courses
+      const coursesResponse = await fetch(`${import.meta.env.VITE_API_URL}/courses/enrolled`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const coursesData = await coursesResponse.json();
+      if (coursesResponse.ok) {
+        setEnrolledCoursesCount(coursesData.enrolledCourses?.length || 0);
+      }
+
+      // Fetch completed mini projects
+      const miniProjectsResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const miniProjectsData = await miniProjectsResponse.json();
+      if (miniProjectsResponse.ok) {
+        const completedCount = miniProjectsData.completedTasks?.filter(
+          (task: any) => task.status === 'submitted'
+        ).length || 0;
+        setCompletedProjectsCount(completedCount);
+      }
+
+      // Fetch assignments
+      const assignmentsResponse = await fetch(`${import.meta.env.VITE_API_URL}/assignments/student/my-assignments`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const assignmentsData = await assignmentsResponse.json();
+      if (assignmentsResponse.ok) {
+        setActiveAssignmentsCount(assignmentsData.activeCount || 0);
+        setUpcomingAssignments(assignmentsData.upcomingAssignments || []);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
+  };
 
   if (!user) {
     return null;
@@ -109,6 +160,42 @@ export default function Dashboard() {
   const filteredNavigation = navigationItems.filter(item => 
     item.roles.includes(user.role)
   );
+
+  const handleNavigation = (href: string) => {
+    if (hasUnsavedChanges && activeNav === '/mini-projects') {
+      setPendingNavigation(href);
+      setShowNavigationWarning(true);
+    } else {
+      setActiveNav(href);
+      setHasUnsavedChanges(false);
+    }
+  };
+
+  const handleCancelNavigation = () => {
+    setShowNavigationWarning(false);
+    setPendingNavigation(null);
+  };
+
+  const handleConfirmNavigation = () => {
+    setShowNavigationWarning(false);
+    if (pendingNavigation) {
+      setActiveNav(pendingNavigation);
+      setHasUnsavedChanges(false);
+    }
+    setPendingNavigation(null);
+  };
+
+  const handleSaveAndNavigate = async () => {
+    if (miniProjectsRef.current && miniProjectsRef.current.saveProgress) {
+      await miniProjectsRef.current.saveProgress();
+    }
+    setShowNavigationWarning(false);
+    if (pendingNavigation) {
+      setActiveNav(pendingNavigation);
+      setHasUnsavedChanges(false);
+    }
+    setPendingNavigation(null);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -168,7 +255,7 @@ export default function Dashboard() {
               return (
                 <button
                   key={item.href}
-                  onClick={() => setActiveNav(item.href)}
+                  onClick={() => handleNavigation(item.href)}
                   className={`
                     w-full flex items-center space-x-2 px-3 py-2 rounded transition-colors
                     ${isActive 
@@ -231,7 +318,20 @@ export default function Dashboard() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <MiniProjects />
+              <MiniProjects 
+                ref={miniProjectsRef}
+                onHasUnsavedChanges={setHasUnsavedChanges}
+              />
+            </>
+          ) : activeNav === '/settings' ? (
+            <>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <Settings />
             </>
           ) : (
             <>
@@ -256,13 +356,12 @@ export default function Dashboard() {
               </div>
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
                 {user.role === 'student' ? (
                   <>
-                    <StatCard icon={BookOpen} label="Enrolled Courses" value="6" />
-                    <StatCard icon={FileText} label="Active Assignments" value="12" />
-                    <StatCard icon={ClipboardList} label="Completed" value="45" />
-                    <StatCard icon={BarChart3} label="Average Grade" value="87%" />
+                    <StatCard icon={BookOpen} label="Enrolled Classes" value={enrolledCoursesCount.toString()} />
+                    <StatCard icon={FileText} label="Active Assignments" value={activeAssignmentsCount.toString()} />
+                    <StatCard icon={FolderKanban} label="Mini Projects Done" value={completedProjectsCount.toString()} />
                   </>
                 ) : (
                   <>
@@ -278,20 +377,22 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {user.role === 'student' ? (
                   <>
-                    <ContentCard
-                      title="Recent Courses"
-                      items={[
-                        { label: 'Advanced JavaScript', progress: 75 },
-                        { label: 'React Fundamentals', progress: 45 },
-                        { label: 'Node.js Backend', progress: 60 }
-                      ]}
+                    <QuickActionsCard
+                      title="Quick Actions"
+                      onMiniProjectsClick={() => handleNavigation('/mini-projects')}
                     />
                     <ContentCard
                       title="Upcoming Assignments"
-                      items={[
-                        { label: 'JavaScript Project', due: 'Due in 2 days' },
-                        { label: 'React Component Build', due: 'Due in 5 days' },
-                        { label: 'Database Design', due: 'Due in 1 week' }
+                      items={upcomingAssignments.length > 0 ? upcomingAssignments.map(assignment => ({
+                        label: assignment.title,
+                        due: assignment.daysUntilDue === 0 
+                          ? 'Due today' 
+                          : assignment.daysUntilDue === 1 
+                          ? 'Due tomorrow' 
+                          : `Due in ${assignment.daysUntilDue} days`,
+                        classroom: assignment.classroom?.name
+                      })) : [
+                        { label: 'No upcoming assignments', due: '' }
                       ]}
                     />
                   </>
@@ -320,6 +421,15 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* Unsaved Changes Warning Modal */}
+      <UnsavedChangesModal
+        isOpen={showNavigationWarning}
+        onCancel={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        onSaveAndLeave={handleSaveAndNavigate}
+        isSaving={false}
+      />
     </div>
   );
 }
@@ -358,6 +468,9 @@ function ContentCard({ title, items }: ContentCardProps) {
           <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-900 truncate">{item.label}</p>
+              {item.classroom && (
+                <p className="text-xs text-gray-500 mt-0.5">{item.classroom}</p>
+              )}
               {item.progress !== undefined && (
                 <div className="mt-1.5 w-full bg-gray-100 rounded-full h-1.5">
                   <div 
@@ -383,6 +496,91 @@ function ContentCard({ title, items }: ContentCardProps) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+interface QuickActionsCardProps {
+  title: string;
+  onMiniProjectsClick: () => void;
+}
+
+interface MiniProject {
+  title: string;
+}
+
+function QuickActionsCard({ title, onMiniProjectsClick }: QuickActionsCardProps) {
+  const [projects, setProjects] = useState<MiniProject[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMiniProjects();
+  }, []);
+
+  const fetchMiniProjects = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/available-projects`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok && data.availableProjects) {
+        setProjects(data.availableProjects.slice(0, 3));
+      }
+    } catch (error) {
+      console.error('Error fetching mini projects:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <button
+          onClick={onMiniProjectsClick}
+          className="text-xs text-gray-600 hover:text-gray-900 font-medium"
+        >
+          View All
+        </button>
+      </div>
+      <div className="space-y-2">
+        {loading ? (
+          <div className="text-center py-4">
+            <p className="text-xs text-gray-500">Loading projects...</p>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="text-center py-4">
+            <p className="text-xs text-gray-500">No projects available</p>
+          </div>
+        ) : (
+          projects.map((project, index) => (
+            <button
+              key={index}
+              onClick={onMiniProjectsClick}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors group text-left"
+            >
+              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className="w-8 h-8 bg-gray-900 rounded flex items-center justify-center group-hover:bg-gray-800 transition-colors flex-shrink-0">
+                  <Code className="w-4 h-4 text-white" />
+                </div>
+                <p className="text-sm font-medium text-gray-900 truncate">{project.title}</p>
+              </div>
+              <div className="text-gray-400 group-hover:text-gray-600 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );

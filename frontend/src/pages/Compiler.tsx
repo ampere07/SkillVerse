@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { Play, Menu, BookOpen, X, Square, Lightbulb, AlertCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { Play, Menu, BookOpen, X, Square, Lightbulb, ArrowLeft, Save, Send } from 'lucide-react';
+import UnsavedChangesModal from '../components/UnsavedChangesModal';
 import { io, Socket } from 'socket.io-client';
 import {
   JAVA_SUGGESTIONS,
@@ -91,9 +92,10 @@ interface CompilerProps {
   onMenuClick: () => void;
   projectDetails?: ProjectDetails;
   onBack?: () => void;
+  onHasUnsavedChanges?: (hasChanges: boolean) => void;
 }
 
-export default function Compiler({ onMenuClick, projectDetails, onBack }: CompilerProps) {
+const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges }, ref) => {
   const [language, setLanguage] = useState('java');
   const [code, setCode] = useState(DEFAULT_CODE.java);
   const [output, setOutput] = useState('');
@@ -124,6 +126,16 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
   const [aiMessages, setAiMessages] = useState<Array<{type: 'ai' | 'user', text: string}>>([]);
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [lastHintTime, setLastHintTime] = useState<number>(0);
+  const [streamingText, setStreamingText] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    saveProgress: handleSaveProgress
+  }));
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
@@ -137,11 +149,6 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
       const projectLang = projectDetails.language.toLowerCase();
       setLanguage(projectLang);
       loadSavedProgress();
-      
-      // Send initial AI greeting
-      setTimeout(() => {
-        sendAiGreeting();
-      }, 1000);
     }
   }, [projectDetails]);
 
@@ -212,7 +219,8 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
       // Restore AI assistant after execution completes
       if (projectDetails) {
         setTimeout(() => {
-          setAiMessages([{ type: 'ai', text: 'Great! Your code finished running. I\'m here if you need help with anything else!' }]);
+          setAiMessages([]);
+          startStreamingMessage('Great! Your code finished running. I\'m here if you need help with anything else!');
           setLastHintTime(Date.now());
         }, 500);
       }
@@ -245,12 +253,12 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
   }, [projectDetails, isRunning, code, lastHintTime]);
 
   const sendAiGreeting = () => {
-    const greeting = `Hello! I'm your AI coding assistant. I'll analyze your code and provide hints to help you complete the project. Let me know if you need help!`;
+    const greeting = `Hello! I'm your SkillVerse coding assistant. I'll analyze your code and provide hints to help you complete the project. Let me know if you need help!`;
     setAiMessages([{ type: 'ai', text: greeting }]);
   };
 
   const analyzeCodeAndGiveHint = async () => {
-    if (!projectDetails || isRunning || isAiThinking) return;
+    if (!projectDetails || isRunning || isAiThinking || isStreaming) return;
     
     setIsAiThinking(true);
     
@@ -275,20 +283,51 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
       const data = await response.json();
       
       if (response.ok && data.hint) {
-        setAiMessages(prev => [...prev, { type: 'ai', text: data.hint }]);
+        setIsAiThinking(false);
+        startStreamingMessage(data.hint);
+      }
+    } catch (error) {
+      console.error('AI analysis error:', error);
+      setIsAiThinking(false);
+    }
+  };
+
+  const startStreamingMessage = (message: string) => {
+    setIsStreaming(true);
+    setStreamingText('');
+    setAiMessages([]);
+    
+    let currentIndex = 0;
+    
+    if (streamingIntervalRef.current) {
+      clearInterval(streamingIntervalRef.current);
+    }
+    
+    streamingIntervalRef.current = setInterval(() => {
+      if (currentIndex < message.length) {
+        setStreamingText(message.substring(0, currentIndex + 1));
+        currentIndex++;
         
-        // Auto-scroll to bottom
+        if (consoleRef.current) {
+          consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+        }
+      } else {
+        setIsStreaming(false);
+        setAiMessages([{ type: 'ai', text: message }]);
+        setStreamingText('');
+        
+        if (streamingIntervalRef.current) {
+          clearInterval(streamingIntervalRef.current);
+          streamingIntervalRef.current = null;
+        }
+        
         setTimeout(() => {
           if (consoleRef.current) {
             consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
           }
         }, 100);
       }
-    } catch (error) {
-      console.error('AI analysis error:', error);
-    } finally {
-      setIsAiThinking(false);
-    }
+    }, 20);
   };
 
   useEffect(() => {
@@ -336,9 +375,15 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
     setCompilationErrors([]);
     setIsRunning(true);
     
-    // Clear AI messages when running code
+    // Clear AI messages and stop streaming when running code
     if (projectDetails) {
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
+        streamingIntervalRef.current = null;
+      }
       setAiMessages([]);
+      setIsStreaming(false);
+      setStreamingText('');
     }
     
     if (language === 'java') {
@@ -360,12 +405,21 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
       // Restore AI assistant after stopping
       if (projectDetails) {
         setTimeout(() => {
-          setAiMessages([{ type: 'ai', text: 'Code execution stopped. I\'m back to help! Ask me anything or I\'ll analyze your code in 30 seconds.' }]);
+          setAiMessages([]);
+          startStreamingMessage('Code execution stopped. I\'m back to help! Ask me anything or I\'ll analyze your code in 30 seconds.');
           setLastHintTime(Date.now());
         }, 500);
       }
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleConsoleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isRunning) return;
@@ -462,6 +516,14 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newCode = e.target.value;
     setCode(newCode);
+    
+    // Mark as having unsaved changes
+    if (projectDetails) {
+      setHasUnsavedChanges(true);
+      if (onHasUnsavedChanges) {
+        onHasUnsavedChanges(true);
+      }
+    }
     
     // Clear bracket highlighting when typing
     setHighlightedBrackets(null);
@@ -899,12 +961,79 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
 
       if (response.ok) {
         setSaveMessage('Progress saved successfully');
+        setHasUnsavedChanges(false);
+        if (onHasUnsavedChanges) {
+          onHasUnsavedChanges(false);
+        }
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
         setSaveMessage(data.message || 'Error saving progress');
       }
     } catch (error) {
       setSaveMessage('Error saving progress');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBackClick = () => {
+    if (projectDetails && hasUnsavedChanges) {
+      setPendingNavigation(() => onBack || (() => {}));
+      setShowNavigationWarning(true);
+    } else if (onBack) {
+      onBack();
+    }
+  };
+
+  const handleCancelNavigation = () => {
+    setShowNavigationWarning(false);
+    setPendingNavigation(null);
+  };
+
+  const handleConfirmNavigation = () => {
+    setShowNavigationWarning(false);
+    if (pendingNavigation) {
+      pendingNavigation();
+    }
+    setPendingNavigation(null);
+  };
+
+  const handleSaveAndNavigate = async () => {
+    if (!projectDetails || isSaving) return;
+
+    setIsSaving(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/save-progress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          projectTitle: projectDetails.title,
+          codeBase: code
+        })
+      });
+
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        if (onHasUnsavedChanges) {
+          onHasUnsavedChanges(false);
+        }
+        setShowNavigationWarning(false);
+        if (pendingNavigation) {
+          pendingNavigation();
+        }
+        setPendingNavigation(null);
+      }
+    } catch (error) {
+      console.error('Error saving:', error);
     } finally {
       setIsSaving(false);
     }
@@ -978,10 +1107,19 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Project Details Banner */}
       {projectDetails && (
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex-shrink-0">
+        <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
+                {onBack && (
+                  <button
+                    onClick={handleBackClick}
+                    className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                    title="Back"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                )}
                 <h2 className="text-base font-semibold text-gray-900">{projectDetails.title}</h2>
                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
                   {projectDetails.language}
@@ -989,37 +1127,12 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
               </div>
               <p className="text-sm text-gray-600 mb-2">{projectDetails.description}</p>
               {projectDetails.requirements && (
-                <div className="bg-white border border-blue-200 rounded-lg p-3">
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
                   <p className="text-xs font-semibold text-gray-700 mb-1">Requirements:</p>
                   <div className="text-xs text-gray-600 whitespace-pre-line">
                     {projectDetails.requirements}
                   </div>
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSaveProgress}
-                disabled={isSaving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving ? 'Saving...' : 'Save'}
-              </button>
-              <button
-                onClick={handleSubmitProject}
-                disabled={isSaving || isGrading}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isGrading ? 'Grading...' : isSaving ? 'Submitting...' : 'Submit'}
-              </button>
-              {onBack && (
-                <button
-                  onClick={onBack}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex-shrink-0"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </button>
               )}
             </div>
           </div>
@@ -1036,7 +1149,7 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
       )}
       
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
+      <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {!projectDetails && (
@@ -1059,17 +1172,32 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
                 </option>
               ))}
             </select>
-            {language === 'java' && libraries.length > 0 && (
-              <button
-                onClick={() => setShowLibraries(!showLibraries)}
-                className="flex items-center space-x-1 px-2 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">{libraries.length} Libraries</span>
-              </button>
-            )}
           </div>
           <div className="flex items-center space-x-2">
+            {projectDetails && (
+              <>
+                <button
+                  onClick={handleSaveProgress}
+                  disabled={isSaving}
+                  className="relative p-2 text-gray-600 hover:text-gray-900 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Save Progress"
+                >
+                  <Save className="w-5 h-5" />
+                  {hasUnsavedChanges && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </button>
+                <button
+                  onClick={handleSubmitProject}
+                  disabled={isSaving || isGrading}
+                  className="flex items-center gap-1.5 px-2 py-2 text-gray-600 hover:text-gray-900 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Submit Project"
+                >
+                  <Send className="w-5 h-5" />
+                  <span className="text-sm font-medium">{isGrading ? 'Grading...' : isSaving ? 'Submitting...' : 'Submit'}</span>
+                </button>
+              </>
+            )}
             {isRunning && (
               <button
                 onClick={handleStop}
@@ -1146,12 +1274,12 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
       )}
 
       {/* Editor and Output */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden" style={{ height: projectDetails ? 'calc(100vh - 300px)' : 'calc(100vh - 200px)' }}>
         {/* Code Editor */}
-        <div className="flex flex-col border-r border-gray-200 bg-white overflow-hidden h-full">
-          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+        <div className="flex flex-col border-r border-gray-200 bg-white overflow-hidden">
+          <div className="px-4 py-2 border-b border-gray-200 flex-shrink-0">
             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-              Code Editor {language === 'java' && <span className="text-gray-500 font-normal">(Auto-import suggestions enabled)</span>}
+              Code Editor {language === 'java'}
             </h3>
           </div>
           <div className="flex-1 flex overflow-hidden min-h-0 relative">
@@ -1189,12 +1317,6 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
                         ''
                       }
                     >
-                      {hasError && (
-                        <AlertCircle className="w-3 h-3 text-red-600 flex-shrink-0" />
-                      )}
-                      {hasWarning && (
-                        <AlertTriangle className="w-3 h-3 text-yellow-600 flex-shrink-0" />
-                      )}
                       <span>{num}</span>
                     </div>
                   );
@@ -1327,68 +1449,91 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
         </div>
 
         {/* Interactive Console */}
-        <div className="flex flex-col bg-gray-900 overflow-hidden h-full">
-          <div className="px-4 py-2 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+        <div className="flex flex-col bg-gray-900 overflow-hidden">
+          <div className="px-1 py-1 bg-gray-800 border-b border-gray-700 flex-shrink-0">
             <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
-              {projectDetails && !isRunning ? '🤖 AI Coding Assistant' : 'Interactive Console'}
+              {projectDetails && !isRunning ? 'SkillVerse Coding Assistant' : 'Interactive Console'}
             </h3>
           </div>
           
           {/* Console Area */}
           <div 
             ref={consoleRef}
-            className="flex-1 overflow-auto p-4 min-h-0 focus:outline-none"
+            className="flex-1 overflow-auto min-h-0 focus:outline-none"
             tabIndex={0}
             onKeyDown={handleConsoleKeyDown}
             style={{ cursor: isRunning ? 'text' : 'default' }}
           >
             {projectDetails && !isRunning ? (
               // AI Assistant Mode
-              <div className="space-y-4">
-                {aiMessages.length === 0 ? (
+              <div className="space-y-2 p-2">
+                {aiMessages.length === 0 && !isStreaming && !isAiThinking ? (
                   <div className="text-sm text-gray-400 font-mono">
-                    AI Assistant is analyzing your code...
+                    Waiting for AI hints...
                   </div>
                 ) : (
-                  aiMessages.map((msg, index) => (
-                    <div key={index} className={`flex ${msg.type === 'ai' ? 'justify-start' : 'justify-end'}`}>
-                      <div className={`max-w-[80%] rounded-lg p-3 ${
-                        msg.type === 'ai' 
-                          ? 'bg-blue-900 text-blue-100' 
-                          : 'bg-gray-700 text-gray-100'
-                      }`}>
-                        <div className="text-xs font-semibold mb-1">
-                          {msg.type === 'ai' ? '🤖 AI Assistant' : 'You'}
-                        </div>
-                        <div className="text-sm font-mono whitespace-pre-wrap">
-                          {msg.text}
+                  <>
+                    {aiMessages.map((msg, index) => (
+                      <div key={index} className="flex justify-start">
+                        <div className="max-w-full">
+                          <div className="text-xs font-semibold mb-1 text-gray-400">
+                            SkillVerse Assistant
+                          </div>
+                          <div className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
+                            {msg.text}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
-                )}
-                {isAiThinking && (
-                  <div className="flex justify-start">
-                    <div className="bg-blue-900 text-blue-100 rounded-lg p-3">
-                      <div className="text-xs font-semibold mb-1">🤖 AI Assistant</div>
-                      <div className="text-sm font-mono">
-                        Analyzing your code<span className="animate-pulse">...</span>
+                    ))}
+                    {isStreaming && (
+                      <div className="flex justify-start">
+                        <div className="max-w-full">
+                          <div className="text-xs font-semibold mb-1 text-gray-400">
+                            SkillVerse Assistant
+                          </div>
+                          <div className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
+                            {streamingText}<span className="animate-pulse">|</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                    {isAiThinking && (
+                      <div className="flex justify-start">
+                        <div className="max-w-full">
+                          <div className="text-xs font-semibold mb-1 text-gray-400">
+                            SkillVerse Assistant
+                          </div>
+                          <div className="text-sm font-mono text-gray-100">
+                            Analyzing your code<span className="animate-pulse">...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ) : (
               // Regular Console Mode
-              <pre className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
-                {output || 'Click "Run Code" to execute your program.\n\nMissing imports are automatically detected!\nWhen the program asks for input, type directly here and press Enter.'}
-                {isRunning && <span className="text-green-400">{currentInput}</span>}
-                {isRunning && <span className="animate-pulse text-green-400">█</span>}
-              </pre>
+              <div className="p-4">
+                <pre className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
+                  {output || 'Click "Run Code" to execute your program.\n\nMissing imports are automatically detected!\nWhen the program asks for input, type directly here and press Enter.'}
+                  {isRunning && <span className="text-green-400">{currentInput}</span>}
+                  {isRunning && <span className="animate-pulse text-green-400">█</span>}
+                </pre>
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Unsaved Changes Warning Modal */}
+      <UnsavedChangesModal
+        isOpen={showNavigationWarning}
+        onCancel={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        onSaveAndLeave={handleSaveAndNavigate}
+        isSaving={isSaving}
+      />
 
       {/* Submit Confirmation Modal */}
       {showSubmitConfirmModal && (
@@ -1477,4 +1622,8 @@ export default function Compiler({ onMenuClick, projectDetails, onBack }: Compil
       )}
     </div>
   );
-}
+});
+
+Compiler.displayName = 'Compiler';
+
+export default Compiler;
