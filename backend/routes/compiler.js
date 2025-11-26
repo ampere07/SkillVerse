@@ -211,31 +211,35 @@ router.post('/analyze-code', authenticateToken, async (req, res) => {
 
     console.log('[AI Hint] Analyzing code for project:', projectTitle);
 
-    const prompt = `TASK: Check if the code satisfies the requirements.
+    const prompt = `You are a friendly coding mentor helping a student. Give feedback in ONE simple paragraph.
 
-STEP 1 - REQUIREMENT CHECK:
-REQUIREMENTS LIST:
+REQUIREMENTS:
 ${requirements}
 
-For each requirement above, check if the CODE implements it.
-
-CODE TO ANALYZE:
+STUDENT CODE:
 ${code}
 
-STEP 2 - DETERMINE STATUS:
-Count how many requirements are satisfied.
-- If ALL requirements are satisfied = CODE IS COMPLETE
-- If ANY requirement is missing = CODE IS INCOMPLETE
+INSTRUCTIONS:
+1. Check if the code does all the requirements (don't show this check)
+2. Look at the code quality (don't show this)
+3. Write your response:
 
-STEP 3 - GENERATE RESPONSE:
+IF ALL REQUIREMENTS ARE DONE:
+Write one paragraph that:
+- Says congrats for finishing all requirements
+- Give 2-3 simple tips to make the code better (like: add comments, use better names, fix errors)
+- Keep it happy and positive
+- Use simple, easy words
 
-IF CODE IS COMPLETE:
-Respond with: "Great job! Your code is complete and meets all the requirements. Here are some suggestions for improvement: [add 1-2 brief suggestions about better practices, optimization, or code quality]"
+IF REQUIREMENTS ARE NOT DONE:
+Write one paragraph that:
+- Say something nice and encouraging
+- Give a hint about what's missing (don't say it directly)
+- Tell them what to work on next
+- Keep it positive and helpful
+- Use simple, easy words
 
-IF CODE IS INCOMPLETE:
-Respond with: "[Give one specific hint about which requirement is missing and what to implement next]"
-
-Now perform the evaluation and provide your response:`;
+IMPORTANT: Write ONLY one paragraph. Don't show any analysis, lists, or code. Use simple English. No complicated words.`;
 
     const response = await ollama.chat({
       model: MODEL_NAME,
@@ -292,7 +296,9 @@ Now perform the evaluation and provide your response:`;
     const likelyComplete = hasSubstantialCode && checkRequirementKeywords();
     
     if (likelyComplete && !hint.toLowerCase().includes('complete')) {
-      hint = 'Great job! Your code is complete and meets all the requirements. Consider adding more detailed comments to explain your logic, and you might want to organize your validation methods into a separate utility class for better code structure.';
+      hint = 'Great job! Your code does everything it needs to do. To make it even better, try adding some comments to explain what your code does, use clearer names for your variables, and add checks to make sure the user types in the right stuff.';
+    } else if (!likelyComplete && hint.toLowerCase().includes('complete')) {
+      hint = 'You\'re doing well! Your code looks good so far, but you still need to add a few more things. Try to finish the main parts first, then test each part to make sure it works before you move to the next one.';
     }
     
     console.log('[AI Hint] Generated hint successfully');
