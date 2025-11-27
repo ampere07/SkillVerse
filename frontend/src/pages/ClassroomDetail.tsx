@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, 
+  ChevronRight,
   Plus, 
   Users, 
   Calendar,
@@ -14,6 +14,7 @@ import {
 import { classroomAPI, activityAPI, moduleAPI } from '../utils/api';
 import CreatePostModal from '../components/CreatePostModal';
 import AssignmentDetail from './AssignmentDetail';
+import PostDetails from './PostDetails';
 
 interface Post {
   _id: string;
@@ -39,9 +40,21 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<{ id: string; type: 'activity' | 'module' } | null>(null);
+
   useEffect(() => {
     fetchClassroomData();
   }, [classroomId]);
+
+  if (selectedPost) {
+    return (
+      <PostDetails
+        postId={selectedPost.id}
+        postType={selectedPost.type}
+        onBack={() => setSelectedPost(null)}
+      />
+    );
+  }
 
   const fetchClassroomData = async () => {
     try {
@@ -118,13 +131,13 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
   return (
     <div className="space-y-6">
       <div>
-        <button
-          onClick={onBack}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Back to Classrooms</span>
-        </button>
+        <div className="flex items-center text-sm text-gray-600 mb-4">
+          <button onClick={onBack} className="hover:text-gray-900 transition-colors">
+            My Classrooms
+          </button>
+          <ChevronRight className="w-4 h-4 mx-2" />
+          <span className="text-gray-900 font-medium">{classroom.name}</span>
+        </div>
 
         <div className="flex items-start justify-between">
           <div>
@@ -202,6 +215,7 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
                 key={post._id}
                 post={post}
                 onDelete={handleDeletePost}
+                onView={() => setSelectedPost({ id: post._id, type: post.postType })}
               />
             ))}
           </div>
@@ -224,9 +238,10 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
 interface PostCardProps {
   post: Post;
   onDelete: (id: string, postType: 'activity' | 'module') => void;
+  onView: () => void;
 }
 
-function PostCard({ post, onDelete }: PostCardProps) {
+function PostCard({ post, onDelete, onView }: PostCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   
   const dueDate = post.dueDate ? new Date(post.dueDate) : null;
@@ -255,7 +270,10 @@ function PostCard({ post, onDelete }: PostCardProps) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
+    <button
+      onClick={onView}
+      className="w-full text-left bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-2">
@@ -311,7 +329,10 @@ function PostCard({ post, onDelete }: PostCardProps) {
 
         <div className="relative ml-4">
           <button
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMenu(!showMenu);
+            }}
             className="p-1 text-gray-400 hover:text-gray-600 rounded"
           >
             <MoreVertical className="w-4 h-4" />
@@ -325,7 +346,8 @@ function PostCard({ post, onDelete }: PostCardProps) {
               />
               <div className="absolute right-0 top-8 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     onDelete(post._id, post.postType);
                     setShowMenu(false);
                   }}
@@ -339,6 +361,6 @@ function PostCard({ post, onDelete }: PostCardProps) {
           )}
         </div>
       </div>
-    </div>
+    </button>
   );
 }

@@ -256,18 +256,30 @@ export const activityAPI = {
     return response.json();
   },
 
-  submitActivity: async (id: string, data: {
-    content: string;
-    attachments?: any[];
-  }) => {
+  submitActivity: async (id: string, formData: FormData) => {
+    const token = localStorage.getItem('token');
     const response = await fetch(`${API_URL}/activities/${id}/submit`, {
       method: 'POST',
-      headers: getAuthHeader(),
-      body: JSON.stringify(data)
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
     });
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || 'Failed to submit activity');
+    }
+    return response.json();
+  },
+
+  unsubmitActivity: async (id: string) => {
+    const response = await fetch(`${API_URL}/activities/${id}/unsubmit`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to unsubmit activity');
     }
     return response.json();
   },
