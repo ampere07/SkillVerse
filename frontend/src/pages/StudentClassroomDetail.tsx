@@ -29,9 +29,10 @@ interface Post {
 interface StudentClassroomDetailProps {
   classroomId: string;
   onBack: () => void;
+  initialPostId?: string | null;
 }
 
-export default function StudentClassroomDetail({ classroomId, onBack }: StudentClassroomDetailProps) {
+export default function StudentClassroomDetail({ classroomId, onBack, initialPostId }: StudentClassroomDetailProps) {
   const { user } = useAuth();
   const [classroom, setClassroom] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -42,6 +43,15 @@ export default function StudentClassroomDetail({ classroomId, onBack }: StudentC
   useEffect(() => {
     fetchClassroomData();
   }, [classroomId]);
+
+  useEffect(() => {
+    if (initialPostId && posts.length > 0) {
+      const post = posts.find(p => p._id === initialPostId);
+      if (post) {
+        setSelectedPost({ id: post._id, type: post.postType });
+      }
+    }
+  }, [initialPostId, posts]);
 
   if (selectedPost) {
     return (
@@ -110,7 +120,7 @@ export default function StudentClassroomDetail({ classroomId, onBack }: StudentC
     : 'Unknown Teacher';
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <div className="flex items-center text-sm text-gray-600 mb-4">
           <button onClick={onBack} className="hover:text-gray-900 transition-colors">
@@ -147,9 +157,9 @@ export default function StudentClassroomDetail({ classroomId, onBack }: StudentC
         </div>
       )}
 
+      <div className="border-t border-gray-200" />
+
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Activities & Modules</h2>
-        
         {posts.length === 0 ? (
           <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
             <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
@@ -203,66 +213,83 @@ function StudentPostCard({ post, userId, onViewDetails }: StudentPostCardProps) 
     const diff = date.getTime() - now.getTime();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
     
-    if (days < 0) return 'Overdue';
-    if (days === 0) return 'Due today';
-    if (days === 1) return 'Due tomorrow';
-    if (days < 7) return `Due in ${days} days`;
+    if (days < 0) return { text: 'Overdue', color: 'text-red-600' };
+    if (days === 0) return { text: 'Due today', color: 'text-red-600' };
+    if (days === 1) return { text: 'Due tomorrow', color: 'text-gray-600' };
+    if (days < 7) return { text: `Due in ${days} days`, color: 'text-gray-600' };
     
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return { 
+      text: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      color: 'text-gray-600'
+    };
   };
 
   return (
     <button
       onClick={onViewDetails}
-      className="w-full text-left bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow"
+      className="w-full text-left bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(post.postType)}`}>
-              {post.postType.charAt(0).toUpperCase() + post.postType.slice(1)}
+      <div className="p-5">
+        <div className="flex items-center space-x-2 mb-3">
+          <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(post.postType)}`}>
+            {post.postType.charAt(0).toUpperCase() + post.postType.slice(1)}
+          </span>
+          {post.requiresCompiler && (
+            <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+              Compiler
             </span>
-            {post.requiresCompiler && (
-              <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
-                Compiler
-              </span>
-            )}
-            {hasSubmitted && (
-              <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700 flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" />
-                Submitted
-              </span>
-            )}
-          </div>
-          
-          <h3 className="text-base font-semibold text-gray-900 mb-1">
-            {post.title}
-          </h3>
-          
-          <p className="text-sm text-gray-600 mb-3">
-            {post.description}
-          </p>
-
-          <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
-            {dueDate && (
-              <div className={`flex items-center space-x-1 ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : ''}`}>
-                {isOverdue ? (
-                  <AlertCircle className="w-4 h-4" />
-                ) : (
-                  <Calendar className="w-4 h-4" />
-                )}
-                <span>{formatDueDate(dueDate)}</span>
-              </div>
-            )}
-            
-            {post.points && post.points > 0 && (
-              <div className="flex items-center space-x-1">
-                <span className="font-medium">{post.points} pts</span>
-              </div>
-            )}
-          </div>
+          )}
+          {hasSubmitted && (
+            <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" />
+              Submitted
+            </span>
+          )}
         </div>
       </div>
+
+      <div className="px-5">
+        <div className="border-t border-gray-200" />
+      </div>
+
+      <div className="p-5">
+        <h3 className="text-base font-semibold text-gray-900 mb-2">
+          {post.title}
+        </h3>
+        
+        <p className="text-sm text-gray-600">
+          {post.description}
+        </p>
+      </div>
+
+      {post.postType === 'activity' && (
+        <>
+          <div className="px-5">
+            <div className="border-t border-gray-200" />
+          </div>
+
+          <div className="p-5">
+            <div className="flex items-center space-x-4 text-sm">
+              {dueDate && (
+                <div className={`flex items-center space-x-1.5 ${formatDueDate(dueDate).color}`}>
+                  {isOverdue ? (
+                    <AlertCircle className="w-4 h-4" />
+                  ) : (
+                    <Calendar className="w-4 h-4" />
+                  )}
+                  <span>{formatDueDate(dueDate).text}</span>
+                </div>
+              )}
+              
+              {post.points && post.points > 0 && (
+                <div className="flex items-center space-x-1.5 text-gray-600">
+                  <span className="font-medium">{post.points} pts</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </button>
   );
 }

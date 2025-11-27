@@ -18,8 +18,7 @@ import {
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Compiler from '../pages/Compiler';
-import MyCourses from '../pages/MyCourses';
-import TeacherClassrooms from '../pages/TeacherClassrooms';
+import Classrooms from '../pages/Classrooms';
 import MiniProjects from '../pages/MiniProjects';
 import Settings from '../pages/Settings';
 import Assignments from '../pages/Assignments';
@@ -42,9 +41,9 @@ const navigationItems: NavItem[] = [
   },
   {
     icon: BookOpen,
-    label: 'My Class',
-    href: '/courses',
-    roles: ['student']
+    label: 'My Classrooms',
+    href: '/classrooms',
+    roles: ['student', 'teacher']
   },
   {
     icon: FileText,
@@ -63,12 +62,6 @@ const navigationItems: NavItem[] = [
     label: 'Mini Projects',
     href: '/mini-projects',
     roles: ['student']
-  },
-  {
-    icon: GraduationCap,
-    label: 'My Classrooms',
-    href: '/classrooms',
-    roles: ['teacher']
   },
   {
     icon: ClipboardList,
@@ -120,7 +113,6 @@ export default function Dashboard() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      // Fetch enrolled courses
       const coursesResponse = await fetch(`${import.meta.env.VITE_API_URL}/courses/enrolled`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -129,7 +121,6 @@ export default function Dashboard() {
         setEnrolledCoursesCount(coursesData.enrolledCourses?.length || 0);
       }
 
-      // Fetch completed mini projects
       const miniProjectsResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -141,14 +132,89 @@ export default function Dashboard() {
         setCompletedProjectsCount(completedCount);
       }
 
-      // Fetch assignments
-      const assignmentsResponse = await fetch(`${import.meta.env.VITE_API_URL}/assignments/student/my-assignments`, {
+      const classroomsResponse = await fetch(`${import.meta.env.VITE_API_URL}/classrooms/student`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const assignmentsData = await assignmentsResponse.json();
-      if (assignmentsResponse.ok) {
-        setActiveAssignmentsCount(assignmentsData.activeCount || 0);
-        setUpcomingAssignments(assignmentsData.upcomingAssignments || []);
+      const classroomsData = await classroomsResponse.json();
+      
+      if (classroomsResponse.ok && classroomsData.classrooms) {
+        const allActivities: any[] = [];
+        
+        for (const classroom of classroomsData.classrooms) {
+          try {
+            const activitiesResponse = await fetch(
+              `${import.meta.env.VITE_API_URL}/activities/classroom/${classroom._id}`,
+              {
+                headers: { 'Authorization': `Bearer ${token}` }
+              }
+            );
+            
+            if (activitiesResponse.ok) {
+              const activitiesData = await activitiesResponse.json();
+              if (activitiesData.success && activitiesData.activities) {
+                const classroomActivities = activitiesData.activities.map((activity: any) => ({
+                  ...activity,
+                  classroom: {
+                    _id: classroom._id,
+                    name: classroom.name,
+                    code: classroom.code
+                  }
+                }));
+                allActivities.push(...classroomActivities);
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching activities for classroom ${classroom._id}:`, err);
+          }
+        }
+
+        const now = new Date();
+        const upcomingActivities = allActivities
+          .filter(activity => {
+            if (!activity.dueDate) return false;
+            
+            const hasSubmitted = activity.submissions?.some(
+              (s: any) => s.student === user?.id || s.student?._id === user?.id
+            );
+            if (hasSubmitted) return false;
+            
+            const dueDate = new Date(activity.dueDate);
+            const diffTime = dueDate.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return diffDays >= 0 && diffDays <= 7;
+          })
+          .sort((a, b) => {
+            const dateA = new Date(a.dueDate).getTime();
+            const dateB = new Date(b.dueDate).getTime();
+            return dateA - dateB;
+          })
+          .map(activity => {
+            const dueDate = new Date(activity.dueDate);
+            const diffTime = dueDate.getTime() - now.getTime();
+            const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return {
+              ...activity,
+              daysUntilDue
+            };
+          })
+          .slice(0, 5);
+
+        const activeCount = allActivities.filter(activity => {
+          const hasSubmitted = activity.submissions?.some(
+            (s: any) => s.student === user?.id || s.student?._id === user?.id
+          );
+          if (hasSubmitted) return false;
+          
+          if (!activity.dueDate) return true;
+          
+          const dueDate = new Date(activity.dueDate);
+          return dueDate >= now || activity.allowLateSubmission;
+        }).length;
+
+        setActiveAssignmentsCount(activeCount);
+        setUpcomingAssignments(upcomingActivities);
       }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -200,7 +266,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="absolute inset-0 bg-gray-50" style={{ overflow: 'auto' }}>
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -292,16 +358,6 @@ export default function Dashboard() {
         <main className={activeNav === '/compiler' ? '' : 'p-4'}>
           {activeNav === '/compiler' ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
-          ) : activeNav === '/courses' ? (
-            <>
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <MyCourses />
-            </>
           ) : activeNav === '/classrooms' ? (
             <>
               <button
@@ -310,7 +366,7 @@ export default function Dashboard() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <TeacherClassrooms />
+              <Classrooms />
             </>
           ) : activeNav === '/mini-projects' ? (
             <>

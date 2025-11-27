@@ -23,6 +23,8 @@ export default function CreatePostModal({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
+  const [durationHours, setDurationHours] = useState('0');
+  const [durationMinutes, setDurationMinutes] = useState('0');
   const [dueDate, setDueDate] = useState('');
   const [points, setPoints] = useState('100');
   const [requiresCompiler, setRequiresCompiler] = useState(false);
@@ -43,6 +45,22 @@ export default function CreatePostModal({
     if (!title.trim() || !description.trim()) {
       setError('Title and description are required');
       return;
+    }
+
+    if (postType === 'activity') {
+      if (!instructions.trim()) {
+        setError('Requirements are required for activities');
+        return;
+      }
+
+      if (requiresCompiler) {
+        const hours = parseInt(durationHours) || 0;
+        const minutes = parseInt(durationMinutes) || 0;
+        if (hours === 0 && minutes === 0) {
+          setError('Duration is required for compiler activities');
+          return;
+        }
+      }
     }
 
     setLoading(true);
@@ -74,7 +92,11 @@ export default function CreatePostModal({
           description: description.trim(),
           dueDate: dueDate || undefined,
           points: parseInt(points) || 100,
-          instructions: instructions.trim() || undefined,
+          instructions: instructions.trim(),
+          duration: {
+            hours: parseInt(durationHours) || 0,
+            minutes: parseInt(durationMinutes) || 0
+          },
           requiresCompiler,
           isPublished: true,
           allowLateSubmission: false,
@@ -93,6 +115,8 @@ export default function CreatePostModal({
       setTitle('');
       setDescription('');
       setInstructions('');
+      setDurationHours('0');
+      setDurationMinutes('0');
       setDueDate('');
       setPoints('100');
       setRequiresCompiler(false);
@@ -126,6 +150,8 @@ export default function CreatePostModal({
   const handleTypeChange = (type: PostType) => {
     setPostType(type);
     setInstructions('');
+    setDurationHours('0');
+    setDurationMinutes('0');
     setDueDate('');
     setPoints('100');
     setRequiresCompiler(false);
@@ -203,20 +229,74 @@ export default function CreatePostModal({
             <>
               <div>
                 <label htmlFor="instructions" className="block text-sm font-medium text-gray-700 mb-2">
-                  Instructions (Optional)
+                  Requirements *
                 </label>
                 <textarea
                   id="instructions"
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
-                  placeholder="Detailed instructions for students"
+                  placeholder="Detailed requirements for students"
                   rows={4}
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-start space-x-3">
+                <div className="flex items-center h-5">
+                  <input
+                    id="requiresCompiler"
+                    type="checkbox"
+                    checked={requiresCompiler}
+                    onChange={(e) => setRequiresCompiler(e.target.checked)}
+                    className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label htmlFor="requiresCompiler" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Requires Compiler
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enable if students need to write and submit code
+                  </p>
+                </div>
+              </div>
+
+              {requiresCompiler && (
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Duration *
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <input
+                        type="number"
+                        value={durationHours}
+                        onChange={(e) => setDurationHours(e.target.value)}
+                        min="0"
+                        placeholder="Hours"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Hours</p>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        value={durationMinutes}
+                        onChange={(e) => setDurationMinutes(e.target.value)}
+                        min="0"
+                        max="59"
+                        placeholder="Minutes"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Minutes</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Time limit for completing the activity</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
                   <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-2">
                     Due Date (Optional)
                   </label>

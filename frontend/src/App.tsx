@@ -11,7 +11,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gray-100 flex items-center justify-center">
         <div className="text-xl text-gray-600">Loading...</div>
       </div>
     );
@@ -19,7 +19,7 @@ function App() {
 
   if (user) {
     return (
-      <>
+      <div className="fixed inset-0">
         <Dashboard />
         {isNewStudent && user.role === 'student' && (
           <OnboardingSurveyModal 
@@ -27,7 +27,7 @@ function App() {
             onClose={completeSurvey} 
           />
         )}
-      </>
+      </div>
     );
   }
 

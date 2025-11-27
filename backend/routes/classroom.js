@@ -169,7 +169,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // Create new classroom (teachers only)
 router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) => {
   try {
-    const { name, description, settings } = req.body;
+    const { name, description, yearLevelSection, settings } = req.body;
 
     if (!name) {
       return res.status(400).json({ 
@@ -181,6 +181,7 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
     const classroom = await classroomService.createClassroom({
       name,
       description,
+      yearLevelSection,
       teacher: req.user.userId,
       settings: settings || {}
     });
@@ -205,7 +206,7 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
 // Update classroom (teacher only)
 router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res) => {
   try {
-    const { name, description, settings } = req.body;
+    const { name, description, yearLevelSection, settings } = req.body;
 
     const isOwner = await classroomService.checkTeacherOwnership(req.params.id, req.user.userId);
     if (!isOwner) {
@@ -218,6 +219,7 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
     const classroom = await classroomService.updateClassroom(req.params.id, {
       name,
       description,
+      yearLevelSection,
       settings
     });
 

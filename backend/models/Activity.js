@@ -27,8 +27,22 @@ const activitySchema = new mongoose.Schema({
   },
   instructions: {
     type: String,
+    required: [true, 'Instructions are required'],
     trim: true,
     maxlength: [5000, 'Instructions cannot exceed 5000 characters']
+  },
+  duration: {
+    hours: {
+      type: Number,
+      default: 0,
+      min: [0, 'Hours cannot be negative']
+    },
+    minutes: {
+      type: Number,
+      default: 0,
+      min: [0, 'Minutes cannot be negative'],
+      max: [59, 'Minutes cannot exceed 59']
+    }
   },
   dueDate: {
     type: Date,
