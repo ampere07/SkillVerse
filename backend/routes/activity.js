@@ -1,9 +1,53 @@
 import express from 'express';
+import multer from 'multer';
 import Activity from '../models/Activity.js';
 import Classroom from '../models/Classroom.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
+import { uploadFile } from '../config/cloudinary.js';
+import fs from 'fs';
 
 const router = express.Router();
+
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'application/zip',
+      'application/x-rar-compressed'
+    ];
+
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images, PDFs, and documents are allowed.'));
+    }
+  }
+});
 
 router.get('/classroom/:classroomId', authenticateToken, async (req, res) => {
   try {
@@ -284,7 +328,7 @@ router.delete('/:id', authenticateToken, authorizeRole('teacher'), async (req, r
   }
 });
 
-router.post('/:id/submit', authenticateToken, authorizeRole('student'), async (req, res) => {
+router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.array('files', 10), async (req, res) => {
   try {
     const activity = await Activity.findById(req.params.id)
       .populate('classroom');
@@ -341,7 +385,40 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), async (r
       content = req.body.codeBase || '';
     } else {
       content = req.body.content || '';
-      attachments = req.body.attachments || [];
+      
+      // Handle file uploads for normal activities
+      if (req.files && req.files.length > 0) {
+        console.log(`Uploading ${req.files.length} files for activity submission`);
+        
+        const uploadPromises = req.files.map(async (file) => {
+          try {
+            const result = await uploadFile(file, {
+              classroomName: activity.classroom.name,
+              postTitle: activity.title,
+              postType: 'activity-submission'
+            });
+
+            fs.unlinkSync(file.path);
+
+            console.log(`  - Uploaded: ${result.public_id}`);
+
+            return {
+              fileName: file.originalname,
+              fileUrl: result.secure_url,
+              fileType: file.mimetype,
+              fileSize: file.size,
+              publicId: result.public_id
+            };
+          } catch (error) {
+            if (fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+            }
+            throw error;
+          }
+        });
+
+        attachments = await Promise.all(uploadPromises);
+      }
     }
 
     await activity.submitActivity(req.user.userId, content, attachments);
@@ -353,6 +430,15 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), async (r
       message: 'Activity submitted successfully'
     });
   } catch (error) {
+    // Clean up uploaded files if there's an error
+    if (req.files) {
+      req.files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+    }
+    
     console.error('Submit activity error:', error);
     res.status(500).json({ 
       success: false,
@@ -394,6 +480,24 @@ router.post('/:id/unsubmit', authenticateToken, authorizeRole('student'), async 
         success: false,
         message: 'No submission found to unsubmit' 
       });
+    }
+
+    const submission = activity.submissions[submissionIndex];
+    
+    // Delete attachments from Cloudinary if they exist
+    if (submission.attachments && submission.attachments.length > 0) {
+      const cloudinary = (await import('../config/cloudinary.js')).default;
+      
+      for (const attachment of submission.attachments) {
+        if (attachment.publicId) {
+          try {
+            await cloudinary.uploader.destroy(attachment.publicId);
+            console.log(`Deleted file from Cloudinary: ${attachment.publicId}`);
+          } catch (deleteError) {
+            console.error(`Failed to delete file from Cloudinary: ${attachment.publicId}`, deleteError);
+          }
+        }
+      }
     }
 
     activity.submissions.splice(submissionIndex, 1);

@@ -766,11 +766,26 @@ function SubmitModal({ postId, postTitle, isUnsubmit, onClose, onSuccess }: Subm
 
       const formData = new FormData();
       formData.append('content', content);
+      
+      // Append files with the correct field name expected by multer
       files.forEach(file => {
         formData.append('files', file);
       });
 
-      await activityAPI.submitActivity(postId, formData);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${postId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit activity');
+      }
+
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit activity');
