@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, 
+  ChevronRight,
   Users, 
   Calendar,
   FileText,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { classroomAPI, activityAPI, moduleAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import PostDetails from './PostDetails';
 
 interface Post {
   _id: string;
@@ -36,10 +37,21 @@ export default function StudentClassroomDetail({ classroomId, onBack }: StudentC
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedPost, setSelectedPost] = useState<{ id: string; type: 'activity' | 'module' } | null>(null);
 
   useEffect(() => {
     fetchClassroomData();
   }, [classroomId]);
+
+  if (selectedPost) {
+    return (
+      <PostDetails
+        postId={selectedPost.id}
+        postType={selectedPost.type}
+        onBack={() => setSelectedPost(null)}
+      />
+    );
+  }
 
   const fetchClassroomData = async () => {
     try {
@@ -100,13 +112,13 @@ export default function StudentClassroomDetail({ classroomId, onBack }: StudentC
   return (
     <div className="space-y-6">
       <div>
-        <button
-          onClick={onBack}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Back to My Classes</span>
-        </button>
+        <div className="flex items-center text-sm text-gray-600 mb-4">
+          <button onClick={onBack} className="hover:text-gray-900 transition-colors">
+            My Classes
+          </button>
+          <ChevronRight className="w-4 h-4 mx-2" />
+          <span className="text-gray-900 font-medium">{classroom.name}</span>
+        </div>
 
         <div className="flex items-start justify-between">
           <div>
@@ -153,6 +165,7 @@ export default function StudentClassroomDetail({ classroomId, onBack }: StudentC
                 key={post._id}
                 post={post}
                 userId={user?.userId || ''}
+                onViewDetails={() => setSelectedPost({ id: post._id, type: post.postType })}
               />
             ))}
           </div>
@@ -165,11 +178,10 @@ export default function StudentClassroomDetail({ classroomId, onBack }: StudentC
 interface StudentPostCardProps {
   post: Post;
   userId: string;
+  onViewDetails: () => void;
 }
 
-function StudentPostCard({ post, userId }: StudentPostCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  
+function StudentPostCard({ post, userId, onViewDetails }: StudentPostCardProps) {
   const dueDate = post.dueDate ? new Date(post.dueDate) : null;
   const isOverdue = dueDate && dueDate < new Date();
   const isDueSoon = dueDate && !isOverdue && (dueDate.getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000;
@@ -200,7 +212,10 @@ function StudentPostCard({ post, userId }: StudentPostCardProps) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
+    <button
+      onClick={onViewDetails}
+      className="w-full text-left bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow"
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-2">
@@ -246,25 +261,8 @@ function StudentPostCard({ post, userId }: StudentPostCardProps) {
               </div>
             )}
           </div>
-
-          {post.instructions && (
-            <>
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="text-sm text-gray-900 hover:text-gray-700 font-medium"
-              >
-                {expanded ? 'Hide' : 'Show'} Instructions
-              </button>
-              
-              {expanded && (
-                <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{post.instructions}</p>
-                </div>
-              )}
-            </>
-          )}
         </div>
       </div>
-    </div>
+    </button>
   );
 }

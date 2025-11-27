@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, 
+  ChevronRight,
   Calendar,
   FileText,
   Users,
@@ -122,15 +122,14 @@ export default function AssignmentDetail({ assignmentId, onBack }: AssignmentDet
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <button
-          onClick={onBack}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Back to Classroom</span>
-        </button>
+        <div className="flex items-center text-sm text-gray-600 mb-4">
+          <button onClick={onBack} className="hover:text-gray-900 transition-colors">
+            Classroom
+          </button>
+          <ChevronRight className="w-4 h-4 mx-2" />
+          <span className="text-gray-900 font-medium">{assignment.title}</span>
+        </div>
 
         <div className="flex items-start justify-between">
           <div className="flex-1">
