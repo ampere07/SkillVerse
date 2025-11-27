@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, X, Plus, Users, Copy, Check, MoreVertical } from 'lucide-react';
 import { classroomAPI } from '../utils/api';
+import StudentClassroomDetail from './StudentClassroomDetail';
 
 interface Classroom {
   _id: string;
@@ -25,6 +26,7 @@ export default function MyCourses() {
   const [error, setError] = useState('');
   const [showBrowseModal, setShowBrowseModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchClassrooms();
@@ -65,6 +67,15 @@ export default function MyCourses() {
       alert(err instanceof Error ? err.message : 'Failed to drop classroom');
     }
   };
+
+  if (selectedClassroomId) {
+    return (
+      <StudentClassroomDetail
+        classroomId={selectedClassroomId}
+        onBack={() => setSelectedClassroomId(null)}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -121,6 +132,7 @@ export default function MyCourses() {
               onCopyCode={copyClassroomCode}
               copiedCode={copiedCode}
               onDropCourse={handleDropCourse}
+              onView={() => setSelectedClassroomId(classroom._id)}
             />
           ))}
         </div>
@@ -141,9 +153,10 @@ interface ClassroomCardProps {
   onCopyCode: (code: string) => void;
   copiedCode: string | null;
   onDropCourse: (classroomId: string) => void;
+  onView: () => void;
 }
 
-function ClassroomCard({ classroom, onCopyCode, copiedCode, onDropCourse }: ClassroomCardProps) {
+function ClassroomCard({ classroom, onCopyCode, copiedCode, onDropCourse, onView }: ClassroomCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   
   const teacherName = typeof classroom.teacher === 'object' && classroom.teacher !== null 
@@ -151,7 +164,10 @@ function ClassroomCard({ classroom, onCopyCode, copiedCode, onDropCourse }: Clas
     : 'Unknown Teacher';
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
+    <button
+      onClick={onView}
+      className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full text-left w-full"
+    >
       <div className="p-4 flex flex-col flex-1">
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1 min-w-0">
@@ -161,7 +177,10 @@ function ClassroomCard({ classroom, onCopyCode, copiedCode, onDropCourse }: Clas
           </div>
           <div className="relative ml-2">
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
               className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
             >
               <MoreVertical className="w-4 h-4" />
@@ -174,7 +193,8 @@ function ClassroomCard({ classroom, onCopyCode, copiedCode, onDropCourse }: Clas
                 />
                 <div className="absolute right-0 top-8 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onDropCourse(classroom._id);
                       setShowMenu(false);
                     }}
@@ -198,7 +218,10 @@ function ClassroomCard({ classroom, onCopyCode, copiedCode, onDropCourse }: Clas
 
         <div className="mb-4">
           <button
-            onClick={() => onCopyCode(classroom.code)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopyCode(classroom.code);
+            }}
             className="flex items-center space-x-2 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {copiedCode === classroom.code ? (
@@ -222,7 +245,7 @@ function ClassroomCard({ classroom, onCopyCode, copiedCode, onDropCourse }: Clas
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

@@ -22,6 +22,8 @@ import MyCourses from '../pages/MyCourses';
 import TeacherClassrooms from '../pages/TeacherClassrooms';
 import MiniProjects from '../pages/MiniProjects';
 import Settings from '../pages/Settings';
+import Assignments from '../pages/Assignments';
+import CreateAssignment from '../pages/CreateAssignment';
 import UnsavedChangesModal from './UnsavedChangesModal';
 
 interface NavItem {
@@ -332,6 +334,26 @@ export default function Dashboard() {
                 <Menu className="w-5 h-5" />
               </button>
               <Settings />
+            </>
+          ) : activeNav === '/assignments' ? (
+            <>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <Assignments />
+            </>
+          ) : activeNav === '/create-assignment' ? (
+            <>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden mb-4 text-gray-600 hover:text-gray-900"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <CreateAssignment />
             </>
           ) : (
             <>
