@@ -297,6 +297,7 @@ export default function CreatePostModal({
               )}
 
               <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-2">
                     Due Date (Optional)
                   </label>
@@ -323,26 +324,6 @@ export default function CreatePostModal({
                     min="0"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <div className="flex items-center h-5">
-                  <input
-                    id="requiresCompiler"
-                    type="checkbox"
-                    checked={requiresCompiler}
-                    onChange={(e) => setRequiresCompiler(e.target.checked)}
-                    className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label htmlFor="requiresCompiler" className="text-sm font-medium text-gray-700 cursor-pointer">
-                    Requires Compiler
-                  </label>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Enable if students need to write and submit code
-                  </p>
                 </div>
               </div>
             </>
