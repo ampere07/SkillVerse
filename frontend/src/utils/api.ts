@@ -220,6 +220,10 @@ export const activityAPI = {
     dueDate?: string;
     points?: number;
     instructions?: string;
+    duration?: {
+      hours: number;
+      minutes: number;
+    };
     requiresCompiler?: boolean;
     isPublished?: boolean;
     allowLateSubmission?: boolean;

@@ -88,6 +88,8 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showCompiler, setShowCompiler] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showActivitySubmitModal, setShowActivitySubmitModal] = useState(false);
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
   const compilerRef = useRef<CompilerHandle>(null);
 
   const isStudent = user?.role === 'student';
@@ -142,11 +144,20 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const mySubmission = postType === 'activity' && post.submissions?.find(
     s => {
       const studentId = typeof s.student === 'object' ? s.student._id : s.student;
-      return studentId === user?.userId;
+      return studentId === user?.id;
     }
   );
 
   const hasSubmitted = !!mySubmission;
+
+  console.log('Submission check:', {
+    postType,
+    hasSubmissions: !!post.submissions,
+    submissionsLength: post.submissions?.length,
+    userId: user?.id,
+    mySubmission,
+    hasSubmitted
+  });
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
@@ -183,6 +194,11 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   };
 
   const handleAddOrCreate = () => {
+    if (hasSubmitted) {
+      alert('You have already submitted this activity. You cannot resubmit.');
+      return;
+    }
+    
     if (post?.requiresCompiler) {
       setShowCompiler(true);
     } else {
@@ -192,10 +208,6 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
 
   const handleCompilerSubmit = async () => {
     if (!compilerRef.current || !post) return;
-    
-    if (!confirm('Are you sure you want to submit this activity? You cannot edit it after submission.')) {
-      return;
-    }
     
     try {
       setSubmitting(true);
@@ -223,9 +235,16 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
       if (response.ok) {
         setShowCompiler(false);
         setHasUnsavedChanges(false);
-        fetchPostDetails();
+        alert('Activity submitted successfully!');
+        await fetchPostDetails();
       } else {
-        setError(data.message || 'Failed to submit');
+        if (data.message === 'You have already submitted this activity') {
+          setShowCompiler(false);
+          alert('You have already submitted this activity. You cannot resubmit.');
+          fetchPostDetails();
+        } else {
+          setError(data.message || 'Failed to submit');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
@@ -235,6 +254,15 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   };
 
   if (showCompiler && post?.requiresCompiler) {
+    const compilerProjectDetails = {
+      _id: post._id,
+      title: post.title,
+      description: post.description,
+      language: 'java',
+      requirements: post.instructions || '',
+      duration: post.duration
+    };
+
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0 bg-white">
@@ -242,7 +270,10 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
             <div className="flex items-center gap-2 mb-2">
               <button
                 onClick={() => {
-                  if (hasUnsavedChanges) {
+                  // Check if activity has duration and compiler is in activity mode
+                  if (post.duration && (post.duration.hours > 0 || post.duration.minutes > 0)) {
+                    setShowLeaveWarning(true);
+                  } else if (hasUnsavedChanges) {
                     if (confirm('You have unsaved changes. Do you want to leave without saving?')) {
                       setShowCompiler(false);
                       setHasUnsavedChanges(false);
@@ -287,7 +318,7 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                 )}
               </div>
               <button
-                onClick={handleCompilerSubmit}
+                onClick={() => setShowActivitySubmitModal(true)}
                 disabled={submitting}
                 className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -301,17 +332,87 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
           <Compiler
             ref={compilerRef}
             onMenuClick={() => {}}
-            projectDetails={{
-              title: post.title,
-              description: post.description,
-              language: 'java',
-              requirements: post.instructions || ''
-            }}
+            projectDetails={compilerProjectDetails as any}
             onBack={() => {}}
             onHasUnsavedChanges={setHasUnsavedChanges}
             isActivityMode={true}
           />
         </div>
+        
+        {/* Activity Submit Confirmation Modal */}
+        {showActivitySubmitModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Submit Activity?</h2>
+              </div>
+
+              <div className="p-6">
+                <p className="text-sm text-gray-700">
+                  Are you sure you want to submit this activity? You cannot edit your submission after submitting.
+                </p>
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowActivitySubmitModal(false)}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowActivitySubmitModal(false);
+                    handleCompilerSubmit();
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Leave Activity Warning Modal */}
+        {showLeaveWarning && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Leave Activity?</h2>
+              </div>
+
+              <div className="p-6">
+                <p className="text-sm text-gray-700">
+                  If you leave now, your current code will be automatically submitted. Do you want to continue?
+                </p>
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowLeaveWarning(false)}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowLeaveWarning(false);
+                    await handleCompilerSubmit();
+                    setShowCompiler(false);
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Submitting...' : 'Submit & Leave'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -488,10 +589,10 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
 
                   <button
                     onClick={handleAddOrCreate}
-                    disabled={isOverdue && !post.allowLateSubmission}
+                    disabled={hasSubmitted || (isOverdue && !post.allowLateSubmission)}
                     className="w-full px-4 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isOverdue && !post.allowLateSubmission ? 'Submission Closed' : (post.requiresCompiler ? 'Open Compiler' : 'Add or create')}
+                    {hasSubmitted ? 'Already Submitted' : (isOverdue && !post.allowLateSubmission ? 'Submission Closed' : (post.requiresCompiler ? 'Open Compiler' : 'Add or create'))}
                   </button>
 
                   {dueDate && (

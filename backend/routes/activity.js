@@ -155,7 +155,10 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
       dueDate: dueDate || null,
       points: points || 100,
       instructions,
-      duration: duration || { hours: 0, minutes: 0 },
+      duration: duration && (duration.hours || duration.minutes) ? {
+        hours: duration.hours || 0,
+        minutes: duration.minutes || 0
+      } : { hours: 0, minutes: 0 },
       requiresCompiler: requiresCompiler || false,
       attachments: attachments || [],
       students: classroomStudents,

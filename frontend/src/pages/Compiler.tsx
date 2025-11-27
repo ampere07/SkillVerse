@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Play, Menu, BookOpen, X, Square, Lightbulb, ArrowLeft, Save, Send } from 'lucide-react';
+import { Play, Menu, BookOpen, X, Square, Lightbulb, ArrowLeft, Save, Send, Clock } from 'lucide-react';
 import UnsavedChangesModal from '../components/UnsavedChangesModal';
 import { io, Socket } from 'socket.io-client';
 import {
@@ -133,6 +133,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showNavigationWarning, setShowNavigationWarning] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [timerStarted, setTimerStarted] = useState(false);
+  const [showTimeUpModal, setShowTimeUpModal] = useState(false);
+  const [showActivitySubmitModal, setShowActivitySubmitModal] = useState(false);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useImperativeHandle(ref, () => ({
     saveProgress: handleSaveProgress,
@@ -153,6 +158,53 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       loadSavedProgress();
     }
   }, [projectDetails]);
+
+  // Timer logic for activity mode
+  useEffect(() => {
+    if (isActivityMode && projectDetails && !timerStarted) {
+      const durationHours = (projectDetails as any).duration?.hours || 0;
+      const durationMinutes = (projectDetails as any).duration?.minutes || 0;
+      const totalSeconds = (durationHours * 3600) + (durationMinutes * 60);
+      
+      if (totalSeconds > 0) {
+        setTimeRemaining(totalSeconds);
+        setTimerStarted(true);
+      }
+    }
+  }, [isActivityMode, projectDetails, timerStarted]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (timeRemaining !== null && timeRemaining > 0 && isActivityMode) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev === null || prev <= 1) {
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+            }
+            setShowTimeUpModal(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+        }
+      };
+    }
+  }, [timeRemaining, isActivityMode]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, []);
 
   const loadSavedProgress = async () => {
     if (!projectDetails) return;
@@ -979,7 +1031,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   };
 
   const handleBackClick = () => {
-    if (projectDetails && hasUnsavedChanges) {
+    if (isActivityMode && timerStarted) {
+      // Show warning modal when trying to leave during activity
+      setPendingNavigation(() => onBack || (() => {}));
+      setShowNavigationWarning(true);
+    } else if (projectDetails && hasUnsavedChanges) {
       setPendingNavigation(() => onBack || (() => {}));
       setShowNavigationWarning(true);
     } else if (onBack) {
@@ -987,17 +1043,64 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }
   };
 
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleCancelNavigation = () => {
     setShowNavigationWarning(false);
     setPendingNavigation(null);
   };
 
-  const handleConfirmNavigation = () => {
+  const handleConfirmNavigation = async () => {
+    if (isActivityMode && timerStarted) {
+      // Auto-submit the activity when leaving
+      await handleAutoSubmit();
+    }
+    
     setShowNavigationWarning(false);
     if (pendingNavigation) {
       pendingNavigation();
     }
     setPendingNavigation(null);
+  };
+
+  const handleAutoSubmit = async () => {
+    if (!isActivityMode || !projectDetails) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${(projectDetails as any)._id}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          codeBase: code
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        if (error.message === 'You have already submitted this activity') {
+          console.log('Activity already submitted, closing compiler');
+        } else {
+          console.error('Auto-submit error:', error.message);
+        }
+      }
+    } catch (error) {
+      console.error('Auto-submit error:', error);
+    }
   };
 
   const handleSaveAndNavigate = async () => {
@@ -1175,6 +1278,17 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                   </option>
                 ))}
               </select>
+            )}
+            {/* Timer Display for Activity Mode */}
+            {isActivityMode && timeRemaining !== null && (
+              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg font-mono text-sm font-semibold ${
+                timeRemaining <= 300 ? 'bg-red-100 text-red-700' :
+                timeRemaining <= 600 ? 'bg-yellow-100 text-yellow-700' :
+                'bg-blue-100 text-blue-700'
+              }`}>
+                <Clock className="w-4 h-4" />
+                <span>{formatTime(timeRemaining)}</span>
+              </div>
             )}
           </div>
           <div className="flex items-center space-x-2">
@@ -1530,14 +1644,84 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         </div>
       </div>
 
-      {/* Unsaved Changes Warning Modal */}
-      <UnsavedChangesModal
-        isOpen={showNavigationWarning}
-        onCancel={handleCancelNavigation}
-        onConfirm={handleConfirmNavigation}
-        onSaveAndLeave={handleSaveAndNavigate}
-        isSaving={isSaving}
-      />
+      {/* Navigation Warning Modal */}
+      {showNavigationWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {isActivityMode ? 'Leave Activity?' : 'Unsaved Changes'}
+              </h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-700">
+                {isActivityMode 
+                  ? 'If you leave now, your current code will be automatically submitted. Do you want to continue?'
+                  : 'You have unsaved changes. What would you like to do?'
+                }
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={handleCancelNavigation}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              {!isActivityMode && (
+                <button
+                  onClick={handleSaveAndNavigate}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSaving ? 'Saving...' : 'Save & Leave'}
+                </button>
+              )}
+              <button
+                onClick={handleConfirmNavigation}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+              >
+                {isActivityMode ? 'Submit & Leave' : 'Leave Without Saving'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Time Up Modal */}
+      {showTimeUpModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Time's Up!</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-700 mb-4">
+                The time limit for this activity has been reached. Your code will be automatically submitted.
+              </p>
+              <p className="text-xs text-gray-500">
+                Click Continue to submit and return to the classroom.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={async () => {
+                  await handleAutoSubmit();
+                  setShowTimeUpModal(false);
+                  if (onBack) onBack();
+                }}
+                className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Submit Confirmation Modal */}
       {showSubmitConfirmModal && (
