@@ -129,7 +129,7 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <div className="flex items-center text-sm text-gray-600 mb-4">
           <button onClick={onBack} className="hover:text-gray-900 transition-colors">
@@ -190,9 +190,9 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
         </div>
       )}
 
+      <div className="border-t border-gray-200"></div>
+
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Posts</h2>
-        
         {posts.length === 0 ? (
           <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
@@ -270,13 +270,13 @@ function PostCard({ post, onDelete, onView }: PostCardProps) {
   };
 
   return (
-    <button
+    <div
       onClick={onView}
       className="w-full text-left bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-2">
+          <div className="flex items-center space-x-2 mb-3">
             <span className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(post.postType)}`}>
               {post.postType.charAt(0).toUpperCase() + post.postType.slice(1)}
             </span>
@@ -292,6 +292,9 @@ function PostCard({ post, onDelete, onView }: PostCardProps) {
             )}
           </div>
           
+          {/* Separation line after badges */}
+          <div className="border-t border-gray-200 mb-3"></div>
+          
           <h3 className="text-base font-semibold text-gray-900 mb-1 hover:text-gray-700 transition-colors">
             {post.title}
           </h3>
@@ -300,31 +303,38 @@ function PostCard({ post, onDelete, onView }: PostCardProps) {
             {post.description}
           </p>
 
-          <div className="flex items-center space-x-4 text-xs text-gray-500">
-            {dueDate && (
-              <div className={`flex items-center space-x-1 ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : ''}`}>
-                {isOverdue ? (
-                  <AlertCircle className="w-4 h-4" />
-                ) : (
-                  <Calendar className="w-4 h-4" />
+          {post.postType === 'activity' && (
+            <>
+              {/* Separation line before details */}
+              <div className="border-t border-gray-200 mb-3"></div>
+              
+              <div className="flex items-center space-x-4 text-xs text-gray-500">
+                {dueDate && (
+                  <div className={`flex items-center space-x-1 ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : ''}`}>
+                    {isOverdue ? (
+                      <AlertCircle className="w-4 h-4" />
+                    ) : (
+                      <Calendar className="w-4 h-4" />
+                    )}
+                    <span>{formatDueDate(dueDate)}</span>
+                  </div>
                 )}
-                <span>{formatDueDate(dueDate)}</span>
+                
+                {post.submissions && (
+                  <div className="flex items-center space-x-1">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>{post.submissions.length} submission{post.submissions.length !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+                
+                {post.points && post.points > 0 && (
+                  <div className="flex items-center space-x-1">
+                    <span className="font-medium">{post.points} pts</span>
+                  </div>
+                )}
               </div>
-            )}
-            
-            {post.postType === 'activity' && post.submissions && (
-              <div className="flex items-center space-x-1">
-                <CheckCircle className="w-4 h-4" />
-                <span>{post.submissions.length} submission{post.submissions.length !== 1 ? 's' : ''}</span>
-              </div>
-            )}
-            
-            {post.points && post.points > 0 && (
-              <div className="flex items-center space-x-1">
-                <span className="font-medium">{post.points} pts</span>
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
         <div className="relative ml-4">
@@ -361,6 +371,6 @@ function PostCard({ post, onDelete, onView }: PostCardProps) {
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }

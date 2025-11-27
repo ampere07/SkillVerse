@@ -20,6 +20,11 @@ const classroomSchema = new mongoose.Schema({
     trim: true,
     maxlength: [500, 'Description cannot exceed 500 characters']
   },
+  yearLevelSection: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'Year level and section cannot exceed 50 characters']
+  },
   teacher: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

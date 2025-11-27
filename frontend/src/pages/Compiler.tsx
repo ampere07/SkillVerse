@@ -93,9 +93,10 @@ interface CompilerProps {
   projectDetails?: ProjectDetails;
   onBack?: () => void;
   onHasUnsavedChanges?: (hasChanges: boolean) => void;
+  isActivityMode?: boolean;
 }
 
-const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges }, ref) => {
+const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges, isActivityMode = false }, ref) => {
   const [language, setLanguage] = useState('java');
   const [code, setCode] = useState(DEFAULT_CODE.java);
   const [output, setOutput] = useState('');
@@ -134,7 +135,8 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
 
   useImperativeHandle(ref, () => ({
-    saveProgress: handleSaveProgress
+    saveProgress: handleSaveProgress,
+    getCode: () => code
   }));
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -217,7 +219,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       setIsRunning(false);
       
       // Restore AI assistant after execution completes
-      if (projectDetails) {
+      if (projectDetails && !isActivityMode) {
         setTimeout(() => {
           setAiMessages([]);
           startStreamingMessage('Great! Your code finished running. I\'m here if you need help with anything else!');
@@ -239,7 +241,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   // AI Hint Timer - runs every 30 seconds when not running code
   useEffect(() => {
-    if (!projectDetails || isRunning) return;
+    if (!projectDetails || isRunning || isActivityMode) return;
     
     const interval = setInterval(() => {
       const now = Date.now();
@@ -250,7 +252,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [projectDetails, isRunning, code, lastHintTime]);
+  }, [projectDetails, isRunning, code, lastHintTime, isActivityMode]);
 
   const sendAiGreeting = () => {
     const greeting = `Hello! I'm your SkillVerse coding assistant. I'll analyze your code and provide hints to help you complete the project. Let me know if you need help!`;
@@ -258,7 +260,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   };
 
   const analyzeCodeAndGiveHint = async () => {
-    if (!projectDetails || isRunning || isAiThinking || isStreaming) return;
+    if (!projectDetails || isRunning || isAiThinking || isStreaming || isActivityMode) return;
     
     setIsAiThinking(true);
     
@@ -376,7 +378,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     setIsRunning(true);
     
     // Clear AI messages and stop streaming when running code
-    if (projectDetails) {
+    if (projectDetails && !isActivityMode) {
       if (streamingIntervalRef.current) {
         clearInterval(streamingIntervalRef.current);
         streamingIntervalRef.current = null;
@@ -403,7 +405,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       setIsRunning(false);
       
       // Restore AI assistant after stopping
-      if (projectDetails) {
+      if (projectDetails && !isActivityMode) {
         setTimeout(() => {
           setAiMessages([]);
           startStreamingMessage('Code execution stopped. I\'m back to help! Ask me anything or I\'ll analyze your code in 30 seconds.');
@@ -1106,7 +1108,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Project Details Banner */}
-      {projectDetails && (
+      {projectDetails && !isActivityMode && (
         <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -1152,7 +1154,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            {!projectDetails && (
+            {!projectDetails && !isActivityMode && (
               <button
                 onClick={onMenuClick}
                 className="lg:hidden text-gray-600 hover:text-gray-900"
@@ -1160,21 +1162,23 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 <Menu className="w-5 h-5" />
               </button>
             )}
-            <select
-              value={language}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isRunning || !!projectDetails}
-            >
-              {LANGUAGE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {!isActivityMode && (
+              <select
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isRunning || !!projectDetails}
+              >
+                {LANGUAGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="flex items-center space-x-2">
-            {projectDetails && (
+            {projectDetails && !isActivityMode && (
               <>
                 <button
                   onClick={handleSaveProgress}
@@ -1274,7 +1278,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       )}
 
       {/* Editor and Output */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden" style={{ height: projectDetails ? 'calc(100vh - 300px)' : 'calc(100vh - 200px)' }}>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden" style={{ height: isActivityMode ? '100%' : (projectDetails ? 'calc(100vh - 300px)' : 'calc(100vh - 200px)') }}>
         {/* Code Editor */}
         <div className="flex flex-col border-r border-gray-200 bg-white overflow-hidden">
           <div className="px-4 py-2 border-b border-gray-200 flex-shrink-0">
@@ -1464,7 +1468,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
             onKeyDown={handleConsoleKeyDown}
             style={{ cursor: isRunning ? 'text' : 'default' }}
           >
-            {projectDetails && !isRunning ? (
+            {projectDetails && !isRunning && !isActivityMode ? (
               // AI Assistant Mode
               <div className="space-y-2 p-2">
                 {aiMessages.length === 0 && !isStreaming && !isAiThinking ? (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   ChevronRight,
   Calendar,
@@ -10,9 +10,11 @@ import {
   Clock,
   Award,
   X,
-  Paperclip
+  Paperclip,
+  Send
 } from 'lucide-react';
 import { activityAPI, moduleAPI } from '../utils/api';
+import Compiler from './Compiler';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Attachment {
@@ -46,6 +48,10 @@ interface PostData {
   dueDate?: string;
   points?: number;
   requiresCompiler?: boolean;
+  duration?: {
+    hours: number;
+    minutes: number;
+  };
   isPublished: boolean;
   attachments: Attachment[];
   submissions?: Submission[];
@@ -68,6 +74,11 @@ interface PostDetailsProps {
   onBack: () => void;
 }
 
+interface CompilerHandle {
+  saveProgress: () => Promise<void>;
+  getCode: () => string;
+}
+
 export default function PostDetails({ postId, postType, onBack }: PostDetailsProps) {
   const { user } = useAuth();
   const [post, setPost] = useState<PostData | null>(null);
@@ -75,6 +86,9 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showCompiler, setShowCompiler] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const compilerRef = useRef<CompilerHandle>(null);
 
   const isStudent = user?.role === 'student';
   const isTeacher = user?.role === 'teacher';
@@ -168,8 +182,142 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
     document.body.removeChild(link);
   };
 
+  const handleAddOrCreate = () => {
+    if (post?.requiresCompiler) {
+      setShowCompiler(true);
+    } else {
+      setShowSubmitModal(true);
+    }
+  };
+
+  const handleCompilerSubmit = async () => {
+    if (!compilerRef.current || !post) return;
+    
+    if (!confirm('Are you sure you want to submit this activity? You cannot edit it after submission.')) {
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      setError('');
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      const codeBase = (compilerRef.current as any).getCode?.() || '';
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${post._id}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ codeBase })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setShowCompiler(false);
+        setHasUnsavedChanges(false);
+        fetchPostDetails();
+      } else {
+        setError(data.message || 'Failed to submit');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (showCompiler && post?.requiresCompiler) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0 bg-white">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => {
+                  if (hasUnsavedChanges) {
+                    if (confirm('You have unsaved changes. Do you want to leave without saving?')) {
+                      setShowCompiler(false);
+                      setHasUnsavedChanges(false);
+                    }
+                  } else {
+                    setShowCompiler(false);
+                  }
+                }}
+                className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h2 className="text-base font-semibold text-gray-900">{post.title}</h2>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                Java
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">{post.description}</p>
+            {post.instructions && (
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-xs font-semibold text-gray-700 mb-1">Requirements:</p>
+                <div className="text-xs text-gray-600 whitespace-pre-line">
+                  {post.instructions}
+                </div>
+              </div>
+            )}
+            <div className="mt-3 flex items-center justify-between">
+              <div className="flex items-center gap-4 text-xs text-gray-500">
+                {post.points !== undefined && (
+                  <span>{post.points} points</span>
+                )}
+                {post.duration && (post.duration.hours > 0 || post.duration.minutes > 0) && (
+                  <span>
+                    Duration: {post.duration.hours > 0 && `${post.duration.hours}h `}
+                    {post.duration.minutes > 0 && `${post.duration.minutes}m`}
+                  </span>
+                )}
+                {dueDate && (
+                  <span className={isOverdue ? 'text-red-600' : ''}>
+                    Due: {formatDate(dueDate)}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={handleCompilerSubmit}
+                disabled={submitting}
+                className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-4 h-4" />
+                {submitting ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <Compiler
+            ref={compilerRef}
+            onMenuClick={() => {}}
+            projectDetails={{
+              title: post.title,
+              description: post.description,
+              language: 'java',
+              requirements: post.instructions || ''
+            }}
+            onBack={() => {}}
+            onHasUnsavedChanges={setHasUnsavedChanges}
+            isActivityMode={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center text-sm text-gray-600">
           <button onClick={onBack} className="hover:text-gray-900 transition-colors">
@@ -199,9 +347,16 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                     <span>•</span>
                     <span>{new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                   </div>
-                  {postType === 'activity' && post.points !== undefined && (
+                  {postType === 'activity' && (
                     <div className="text-sm text-gray-600 pb-6 border-b border-gray-200">
-                      {post.points} points
+                      {post.points !== undefined && <span>{post.points} points</span>}
+                      {post.points !== undefined && post.duration && (post.duration.hours > 0 || post.duration.minutes > 0) && <span> • </span>}
+                      {post.duration && (post.duration.hours > 0 || post.duration.minutes > 0) && (
+                        <span>
+                          Duration: {post.duration.hours > 0 && `${post.duration.hours}h `}
+                          {post.duration.minutes > 0 && `${post.duration.minutes}m`}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -332,11 +487,11 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                   </div>
 
                   <button
-                    onClick={() => setShowSubmitModal(true)}
+                    onClick={handleAddOrCreate}
                     disabled={isOverdue && !post.allowLateSubmission}
                     className="w-full px-4 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isOverdue && !post.allowLateSubmission ? 'Submission Closed' : 'Add or create'}
+                    {isOverdue && !post.allowLateSubmission ? 'Submission Closed' : (post.requiresCompiler ? 'Open Compiler' : 'Add or create')}
                   </button>
 
                   {dueDate && (

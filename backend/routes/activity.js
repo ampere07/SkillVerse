@@ -112,16 +112,17 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
       dueDate,
       points,
       instructions,
+      duration,
       requiresCompiler,
       isPublished,
       allowLateSubmission,
       attachments
     } = req.body;
 
-    if (!classroomId || !title || !description) {
+    if (!classroomId || !title || !description || !instructions) {
       return res.status(400).json({ 
         success: false,
-        message: 'Classroom ID, title, and description are required' 
+        message: 'Classroom ID, title, description, and instructions are required' 
       });
     }
 
@@ -153,7 +154,8 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
       description,
       dueDate: dueDate || null,
       points: points || 100,
-      instructions: instructions || '',
+      instructions,
+      duration: duration || { hours: 0, minutes: 0 },
       requiresCompiler: requiresCompiler || false,
       attachments: attachments || [],
       students: classroomStudents,
@@ -206,6 +208,7 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
       dueDate,
       points,
       instructions,
+      duration,
       requiresCompiler,
       isPublished,
       allowLateSubmission
@@ -216,6 +219,7 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
     if (dueDate !== undefined) activity.dueDate = dueDate;
     if (points !== undefined) activity.points = points;
     if (instructions !== undefined) activity.instructions = instructions;
+    if (duration !== undefined) activity.duration = duration;
     if (requiresCompiler !== undefined) activity.requiresCompiler = requiresCompiler;
     if (isPublished !== undefined) activity.isPublished = isPublished;
     if (allowLateSubmission !== undefined) activity.allowLateSubmission = allowLateSubmission;
@@ -279,8 +283,6 @@ router.delete('/:id', authenticateToken, authorizeRole('teacher'), async (req, r
 
 router.post('/:id/submit', authenticateToken, authorizeRole('student'), async (req, res) => {
   try {
-    const { content, attachments } = req.body;
-
     const activity = await Activity.findById(req.params.id)
       .populate('classroom');
 
@@ -329,6 +331,16 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), async (r
       }
     }
 
+    let content = '';
+    let attachments = [];
+
+    if (activity.requiresCompiler) {
+      content = req.body.codeBase || '';
+    } else {
+      content = req.body.content || '';
+      attachments = req.body.attachments || [];
+    }
+
     await activity.submitActivity(req.user.userId, content, attachments);
 
     console.log(`Activity submitted: ${activity.title} by ${req.user.email}`);
@@ -342,6 +354,59 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), async (r
     res.status(500).json({ 
       success: false,
       message: error.message || 'Failed to submit activity',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+router.post('/:id/unsubmit', authenticateToken, authorizeRole('student'), async (req, res) => {
+  try {
+    const activity = await Activity.findById(req.params.id)
+      .populate('classroom');
+
+    if (!activity) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Activity not found' 
+      });
+    }
+
+    const isEnrolled = activity.classroom.students.some(
+      s => s.studentId.toString() === req.user.userId
+    );
+
+    if (!isEnrolled) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'You are not enrolled in this classroom' 
+      });
+    }
+
+    const submissionIndex = activity.submissions.findIndex(
+      s => s.student.toString() === req.user.userId
+    );
+
+    if (submissionIndex === -1) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No submission found to unsubmit' 
+      });
+    }
+
+    activity.submissions.splice(submissionIndex, 1);
+    await activity.save();
+
+    console.log(`Activity unsubmitted: ${activity.title} by ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Activity unsubmitted successfully'
+    });
+  } catch (error) {
+    console.error('Unsubmit activity error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message || 'Failed to unsubmit activity',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { FileText, Clock, AlertCircle, CheckCircle, Calendar, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { classroomAPI } from '../utils/api';
+import StudentClassroomDetail from './StudentClassroomDetail';
 
 interface Assignment {
   _id: string;
@@ -42,6 +43,8 @@ export default function Assignments() {
   const [activeTab, setActiveTab] = useState<TabType>('todo');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -201,6 +204,24 @@ export default function Assignments() {
     }
   };
 
+  const handleNavigateToPost = (classroomId: string, postId: string) => {
+    setSelectedClassroomId(classroomId);
+    setSelectedPostId(postId);
+  };
+
+  if (selectedClassroomId) {
+    return (
+      <StudentClassroomDetail
+        classroomId={selectedClassroomId}
+        onBack={() => {
+          setSelectedClassroomId(null);
+          setSelectedPostId(null);
+        }}
+        initialPostId={selectedPostId}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -284,6 +305,7 @@ export default function Assignments() {
                 activeTab={activeTab}
                 getSubmissionStatus={getSubmissionStatus}
                 getDaysUntilDue={getDaysUntilDue}
+                onNavigate={handleNavigateToPost}
               />
             </div>
           </div>
@@ -298,9 +320,10 @@ interface AssignmentListProps {
   activeTab: TabType;
   getSubmissionStatus: (assignment: Assignment) => string;
   getDaysUntilDue: (dueDate: string) => number;
+  onNavigate: (classroomId: string, postId: string) => void;
 }
 
-function AssignmentList({ assignments, activeTab, getSubmissionStatus, getDaysUntilDue }: AssignmentListProps) {
+function AssignmentList({ assignments, activeTab, getSubmissionStatus, getDaysUntilDue, onNavigate }: AssignmentListProps) {
   const getEmptyMessage = () => {
     switch (activeTab) {
       case 'todo':
@@ -381,6 +404,7 @@ function AssignmentList({ assignments, activeTab, getSubmissionStatus, getDaysUn
           assignments={groupAssignments}
           getSubmissionStatus={getSubmissionStatus}
           getDaysUntilDue={getDaysUntilDue}
+          onNavigate={onNavigate}
         />
       ))}
     </div>
@@ -392,9 +416,10 @@ interface AssignmentGroupProps {
   assignments: Assignment[];
   getSubmissionStatus: (assignment: Assignment) => string;
   getDaysUntilDue: (dueDate: string) => number;
+  onNavigate: (classroomId: string, postId: string) => void;
 }
 
-function AssignmentGroup({ title, assignments, getSubmissionStatus, getDaysUntilDue }: AssignmentGroupProps) {
+function AssignmentGroup({ title, assignments, getSubmissionStatus, getDaysUntilDue, onNavigate }: AssignmentGroupProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
@@ -426,6 +451,7 @@ function AssignmentGroup({ title, assignments, getSubmissionStatus, getDaysUntil
                 assignment={assignment}
                 status={status}
                 daysUntilDue={daysUntilDue}
+                onNavigate={onNavigate}
               />
             );
           })}
@@ -439,9 +465,10 @@ interface AssignmentCardProps {
   assignment: Assignment;
   status: string;
   daysUntilDue: number | null;
+  onNavigate: (classroomId: string, postId: string) => void;
 }
 
-function AssignmentCard({ assignment, status, daysUntilDue }: AssignmentCardProps) {
+function AssignmentCard({ assignment, status, daysUntilDue, onNavigate }: AssignmentCardProps) {
   const getDueDateDisplay = () => {
     if (!assignment.dueDate) return null;
 
@@ -455,10 +482,17 @@ function AssignmentCard({ assignment, status, daysUntilDue }: AssignmentCardProp
     return dueDate.toLocaleDateString('en-US', options);
   };
 
+  const handleClick = () => {
+    onNavigate(assignment.classroom._id, assignment._id);
+  };
+
   const dueDateDisplay = getDueDateDisplay();
 
   return (
-    <div className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow cursor-pointer">
+    <div 
+      onClick={handleClick}
+      className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow cursor-pointer"
+    >
       <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
         <FileText className="w-5 h-5 text-white" />
       </div>
