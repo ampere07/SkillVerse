@@ -23,6 +23,7 @@ interface Assignment {
   isPublished: boolean;
   allowLateSubmission: boolean;
   createdAt: string;
+  requiresCompiler?: boolean;
 }
 
 interface Classroom {
@@ -53,6 +54,7 @@ export default function Assignments() {
 
       const response = await classroomAPI.getStudentClassrooms();
       const userClassrooms = response.classrooms || [];
+      console.log('Fetched classrooms:', userClassrooms);
       setClassrooms(userClassrooms);
 
       const allAssignments: Assignment[] = [];
@@ -60,8 +62,8 @@ export default function Assignments() {
       for (const classroom of userClassrooms) {
         try {
           const token = localStorage.getItem('token');
-          const assignmentResponse = await fetch(
-            `${import.meta.env.VITE_API_URL}/assignments/classroom/${classroom._id}`,
+          const activityResponse = await fetch(
+            `${import.meta.env.VITE_API_URL}/activities/classroom/${classroom._id}`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -70,16 +72,33 @@ export default function Assignments() {
             }
           );
 
-          if (assignmentResponse.ok) {
-            const assignmentData = await assignmentResponse.json();
-            if (assignmentData.success && assignmentData.assignments) {
-              allAssignments.push(...assignmentData.assignments);
+          console.log(`Fetching activities for classroom ${classroom._id}`);
+          
+          if (activityResponse.ok) {
+            const activityData = await activityResponse.json();
+            console.log(`Activity data for ${classroom.name}:`, activityData);
+            
+            if (activityData.success && activityData.activities) {
+              const classroomActivities = activityData.activities.map((a: any) => ({
+                ...a,
+                classroom: {
+                  _id: classroom._id,
+                  name: classroom.name,
+                  code: classroom.code
+                }
+              }));
+              console.log('Mapped activities:', classroomActivities);
+              allAssignments.push(...classroomActivities);
             }
+          } else {
+            console.error(`Failed to fetch activities: ${activityResponse.status}`);
           }
         } catch (err) {
-          console.error(`Error fetching assignments for classroom ${classroom._id}:`, err);
+          console.error(`Error fetching activities for classroom ${classroom._id}:`, err);
         }
       }
+
+      console.log('All activities fetched:', allAssignments);
 
       allAssignments.sort((a, b) => {
         if (!a.dueDate) return 1;
@@ -89,6 +108,7 @@ export default function Assignments() {
 
       setAssignments(allAssignments);
     } catch (err) {
+      console.error('Fetch data error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
       setLoading(false);
@@ -103,7 +123,7 @@ export default function Assignments() {
     if (!user) return 'not-submitted';
     
     const submission = assignment.submissions.find(
-      s => s.student === user.userId || s.student._id === user.userId
+      s => s.student === user.id || s.student._id === user.id
     );
     
     if (submission) {
@@ -143,21 +163,25 @@ export default function Assignments() {
     const dueToday: Assignment[] = [];
     const missing: Assignment[] = [];
 
+    console.log('Categorizing assignments:', filteredAssignments);
+    console.log('Current user:', user);
+
     filteredAssignments.forEach(assignment => {
       const status = getSubmissionStatus(assignment);
+      console.log(`Assignment: ${assignment.title}, Status: ${status}, DueDate: ${assignment.dueDate}`);
       
       if (status === 'overdue') {
         missing.push(assignment);
-      } else if (status === 'not-submitted' && assignment.dueDate) {
-        if (isToday(assignment.dueDate)) {
+      } else if (status === 'not-submitted') {
+        if (assignment.dueDate && isToday(assignment.dueDate)) {
           dueToday.push(assignment);
         } else {
           toDo.push(assignment);
         }
-      } else if (status === 'not-submitted' && !assignment.dueDate) {
-        toDo.push(assignment);
       }
     });
+
+    console.log('Categorized - To Do:', toDo.length, 'Due Today:', dueToday.length, 'Missing:', missing.length);
 
     return { toDo, dueToday, missing };
   };
