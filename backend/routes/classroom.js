@@ -1,20 +1,33 @@
 import express from 'express';
-import Classroom from '../models/Classroom.js';
-import User from '../models/User.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
+import { classroomService } from '../services/classroomService.js';
 
 const router = express.Router();
+
+// Get all active classrooms (for browsing)
+router.get('/all', authenticateToken, async (req, res) => {
+  try {
+    const classrooms = await classroomService.getAllActiveClassrooms();
+    
+    res.json({
+      success: true,
+      count: classrooms.length,
+      classrooms
+    });
+  } catch (error) {
+    console.error('Get all classrooms error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch classrooms',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 
 // Get all classrooms for a teacher
 router.get('/teacher', authenticateToken, authorizeRole('teacher'), async (req, res) => {
   try {
-    const classrooms = await Classroom.find({ 
-      teacher: req.user.userId,
-      isActive: true 
-    })
-    .populate('teacher', 'name email')
-    .populate('students.studentId', 'name email')
-    .sort({ createdAt: -1 });
+    const classrooms = await classroomService.getTeacherClassrooms(req.user.userId);
 
     res.json({
       success: true,
@@ -34,12 +47,7 @@ router.get('/teacher', authenticateToken, authorizeRole('teacher'), async (req, 
 // Get all classrooms for a student (enrolled classrooms)
 router.get('/student', authenticateToken, authorizeRole('student'), async (req, res) => {
   try {
-    const classrooms = await Classroom.find({ 
-      'students.studentId': req.user.userId,
-      isActive: true 
-    })
-    .populate('teacher', 'name email')
-    .sort({ createdAt: -1 });
+    const classrooms = await classroomService.getStudentClassrooms(req.user.userId);
 
     res.json({
       success: true,
@@ -56,12 +64,78 @@ router.get('/student', authenticateToken, authorizeRole('student'), async (req, 
   }
 });
 
+// Join classroom with code (students only)
+router.post('/join', authenticateToken, authorizeRole('student'), async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Classroom code is required' 
+      });
+    }
+
+    const classroom = await classroomService.joinClassroom(code, req.user.userId);
+
+    console.log(`Student ${req.user.email} joined classroom: ${classroom.name}`);
+
+    res.json({
+      success: true,
+      message: 'Successfully joined classroom',
+      classroom
+    });
+  } catch (error) {
+    console.error('Join classroom error:', error);
+    
+    if (error.message === 'Invalid classroom code' || error.message === 'You are already enrolled in this classroom') {
+      return res.status(400).json({ 
+        success: false,
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to join classroom',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Leave classroom (student leaves on their own) - MUST come before /:id routes
+router.post('/:id/leave', authenticateToken, authorizeRole('student'), async (req, res) => {
+  try {
+    await classroomService.leaveClassroom(req.params.id, req.user.userId);
+
+    console.log(`Student ${req.user.email} left classroom`);
+
+    res.json({
+      success: true,
+      message: 'Successfully left classroom'
+    });
+  } catch (error) {
+    console.error('Leave classroom error:', error);
+    
+    if (error.message === 'Classroom not found' || error.message === 'You are not enrolled in this classroom') {
+      return res.status(400).json({ 
+        success: false,
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to leave classroom',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Get single classroom by ID
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const classroom = await Classroom.findById(req.params.id)
-      .populate('teacher', 'name email')
-      .populate('students.studentId', 'name email');
+    const classroom = await classroomService.getClassroomById(req.params.id);
 
     if (!classroom) {
       return res.status(404).json({ 
@@ -70,13 +144,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    // Check if user has access to this classroom
-    const isTeacher = classroom.teacher._id.toString() === req.user.userId;
-    const isStudent = classroom.students.some(
-      s => s.studentId._id.toString() === req.user.userId
-    );
-
-    if (!isTeacher && !isStudent) {
+    const hasAccess = await classroomService.checkUserAccess(req.params.id, req.user.userId);
+    if (!hasAccess) {
       return res.status(403).json({ 
         success: false,
         message: 'Access denied to this classroom' 
@@ -109,28 +178,12 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
       });
     }
 
-    // Generate unique classroom code
-    let code;
-    let isUnique = false;
-    
-    while (!isUnique) {
-      code = Classroom.generateCode();
-      const existing = await Classroom.findOne({ code });
-      if (!existing) {
-        isUnique = true;
-      }
-    }
-
-    const classroom = new Classroom({
+    const classroom = await classroomService.createClassroom({
       name,
-      code,
       description,
       teacher: req.user.userId,
       settings: settings || {}
     });
-
-    await classroom.save();
-    await classroom.populate('teacher', 'name email');
 
     console.log(`New classroom created: ${classroom.name} (${classroom.code}) by ${req.user.email}`);
 
@@ -154,29 +207,19 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
   try {
     const { name, description, settings } = req.body;
 
-    const classroom = await Classroom.findById(req.params.id);
-
-    if (!classroom) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Classroom not found' 
-      });
-    }
-
-    // Check if the teacher owns this classroom
-    if (classroom.teacher.toString() !== req.user.userId) {
+    const isOwner = await classroomService.checkTeacherOwnership(req.params.id, req.user.userId);
+    if (!isOwner) {
       return res.status(403).json({ 
         success: false,
         message: 'Access denied. You can only update your own classrooms.' 
       });
     }
 
-    if (name) classroom.name = name;
-    if (description !== undefined) classroom.description = description;
-    if (settings) classroom.settings = { ...classroom.settings, ...settings };
-
-    await classroom.save();
-    await classroom.populate('teacher', 'name email');
+    const classroom = await classroomService.updateClassroom(req.params.id, {
+      name,
+      description,
+      settings
+    });
 
     console.log(`Classroom updated: ${classroom.name} by ${req.user.email}`);
 
@@ -198,27 +241,17 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
 // Delete classroom (soft delete - set isActive to false)
 router.delete('/:id', authenticateToken, authorizeRole('teacher'), async (req, res) => {
   try {
-    const classroom = await Classroom.findById(req.params.id);
-
-    if (!classroom) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Classroom not found' 
-      });
-    }
-
-    // Check if the teacher owns this classroom
-    if (classroom.teacher.toString() !== req.user.userId) {
+    const isOwner = await classroomService.checkTeacherOwnership(req.params.id, req.user.userId);
+    if (!isOwner) {
       return res.status(403).json({ 
         success: false,
         message: 'Access denied. You can only delete your own classrooms.' 
       });
     }
 
-    classroom.isActive = false;
-    await classroom.save();
+    await classroomService.deleteClassroom(req.params.id);
 
-    console.log(`Classroom deleted: ${classroom.name} by ${req.user.email}`);
+    console.log(`Classroom deleted by ${req.user.email}`);
 
     res.json({
       success: true,
@@ -234,85 +267,20 @@ router.delete('/:id', authenticateToken, authorizeRole('teacher'), async (req, r
   }
 });
 
-// Join classroom with code (students only)
-router.post('/join', authenticateToken, authorizeRole('student'), async (req, res) => {
-  try {
-    const { code } = req.body;
-
-    if (!code) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Classroom code is required' 
-      });
-    }
-
-    const classroom = await Classroom.findOne({ 
-      code: code.toUpperCase(),
-      isActive: true 
-    });
-
-    if (!classroom) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Invalid classroom code' 
-      });
-    }
-
-    // Check if student is already enrolled
-    const alreadyEnrolled = classroom.students.some(
-      s => s.studentId.toString() === req.user.userId
-    );
-
-    if (alreadyEnrolled) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'You are already enrolled in this classroom' 
-      });
-    }
-
-    await classroom.addStudent(req.user.userId);
-    await classroom.populate('teacher', 'name email');
-
-    console.log(`Student ${req.user.email} joined classroom: ${classroom.name}`);
-
-    res.json({
-      success: true,
-      message: 'Successfully joined classroom',
-      classroom
-    });
-  } catch (error) {
-    console.error('Join classroom error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to join classroom',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
 // Remove student from classroom (teacher only)
 router.delete('/:id/students/:studentId', authenticateToken, authorizeRole('teacher'), async (req, res) => {
   try {
-    const classroom = await Classroom.findById(req.params.id);
-
-    if (!classroom) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Classroom not found' 
-      });
-    }
-
-    // Check if the teacher owns this classroom
-    if (classroom.teacher.toString() !== req.user.userId) {
+    const isOwner = await classroomService.checkTeacherOwnership(req.params.id, req.user.userId);
+    if (!isOwner) {
       return res.status(403).json({ 
         success: false,
         message: 'Access denied. You can only manage your own classrooms.' 
       });
     }
 
-    await classroom.removeStudent(req.params.studentId);
+    await classroomService.removeStudent(req.params.id, req.params.studentId);
 
-    console.log(`Student removed from classroom: ${classroom.name} by ${req.user.email}`);
+    console.log(`Student removed from classroom by ${req.user.email}`);
 
     res.json({
       success: true,
