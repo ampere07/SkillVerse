@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BookOpen } from 'lucide-react';
+import { courseAPI } from '../utils/api';
 
 interface Course {
   _id: string;
@@ -13,171 +14,37 @@ interface Course {
   enrolledStudents: number;
 }
 
-const allCourses: Course[] = [
-  {
-    _id: '1',
-    title: 'Complete Web Development Bootcamp',
-    description: 'Master full-stack web development with HTML, CSS, JavaScript, React, Node.js, and MongoDB.',
-    instructor: 'Sarah Johnson',
-    category: 'Programming',
-    level: 'Beginner',
-    duration: 480,
-    rating: 4.8,
-    enrolledStudents: 12543
-  },
-  {
-    _id: '2',
-    title: 'Advanced React and Redux',
-    description: 'Take your React skills to the next level with hooks, context API, Redux, and performance optimization.',
-    instructor: 'Michael Chen',
-    category: 'Programming',
-    level: 'Advanced',
-    duration: 360,
-    rating: 4.9,
-    enrolledStudents: 8234
-  },
-  {
-    _id: '3',
-    title: 'UI/UX Design Masterclass',
-    description: 'Learn the principles of user interface and user experience design using Figma and Adobe XD.',
-    instructor: 'Emily Rodriguez',
-    category: 'Design',
-    level: 'Intermediate',
-    duration: 300,
-    rating: 4.7,
-    enrolledStudents: 9876
-  },
-  {
-    _id: '4',
-    title: 'Data Science with Python',
-    description: 'Master data science using Python, NumPy, Pandas, and Matplotlib.',
-    instructor: 'Dr. James Wilson',
-    category: 'Data Science',
-    level: 'Intermediate',
-    duration: 420,
-    rating: 4.8,
-    enrolledStudents: 11234
-  },
-  {
-    _id: '5',
-    title: 'Digital Marketing Strategy',
-    description: 'Learn how to create effective digital marketing campaigns with SEO and social media.',
-    instructor: 'Amanda Lee',
-    category: 'Marketing',
-    level: 'Beginner',
-    duration: 240,
-    rating: 4.6,
-    enrolledStudents: 15678
-  },
-  {
-    _id: '6',
-    title: 'Mobile App Development with React Native',
-    description: 'Build cross-platform mobile apps for iOS and Android using React Native.',
-    instructor: 'Alex Park',
-    category: 'Programming',
-    level: 'Intermediate',
-    duration: 400,
-    rating: 4.7,
-    enrolledStudents: 7456
-  },
-  {
-    _id: '7',
-    title: 'Machine Learning Fundamentals',
-    description: 'Understand the core concepts of machine learning. Build and train models using Python, scikit-learn, and TensorFlow.',
-    instructor: 'Dr. Lisa Martinez',
-    category: 'Data Science',
-    level: 'Advanced',
-    duration: 480,
-    rating: 4.9,
-    enrolledStudents: 6543
-  },
-  {
-    _id: '8',
-    title: 'Graphic Design Essentials',
-    description: 'Master the fundamentals of graphic design using Adobe Photoshop, Illustrator, and InDesign.',
-    instructor: 'David Thompson',
-    category: 'Design',
-    level: 'Beginner',
-    duration: 280,
-    rating: 4.5,
-    enrolledStudents: 10234
-  },
-  {
-    _id: '9',
-    title: 'Productivity and Time Management',
-    description: 'Boost your productivity and achieve your goals with proven time management techniques and habit formation.',
-    instructor: 'Jennifer Adams',
-    category: 'Personal Development',
-    level: 'Beginner',
-    duration: 180,
-    rating: 4.8,
-    enrolledStudents: 18765
-  },
-  {
-    _id: '10',
-    title: 'Business Analytics and Intelligence',
-    description: 'Learn to make data-driven business decisions with Excel, SQL, and business intelligence tools.',
-    instructor: 'Robert Kumar',
-    category: 'Business',
-    level: 'Intermediate',
-    duration: 350,
-    rating: 4.7,
-    enrolledStudents: 7890
-  },
-  {
-    _id: '11',
-    title: 'Introduction to Cybersecurity',
-    description: 'Learn the fundamentals of cybersecurity, network security, and ethical hacking.',
-    instructor: 'Marcus Johnson',
-    category: 'Programming',
-    level: 'Intermediate',
-    duration: 320,
-    rating: 4.6,
-    enrolledStudents: 5432
-  },
-  {
-    _id: '12',
-    title: 'Content Creation for Social Media',
-    description: 'Master content creation strategies for Instagram, TikTok, and YouTube.',
-    instructor: 'Sophie Williams',
-    category: 'Marketing',
-    level: 'Beginner',
-    duration: 200,
-    rating: 4.4,
-    enrolledStudents: 12456
-  }
-];
-
-const getEnrolledCourses = () => {
-  const stored = localStorage.getItem('enrolledCourseIds');
-  return stored ? JSON.parse(stored) : ['1', '2', '3', '4', '5', '6'];
-};
-
-const saveEnrolledCourses = (ids: string[]) => {
-  localStorage.setItem('enrolledCourseIds', JSON.stringify(ids));
-};
+const categories = ['All', 'Programming', 'Design', 'Business', 'Marketing', 'Data Science', 'Personal Development'];
 
 export default function BrowseCourses() {
-  const [enrolledIds, setEnrolledIds] = useState<string[]>(getEnrolledCourses());
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
+  const [enrolledIds, setEnrolledIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const handleStorageChange = () => {
-      setEnrolledIds(getEnrolledCourses());
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 500);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    fetchCourses();
   }, []);
 
-  const categories = ['All', 'Programming', 'Design', 'Business', 'Marketing', 'Data Science', 'Personal Development'];
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      const [allCoursesRes, enrolledCoursesRes] = await Promise.all([
+        courseAPI.getAllCourses(),
+        courseAPI.getEnrolledCourses()
+      ]);
+      
+      setAllCourses(allCoursesRes.courses || []);
+      setEnrolledIds((enrolledCoursesRes.courses || []).map((c: any) => c._id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch courses');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const availableCourses = allCourses.filter(course => !enrolledIds.includes(course._id));
 
@@ -190,15 +57,34 @@ export default function BrowseCourses() {
     setShowEnrollModal(true);
   };
 
-  const confirmEnroll = () => {
+  const confirmEnroll = async () => {
     if (selectedCourse) {
-      const newEnrolledIds = [...enrolledIds, selectedCourse._id];
-      setEnrolledIds(newEnrolledIds);
-      saveEnrolledCourses(newEnrolledIds);
-      setShowEnrollModal(false);
-      setSelectedCourse(null);
+      try {
+        await courseAPI.enrollCourse(selectedCourse._id);
+        await fetchCourses();
+        setShowEnrollModal(false);
+        setSelectedCourse(null);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to enroll in course');
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-gray-500">Loading courses...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -271,7 +157,6 @@ interface CourseCardProps {
 function CourseCard({ course, onEnroll }: CourseCardProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
-
       <div className="p-4 flex flex-col flex-1">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">

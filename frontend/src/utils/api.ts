@@ -23,6 +23,15 @@ export const classroomAPI = {
     return response.json();
   },
 
+  // Get all active classrooms (for browsing)
+  getAllClassrooms: async () => {
+    const response = await fetch(`${API_URL}/classrooms/all`, {
+      headers: getAuthHeader()
+    });
+    if (!response.ok) throw new Error('Failed to fetch classrooms');
+    return response.json();
+  },
+
   // Get all student's classrooms
   getStudentClassrooms: async () => {
     const response = await fetch(`${API_URL}/classrooms/student`, {
@@ -108,6 +117,19 @@ export const classroomAPI = {
       headers: getAuthHeader()
     });
     if (!response.ok) throw new Error('Failed to remove student');
+    return response.json();
+  },
+
+  // Leave classroom (student leaves on their own)
+  leaveClassroom: async (classroomId: string) => {
+    const response = await fetch(`${API_URL}/classrooms/${classroomId}/leave`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to leave classroom');
+    }
     return response.json();
   }
 };
@@ -321,6 +343,39 @@ export const moduleAPI = {
       headers: getAuthHeader()
     });
     if (!response.ok) throw new Error('Failed to delete module');
+    return response.json();
+  }
+};
+
+// ===== COURSE API =====
+
+export const courseAPI = {
+  getAllCourses: async () => {
+    const response = await fetch(`${API_URL}/courses/all`, {
+      headers: getAuthHeader()
+    });
+    if (!response.ok) throw new Error('Failed to fetch courses');
+    return response.json();
+  },
+
+  getEnrolledCourses: async () => {
+    const response = await fetch(`${API_URL}/courses/enrolled`, {
+      headers: getAuthHeader()
+    });
+    if (!response.ok) throw new Error('Failed to fetch enrolled courses');
+    return response.json();
+  },
+
+  enrollCourse: async (courseId: string) => {
+    const response = await fetch(`${API_URL}/courses/enroll`, {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ courseId })
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to enroll in course');
+    }
     return response.json();
   }
 };

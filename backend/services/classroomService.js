@@ -1,0 +1,148 @@
+import Classroom from '../models/Classroom.js';
+
+export const classroomService = {
+  async getAllActiveClassrooms() {
+    return await Classroom.find({ isActive: true })
+      .populate('teacher', 'name email')
+      .lean()
+      .sort({ createdAt: -1 });
+  },
+
+  async getTeacherClassrooms(teacherId) {
+    return await Classroom.find({ 
+      teacher: teacherId,
+      isActive: true 
+    })
+    .populate('teacher', 'name email')
+    .populate('students.studentId', 'name email')
+    .sort({ createdAt: -1 });
+  },
+
+  async getStudentClassrooms(studentId) {
+    const classrooms = await Classroom.find({ 
+      'students.studentId': studentId,
+      isActive: true 
+    })
+    .populate('teacher', 'name email')
+    .sort({ createdAt: -1 });
+
+    console.log('Student classrooms:', classrooms.length);
+    classrooms.forEach(c => {
+      console.log(`Classroom: ${c.name}, Teacher:`, c.teacher);
+    });
+
+    return classrooms;
+  },
+
+  async getClassroomById(classroomId) {
+    return await Classroom.findById(classroomId)
+      .populate('teacher', 'name email')
+      .populate('students.studentId', 'name email');
+  },
+
+  async createClassroom(data) {
+    let code;
+    let isUnique = false;
+    
+    while (!isUnique) {
+      code = Classroom.generateCode();
+      const existing = await Classroom.findOne({ code });
+      if (!existing) {
+        isUnique = true;
+      }
+    }
+
+    const classroom = new Classroom({
+      ...data,
+      code
+    });
+
+    await classroom.save();
+    await classroom.populate('teacher', 'name email');
+    return classroom;
+  },
+
+  async updateClassroom(classroomId, data) {
+    const classroom = await Classroom.findById(classroomId);
+    
+    if (data.name) classroom.name = data.name;
+    if (data.description !== undefined) classroom.description = data.description;
+    if (data.settings) classroom.settings = { ...classroom.settings, ...data.settings };
+
+    await classroom.save();
+    await classroom.populate('teacher', 'name email');
+    return classroom;
+  },
+
+  async deleteClassroom(classroomId) {
+    const classroom = await Classroom.findById(classroomId);
+    classroom.isActive = false;
+    await classroom.save();
+    return classroom;
+  },
+
+  async joinClassroom(code, studentId) {
+    const classroom = await Classroom.findOne({ 
+      code: code.toUpperCase(),
+      isActive: true 
+    });
+
+    if (!classroom) {
+      throw new Error('Invalid classroom code');
+    }
+
+    const alreadyEnrolled = classroom.students.some(
+      s => s.studentId.toString() === studentId
+    );
+
+    if (alreadyEnrolled) {
+      throw new Error('You are already enrolled in this classroom');
+    }
+
+    await classroom.addStudent(studentId);
+    await classroom.populate('teacher', 'name email');
+    return classroom;
+  },
+
+  async removeStudent(classroomId, studentId) {
+    const classroom = await Classroom.findById(classroomId);
+    await classroom.removeStudent(studentId);
+    return classroom;
+  },
+
+  async leaveClassroom(classroomId, studentId) {
+    const classroom = await Classroom.findById(classroomId);
+    
+    if (!classroom) {
+      throw new Error('Classroom not found');
+    }
+
+    const isEnrolled = classroom.students.some(
+      s => s.studentId.toString() === studentId
+    );
+
+    if (!isEnrolled) {
+      throw new Error('You are not enrolled in this classroom');
+    }
+
+    await classroom.removeStudent(studentId);
+    return classroom;
+  },
+
+  async checkTeacherOwnership(classroomId, teacherId) {
+    const classroom = await Classroom.findById(classroomId);
+    return classroom && classroom.teacher.toString() === teacherId;
+  },
+
+  async checkUserAccess(classroomId, userId) {
+    const classroom = await Classroom.findById(classroomId);
+    if (!classroom) return false;
+
+    const isTeacher = classroom.teacher.toString() === userId;
+    const isStudent = classroom.students.some(
+      s => s.studentId.toString() === userId
+    );
+
+    return isTeacher || isStudent;
+  }
+};
