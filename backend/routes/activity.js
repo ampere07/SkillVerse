@@ -330,6 +330,11 @@ router.delete('/:id', authenticateToken, authorizeRole('teacher'), async (req, r
 
 router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.array('files', 10), async (req, res) => {
   try {
+    console.log('=== Activity Submit Request ===' );
+    console.log('Request body:', req.body);
+    console.log('Request files:', req.files);
+    console.log('Files count:', req.files ? req.files.length : 0);
+    
     const activity = await Activity.findById(req.params.id)
       .populate('classroom');
 
@@ -383,15 +388,17 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
 
     if (activity.requiresCompiler) {
       content = req.body.codeBase || '';
+      console.log('Compiler activity - content length:', content.length);
     } else {
       content = req.body.content || '';
+      console.log('Normal activity - content length:', content.length);
       
-      // Handle file uploads for normal activities
       if (req.files && req.files.length > 0) {
-        console.log(`Uploading ${req.files.length} files for activity submission`);
+        console.log(`Processing ${req.files.length} files for upload`);
         
         const uploadPromises = req.files.map(async (file) => {
           try {
+            console.log(`  - Uploading file: ${file.originalname} (${file.mimetype})`);
             const result = await uploadFile(file, {
               classroomName: activity.classroom.name,
               postTitle: activity.title,
@@ -400,7 +407,7 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
 
             fs.unlinkSync(file.path);
 
-            console.log(`  - Uploaded: ${result.public_id}`);
+            console.log(`  - Success: ${result.public_id}`);
 
             return {
               fileName: file.originalname,
@@ -410,6 +417,7 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
               publicId: result.public_id
             };
           } catch (error) {
+            console.error(`  - Error uploading ${file.originalname}:`, error);
             if (fs.existsSync(file.path)) {
               fs.unlinkSync(file.path);
             }
@@ -418,10 +426,21 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
         });
 
         attachments = await Promise.all(uploadPromises);
+        console.log('Final attachments array:', attachments);
+      } else {
+        console.log('No files received in request');
       }
     }
 
+    console.log('Submitting activity with attachments count:', attachments.length);
+    console.log('Attachments to be saved:', JSON.stringify(attachments, null, 2));
     await activity.submitActivity(req.user.userId, content, attachments);
+
+    // Verify submission was saved
+    const savedActivity = await Activity.findById(req.params.id);
+    const savedSubmission = savedActivity.submissions.find(s => s.student.toString() === req.user.userId);
+    console.log('Saved submission attachments count:', savedSubmission?.attachments?.length || 0);
+    console.log('Saved submission attachments:', JSON.stringify(savedSubmission?.attachments, null, 2));
 
     console.log(`Activity submitted: ${activity.title} by ${req.user.email}`);
 
@@ -430,7 +449,6 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
       message: 'Activity submitted successfully'
     });
   } catch (error) {
-    // Clean up uploaded files if there's an error
     if (req.files) {
       req.files.forEach(file => {
         if (fs.existsSync(file.path)) {
