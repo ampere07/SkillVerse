@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Award, Send } from 'lucide-react';
+import { Award, Send, CheckCircle } from 'lucide-react';
 import { activityAPI } from '../utils/api';
 
 interface GradingSidebarProps {
@@ -26,6 +26,7 @@ export default function GradingSidebar({ submission, activityId, maxPoints, onSu
   const [feedback, setFeedback] = useState(submission.feedback || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const student = typeof submission.student === 'object' ? submission.student : null;
 
@@ -51,16 +52,20 @@ export default function GradingSidebar({ submission, activityId, maxPoints, onSu
         grade: gradeNum,
         feedback: feedback.trim() || undefined
       });
-      onSuccess();
+      setShowSuccessModal(true);
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        onSuccess();
+      }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to grade submission');
-    } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 sticky top-6">
+    <>
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sticky top-6">
       <h3 className="text-base font-semibold text-gray-900 mb-4">Grade Submission</h3>
 
       {error && (
@@ -164,5 +169,34 @@ export default function GradingSidebar({ submission, activityId, maxPoints, onSu
         </div>
       </div>
     </div>
+
+      {/* Loading Modal */}
+      {submitting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-gray-900 mx-auto mb-4"></div>
+              <p className="text-lg font-semibold text-gray-900 mb-2">Submitting Grade...</p>
+              <p className="text-sm text-gray-600">Please wait</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-10 h-10 text-green-600" />
+              </div>
+              <p className="text-lg font-semibold text-gray-900 mb-2">Grade Submitted!</p>
+              <p className="text-sm text-gray-600">Redirecting back...</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

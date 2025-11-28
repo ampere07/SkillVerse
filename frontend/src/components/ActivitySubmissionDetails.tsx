@@ -3,6 +3,7 @@ import { X, Download, FileText, Award, Send, ChevronDown, ChevronUp } from 'luci
 import { activityAPI } from '../utils/api';
 import DocumentViewer from './DocumentViewer';
 import PDFViewer from './PDFViewer';
+import TeacherGradingCompiler from './TeacherGradingCompiler';
 
 interface Attachment {
   fileName: string;
@@ -33,6 +34,8 @@ interface ActivitySubmissionDetailsProps {
   maxPoints: number;
   onClose: () => void;
   onSuccess: () => void;
+  requiresCompiler?: boolean;
+  activity?: any;
 }
 
 export default function ActivitySubmissionDetails({
@@ -41,7 +44,9 @@ export default function ActivitySubmissionDetails({
   activityTitle,
   maxPoints,
   onClose,
-  onSuccess
+  onSuccess,
+  requiresCompiler = false,
+  activity
 }: ActivitySubmissionDetailsProps) {
   const [grade, setGrade] = useState(submission.grade?.toString() || '');
   const [feedback, setFeedback] = useState(submission.feedback || '');
@@ -93,6 +98,17 @@ export default function ActivitySubmissionDetails({
   };
 
   const submittedDate = new Date(submission.submittedAt);
+
+  if (requiresCompiler && activity && submission.codeBase) {
+    return (
+      <TeacherGradingCompiler
+        submission={submission}
+        activity={activity}
+        onBack={onClose}
+        onGradeSuccess={onSuccess}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

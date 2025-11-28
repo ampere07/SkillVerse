@@ -94,9 +94,10 @@ interface CompilerProps {
   onBack?: () => void;
   onHasUnsavedChanges?: (hasChanges: boolean) => void;
   isActivityMode?: boolean;
+  readOnly?: boolean;
 }
 
-const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges, isActivityMode = false }, ref) => {
+const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges, isActivityMode = false, readOnly = false }, ref) => {
   const [language, setLanguage] = useState('java');
   const [code, setCode] = useState(DEFAULT_CODE.java);
   const [output, setOutput] = useState('');

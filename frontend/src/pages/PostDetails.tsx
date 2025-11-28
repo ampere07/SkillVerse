@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import GradingSidebar from '../components/GradingSidebar';
 import PDFViewer from '../components/PDFViewer';
 import DocumentViewer from '../components/DocumentViewer';
+import TeacherGradingCompiler from '../components/TeacherGradingCompiler';
 
 interface Attachment {
   fileName: string;
@@ -103,6 +104,8 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [showSubmissionDetails, setShowSubmissionDetails] = useState(false);
   const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number | null>(null);
+  const [showCompilerGrading, setShowCompilerGrading] = useState(false);
+  const [gradingSubmission, setGradingSubmission] = useState<Submission | null>(null);
   const compilerRef = useRef<CompilerHandle>(null);
 
   const isStudent = user?.role === 'student';
@@ -469,6 +472,24 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
     hasSubmitted
   });
 
+  if (showCompilerGrading && gradingSubmission && post?.requiresCompiler) {
+    return (
+      <TeacherGradingCompiler
+        submission={gradingSubmission}
+        activity={post}
+        onBack={() => {
+          setShowCompilerGrading(false);
+          setGradingSubmission(null);
+        }}
+        onGradeSuccess={() => {
+          setShowCompilerGrading(false);
+          setGradingSubmission(null);
+          fetchPostDetails();
+        }}
+      />
+    );
+  }
+
   if (showCompiler && post?.requiresCompiler) {
     const compilerProjectDetails = {
       _id: post._id,
@@ -787,9 +808,14 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                       setIsSubmitMode(false);
                       setShowSubmitModal(true);
                     }}
-                    className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    disabled={mySubmission.grade !== undefined}
+                    className={`w-full px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
+                      mySubmission.grade !== undefined
+                        ? 'bg-green-600 text-white cursor-not-allowed opacity-75'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
-                    Unsubmit
+                    {mySubmission.grade !== undefined ? 'Graded' : 'Unsubmit'}
                   </button>
 
                   {mySubmission.grade !== undefined && (
@@ -803,6 +829,7 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                       {mySubmission.feedback && (
                         <div className="mt-3">
                           <p className="text-xs font-medium text-gray-700 mb-1">Feedback</p>
+                          <p className="text-xs text-gray-500 mb-2">by {post.teacher.name}</p>
                           <p className="text-sm text-gray-600 whitespace-pre-wrap">{mySubmission.feedback}</p>
                         </div>
                       )}
@@ -935,8 +962,13 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                       <button
                         key={index}
                         onClick={() => {
-                          setSelectedSubmission(submission);
-                          setShowSubmissionDetails(true);
+                          if (post.requiresCompiler) {
+                            setGradingSubmission(submission);
+                            setShowCompilerGrading(true);
+                          } else {
+                            setSelectedSubmission(submission);
+                            setShowSubmissionDetails(true);
+                          }
                         }}
                         className="w-full border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors text-left"
                       >
