@@ -11,11 +11,17 @@ import {
   Award,
   X,
   Paperclip,
-  Send
+  Send,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { activityAPI, moduleAPI } from '../utils/api';
 import Compiler from './Compiler';
 import { useAuth } from '../contexts/AuthContext';
+import GradingSidebar from '../components/GradingSidebar';
+import PDFViewer from '../components/PDFViewer';
+import DocumentViewer from '../components/DocumentViewer';
+import TeacherGradingCompiler from '../components/TeacherGradingCompiler';
 
 interface Attachment {
   fileName: string;
@@ -86,78 +92,24 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
+  const [isSubmitMode, setIsSubmitMode] = useState(false);
   const [showCompiler, setShowCompiler] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showActivitySubmitModal, setShowActivitySubmitModal] = useState(false);
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [submissionContent, setSubmissionContent] = useState('');
+  const [submittedAttachments, setSubmittedAttachments] = useState<Attachment[]>([]);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [showSubmissionDetails, setShowSubmissionDetails] = useState(false);
+  const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number | null>(null);
+  const [showCompilerGrading, setShowCompilerGrading] = useState(false);
+  const [gradingSubmission, setGradingSubmission] = useState<Submission | null>(null);
   const compilerRef = useRef<CompilerHandle>(null);
 
   const isStudent = user?.role === 'student';
   const isTeacher = user?.role === 'teacher';
-
-  useEffect(() => {
-    fetchPostDetails();
-  }, [postId, postType]);
-
-  const fetchPostDetails = async () => {
-    try {
-      setLoading(true);
-      let response;
-      
-      if (postType === 'activity') {
-        response = await activityAPI.getActivity(postId);
-        setPost(response.activity);
-      } else {
-        response = await moduleAPI.getModule(postId);
-        setPost(response.module);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch post details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-500">Loading post details...</div>
-      </div>
-    );
-  }
-
-  if (error || !post) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-600">{error || 'Post not found'}</p>
-        <button onClick={onBack} className="mt-4 text-gray-600 hover:text-gray-900">
-          Go back
-        </button>
-      </div>
-    );
-  }
-
-  const dueDate = post.dueDate ? new Date(post.dueDate) : null;
-  const isOverdue = dueDate && dueDate < new Date();
-  const isDueSoon = dueDate && !isOverdue && (dueDate.getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000;
-
-  const mySubmission = postType === 'activity' && post.submissions?.find(
-    s => {
-      const studentId = typeof s.student === 'object' ? s.student._id : s.student;
-      return studentId === user?.id;
-    }
-  );
-
-  const hasSubmitted = !!mySubmission;
-
-  console.log('Submission check:', {
-    postType,
-    hasSubmissions: !!post.submissions,
-    submissionsLength: post.submissions?.length,
-    userId: user?.id,
-    mySubmission,
-    hasSubmitted
-  });
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
@@ -202,7 +154,46 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
     if (post?.requiresCompiler) {
       setShowCompiler(true);
     } else {
+      setIsSubmitMode(false);
       setShowSubmitModal(true);
+    }
+  };
+
+  const handleSubmitWork = async () => {
+    try {
+      setSubmitting(true);
+      setError('');
+
+      const formData = new FormData();
+      formData.append('content', submissionContent);
+      
+      pendingFiles.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${postId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit activity');
+      }
+
+      setShowSubmitConfirmation(false);
+      setPendingFiles([]);
+      setSubmissionContent('');
+      await fetchPostDetails();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit activity');
+      alert(err instanceof Error ? err.message : 'Failed to submit activity');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -252,6 +243,252 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    fetchPostDetails();
+  }, [postId, postType]);
+
+  const fetchPostDetails = async () => {
+    try {
+      setLoading(true);
+      let response;
+      
+      if (postType === 'activity') {
+        response = await activityAPI.getActivity(postId);
+        setPost(response.activity);
+      } else {
+        response = await moduleAPI.getModule(postId);
+        setPost(response.module);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch post details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-gray-500">Loading post details...</div>
+      </div>
+    );  
+  }
+
+  if (showSubmissionDetails && selectedSubmission) {
+    const student = typeof selectedSubmission.student === 'object' ? selectedSubmission.student : null;
+    const studentName = student ? student.name : 'Unknown Student';
+    
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6">
+          <div className="flex items-center text-sm text-gray-600">
+            <button onClick={onBack} className="hover:text-gray-900 transition-colors">
+              Classrooms
+            </button>
+            <ChevronRight className="w-4 h-4 mx-2" />
+            <button onClick={onBack} className="hover:text-gray-900 transition-colors">
+              {post.classroom?.name || 'Classroom'}
+            </button>
+            <ChevronRight className="w-4 h-4 mx-2" />
+            <button 
+              onClick={() => {
+                setShowSubmissionDetails(false);
+                setSelectedSubmission(null);
+                setSelectedPreviewIndex(null);
+              }} 
+              className="hover:text-gray-900 transition-colors"
+            >
+              {post.title}
+            </button>
+            <ChevronRight className="w-4 h-4 mx-2" />
+            <span className="text-gray-900 font-medium">{studentName}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <div>
+              <div className="p-6 border-b border-gray-200">
+                <h1 className="text-2xl font-semibold text-gray-900">{post.title}</h1>
+                <p className="text-sm text-gray-500 mt-2">
+                  Submitted {new Date(selectedSubmission.submittedAt).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {selectedSubmission.content && selectedPreviewIndex === null && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Submission Content</h3>
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                        {selectedSubmission.content}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedSubmission.attachments && selectedSubmission.attachments.length > 0 && (
+                  <div>
+                    <div className="border-t border-gray-200 pt-6" />
+                    <div className="space-y-3">
+                      {selectedSubmission.attachments.map((attachment, index) => {
+                        const isDocx = attachment.fileType?.includes('word') || attachment.fileName.endsWith('.docx');
+                        const isPdf = attachment.fileType?.includes('pdf') || attachment.fileName.endsWith('.pdf');
+                        const canPreview = isDocx || isPdf;
+                        const isSelected = selectedPreviewIndex === index;
+                        
+                        return (
+                          <div key={index} className="space-y-3">
+                            <div className="w-full p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                              <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                                  <FileText className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 mb-1 truncate">
+                                    {attachment.fileName}
+                                  </p>
+                                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                                    <span>{formatFileSize(attachment.fileSize)}</span>
+                                    <span>•</span>
+                                    <span>
+                                      {attachment.fileType?.includes('word') ? 'Microsoft Word' : 
+                                       attachment.fileType?.includes('pdf') ? 'PDF Document' :
+                                       attachment.fileType?.includes('image') ? 'Image' : 
+                                       attachment.fileType?.includes('video') ? 'Video' : 'File'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {canPreview && (
+                                    <button
+                                      onClick={() => setSelectedPreviewIndex(isSelected ? null : index)}
+                                      className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    >
+                                      {isSelected ? (
+                                        <>
+                                          <ChevronUp className="w-4 h-4" />
+                                          Hide Preview
+                                        </>
+                                      ) : (
+                                        <>
+                                          <ChevronDown className="w-4 h-4" />
+                                          Preview
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDownload(attachment.fileUrl, attachment.fileName)}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    Download
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {canPreview && isSelected && (
+                              <div className="ml-4 pl-4 border-l-2 border-gray-300">
+                                {isPdf ? (
+                                  <PDFViewer fileUrl={attachment.fileUrl} fileName={attachment.fileName} />
+                                ) : isDocx ? (
+                                  <DocumentViewer fileUrl={attachment.fileUrl} fileName={attachment.fileName} />
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!selectedSubmission.content && (!selectedSubmission.attachments || selectedSubmission.attachments.length === 0) && (
+                  <div className="text-center py-12">
+                    <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No submission content available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1">
+            <GradingSidebar
+              submission={selectedSubmission}
+              activityId={postId}
+              maxPoints={post.points || 100}
+              onSuccess={() => {
+                setShowSubmissionDetails(false);
+                setSelectedSubmission(null);
+                fetchPostDetails();
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !post) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">{error || 'Post not found'}</p>
+        <button onClick={onBack} className="mt-4 text-gray-600 hover:text-gray-900">
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const dueDate = post.dueDate ? new Date(post.dueDate) : null;
+  const isOverdue = dueDate && dueDate < new Date();
+  const isDueSoon = dueDate && !isOverdue && (dueDate.getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000;
+
+  const mySubmission = postType === 'activity' && post.submissions?.find(
+    s => {
+      const studentId = typeof s.student === 'object' ? s.student._id : s.student;
+      return studentId === user?.id;
+    }
+  );
+
+  const hasSubmitted = !!mySubmission;
+
+  console.log('Submission check:', {
+    postType,
+    hasSubmissions: !!post.submissions,
+    submissionsLength: post.submissions?.length,
+    userId: user?.id,
+    mySubmission,
+    hasSubmitted
+  });
+
+  if (showCompilerGrading && gradingSubmission && post?.requiresCompiler) {
+    return (
+      <TeacherGradingCompiler
+        submission={gradingSubmission}
+        activity={post}
+        onBack={() => {
+          setShowCompilerGrading(false);
+          setGradingSubmission(null);
+        }}
+        onGradeSuccess={() => {
+          setShowCompilerGrading(false);
+          setGradingSubmission(null);
+          fetchPostDetails();
+        }}
+      />
+    );
+  }
 
   if (showCompiler && post?.requiresCompiler) {
     const compilerProjectDetails = {
@@ -529,39 +766,56 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
               
               {hasSubmitted && mySubmission ? (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                    <span className="text-sm font-medium text-gray-900">Turned in</span>
+                  <div className="pb-4 border-b border-gray-200">
+                    <span className="text-sm text-gray-600">Turned in</span>
                   </div>
+
+                  {mySubmission.content && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs font-medium text-gray-700 mb-2">Submission:</p>
+                      <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                        {mySubmission.content}
+                      </p>
+                    </div>
+                  )}
 
                   {mySubmission.attachments && mySubmission.attachments.length > 0 && (
                     <div className="space-y-2">
                       {mySubmission.attachments.map((attachment, index) => (
                         <div
                           key={index}
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                          className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => handleDownload(attachment.fileUrl, attachment.fileName)}
                         >
+                          <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">
                               {attachment.fileName}
                             </p>
-                            <p className="text-xs text-gray-500">Compressed archive</p>
+                            <p className="text-xs text-gray-500">{formatFileSize(attachment.fileSize)}</p>
                           </div>
-                          <button
-                            onClick={() => handleDownload(attachment.fileUrl, attachment.fileName)}
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            <Download className="w-5 h-5" />
-                          </button>
                         </div>
                       ))}
                     </div>
                   )}
 
                   <button
-                    onClick={() => setShowSubmitModal(true)}
-                    className="w-full px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                    onClick={() => {
+                      if (mySubmission) {
+                        setSubmissionContent(mySubmission.content || '');
+                        setSubmittedAttachments(mySubmission.attachments || []);
+                      }
+                      setIsSubmitMode(false);
+                      setShowSubmitModal(true);
+                    }}
+                    disabled={mySubmission.grade !== undefined}
+                    className={`w-full px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
+                      mySubmission.grade !== undefined
+                        ? 'bg-green-600 text-white cursor-not-allowed opacity-75'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
-                    Unsubmit
+                    {mySubmission.grade !== undefined ? 'Graded' : 'Unsubmit'}
                   </button>
 
                   {mySubmission.grade !== undefined && (
@@ -575,6 +829,7 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                       {mySubmission.feedback && (
                         <div className="mt-3">
                           <p className="text-xs font-medium text-gray-700 mb-1">Feedback</p>
+                          <p className="text-xs text-gray-500 mb-2">by {post.teacher.name}</p>
                           <p className="text-sm text-gray-600 whitespace-pre-wrap">{mySubmission.feedback}</p>
                         </div>
                       )}
@@ -587,6 +842,78 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                     <span className="text-sm text-gray-600">Not turned in</span>
                   </div>
 
+                  {submissionContent.trim() && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-medium text-gray-700">Submission:</p>
+                        <button
+                          onClick={() => setSubmissionContent('')}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                        {submissionContent}
+                      </p>
+                    </div>
+                  )}
+
+                  {pendingFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {pendingFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newFiles = pendingFiles.filter((_, i) => i !== index);
+                              setPendingFiles(newFiles);
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {submittedAttachments.length > 0 && (
+                    <div className="space-y-2">
+                      {submittedAttachments.map((attachment, index) => (
+                        <div
+                          key={`submitted-${index}`}
+                          className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {attachment.fileName}
+                            </p>
+                            <p className="text-xs text-gray-500">{formatFileSize(attachment.fileSize)}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newAttachments = submittedAttachments.filter((_, i) => i !== index);
+                              setSubmittedAttachments(newAttachments);
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <button
                     onClick={handleAddOrCreate}
                     disabled={hasSubmitted || (isOverdue && !post.allowLateSubmission)}
@@ -594,6 +921,15 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                   >
                     {hasSubmitted ? 'Already Submitted' : (isOverdue && !post.allowLateSubmission ? 'Submission Closed' : (post.requiresCompiler ? 'Open Compiler' : 'Add or create'))}
                   </button>
+
+                  {(pendingFiles.length > 0 || submissionContent.trim()) && (
+                    <button
+                      onClick={() => setShowSubmitConfirmation(true)}
+                      className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      Submit Work
+                    </button>
+                  )}
 
                   {dueDate && (
                     <div className="pt-4 border-t border-gray-200">
@@ -623,9 +959,18 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                     const studentName = student ? student.name : 'Unknown Student';
                     
                     return (
-                      <div
+                      <button
                         key={index}
-                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          if (post.requiresCompiler) {
+                            setGradingSubmission(submission);
+                            setShowCompilerGrading(true);
+                          } else {
+                            setSelectedSubmission(submission);
+                            setShowSubmissionDetails(true);
+                          }
+                        }}
+                        className="w-full border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors text-left"
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1">
@@ -672,19 +1017,18 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                             </p>
                             <div className="space-y-1">
                               {submission.attachments.map((attachment, idx) => (
-                                <button
+                                <div
                                   key={idx}
-                                  onClick={() => handleDownload(attachment.fileUrl, attachment.fileName)}
-                                  className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 w-full text-left"
+                                  className="flex items-center gap-2 text-xs text-blue-600 w-full text-left"
                                 >
                                   <Download className="w-3 h-3" />
                                   <span className="truncate">{attachment.fileName}</span>
-                                </button>
+                                </div>
                               ))}
                             </div>
                           </div>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -704,12 +1048,77 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
           postId={postId}
           postTitle={post.title}
           isUnsubmit={hasSubmitted}
-          onClose={() => setShowSubmitModal(false)}
+          pendingFiles={pendingFiles}
+          isSubmitMode={isSubmitMode}
+          submissionContent={submissionContent}
+          onContentChange={setSubmissionContent}
+          onClose={() => {
+            setShowSubmitModal(false);
+          }}
           onSuccess={() => {
             setShowSubmitModal(false);
+            if (!hasSubmitted) {
+              setPendingFiles([]);
+              setSubmissionContent('');
+            }
             fetchPostDetails();
           }}
+          onFilesChange={setPendingFiles}
         />
+      )}
+
+      {showSubmitConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Submit Work?</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-700 mb-4">
+                Are you sure you want to submit this work? You cannot edit your submission after submitting.
+              </p>
+              
+              {submissionContent.trim() && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Submission Content:</p>
+                  <p className="text-xs text-gray-600 whitespace-pre-wrap">{submissionContent}</p>
+                </div>
+              )}
+
+              {pendingFiles.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Files to submit:</p>
+                  <div className="space-y-2">
+                    {pendingFiles.map((file, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Paperclip className="w-3 h-3 text-gray-400" />
+                        <span className="text-xs text-gray-600">{file.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowSubmitConfirmation(false)}
+                disabled={submitting}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitWork}
+                disabled={submitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -719,29 +1128,44 @@ interface SubmitModalProps {
   postId: string;
   postTitle: string;
   isUnsubmit: boolean;
+  pendingFiles: File[];
   onClose: () => void;
   onSuccess: () => void;
+  onFilesChange: (files: File[]) => void;
+  isSubmitMode?: boolean;
+  submissionContent: string;
+  onContentChange: (content: string) => void;
 }
 
-function SubmitModal({ postId, postTitle, isUnsubmit, onClose, onSuccess }: SubmitModalProps) {
-  const [content, setContent] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
+function SubmitModal({ postId, postTitle, isUnsubmit, pendingFiles, onClose, onSuccess, onFilesChange, isSubmitMode = false, submissionContent, onContentChange }: SubmitModalProps) {
+  const [content, setContent] = useState(submissionContent);
+  const [files, setFiles] = useState<File[]>(pendingFiles);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    setContent(submissionContent);
+    setFiles(pendingFiles);
+  }, [submissionContent, pendingFiles]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+      const newFiles = Array.from(e.target.files);
+      const updatedFiles = [...files, ...newFiles];
+      setFiles(updatedFiles);
     }
+  };
+
+  const handleAddFiles = () => {
+    onFilesChange(files);
+    onContentChange(content);
+    onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (isUnsubmit) {
-      if (!confirm('Are you sure you want to unsubmit this work?')) {
-        return;
-      }
       try {
         setSubmitting(true);
         setError('');
@@ -764,15 +1188,44 @@ function SubmitModal({ postId, postTitle, isUnsubmit, onClose, onSuccess }: Subm
       setSubmitting(true);
       setError('');
 
+      console.log('=== Frontend Submit Debug ===');
+      console.log('Content:', content);
+      console.log('Files count:', files.length);
+      console.log('Files:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
+
       const formData = new FormData();
       formData.append('content', content);
-      files.forEach(file => {
+      
+      files.forEach((file, index) => {
+        console.log(`Appending file ${index}:`, file.name);
         formData.append('files', file);
       });
 
-      await activityAPI.submitActivity(postId, formData);
+      console.log('FormData entries:');
+      for (let pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+      }
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${postId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit activity');
+      }
+
+      const responseData = await response.json();
+      console.log('Submit response:', responseData);
+
       onSuccess();
     } catch (err) {
+      console.error('Submit error:', err);
       setError(err instanceof Error ? err.message : 'Failed to submit activity');
     } finally {
       setSubmitting(false);
@@ -780,7 +1233,9 @@ function SubmitModal({ postId, postTitle, isUnsubmit, onClose, onSuccess }: Subm
   };
 
   const removeFile = (index: number) => {
-    setFiles(files.filter((_, i) => i !== index));
+    const newFiles = files.filter((_, i) => i !== index);
+    setFiles(newFiles);
+    onFilesChange(newFiles);
   };
 
   return (
@@ -886,17 +1341,34 @@ function SubmitModal({ postId, postTitle, isUnsubmit, onClose, onSuccess }: Subm
           >
             Cancel
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || (!isUnsubmit && !content.trim() && files.length === 0)}
-            className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-              isUnsubmit 
-                ? 'bg-red-600 text-white hover:bg-red-700' 
-                : 'bg-gray-900 text-white hover:bg-gray-800'
-            }`}
-          >
-            {submitting ? (isUnsubmit ? 'Unsubmitting...' : 'Submitting...') : (isUnsubmit ? 'Unsubmit' : 'Submit')}
-          </button>
+          {!isUnsubmit && !isSubmitMode && (
+            <button
+              type="button"
+              onClick={handleAddFiles}
+              disabled={submitting || files.length === 0}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add Files
+            </button>
+          )}
+          {!isUnsubmit && isSubmitMode && (
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || (!content.trim() && pendingFiles.length === 0)}
+              className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Submitting...' : 'Submit'}
+            </button>
+          )}
+          {isUnsubmit && (
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Unsubmitting...' : 'Unsubmit'}
+            </button>
+          )}
         </div>
       </div>
     </div>

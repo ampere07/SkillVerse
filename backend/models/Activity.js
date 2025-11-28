@@ -135,6 +135,12 @@ activitySchema.virtual('isOverdue').get(function() {
 });
 
 activitySchema.methods.submitActivity = function(studentId, content, attachments = []) {
+  console.log('=== submitActivity Method ===');
+  console.log('StudentId:', studentId);
+  console.log('Content length:', content.length);
+  console.log('Attachments received:', JSON.stringify(attachments, null, 2));
+  console.log('Attachments count:', attachments.length);
+  
   const existingSubmission = this.submissions.find(
     s => s.student.toString() === studentId.toString()
   );
@@ -143,12 +149,16 @@ activitySchema.methods.submitActivity = function(studentId, content, attachments
     throw new Error('Activity already submitted');
   }
 
-  this.submissions.push({
+  const newSubmission = {
     student: studentId,
     content,
     attachments
-  });
+  };
 
+  console.log('New submission object:', JSON.stringify(newSubmission, null, 2));
+  this.submissions.push(newSubmission);
+
+  console.log('Submission added to activity, total submissions:', this.submissions.length);
   return this.save();
 };
 
