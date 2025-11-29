@@ -4,6 +4,7 @@ import Activity from '../models/Activity.js';
 import Classroom from '../models/Classroom.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 import { uploadFile } from '../config/cloudinary.js';
+import { generateActivityFeedback } from '../services/activityFeedbackService.js';
 import fs from 'fs';
 
 const router = express.Router();
@@ -384,11 +385,16 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
     }
 
     let content = '';
+    let codeBase = '';
     let attachments = [];
 
     if (activity.requiresCompiler) {
-      content = req.body.codeBase || '';
-      console.log('Compiler activity - content length:', content.length);
+      codeBase = req.body.codeBase || '';
+      console.log('Compiler activity - codeBase received:', !!codeBase);
+      console.log('Compiler activity - codeBase length:', codeBase.length);
+      if (codeBase) {
+        console.log('First 200 chars of codeBase:', codeBase.substring(0, 200));
+      }
     } else {
       content = req.body.content || '';
       console.log('Normal activity - content length:', content.length);
@@ -434,7 +440,30 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
 
     console.log('Submitting activity with attachments count:', attachments.length);
     console.log('Attachments to be saved:', JSON.stringify(attachments, null, 2));
-    await activity.submitActivity(req.user.userId, content, attachments);
+    
+    let aiFeedback = null;
+    
+    if (activity.requiresCompiler && codeBase) {
+      console.log('[Activity Submit] Generating AI feedback for compiler activity...');
+      try {
+        const feedbackResult = await generateActivityFeedback(activity, codeBase);
+        aiFeedback = feedbackResult.feedback;
+        console.log('[Activity Submit] AI feedback generated successfully');
+      } catch (feedbackError) {
+        console.error('[Activity Submit] Error generating AI feedback:', feedbackError);
+        aiFeedback = 'Great work on completing this activity! Your submission has been received.';
+      }
+    }
+    
+    await activity.submitActivity(req.user.userId, content, codeBase, attachments);
+    
+    if (aiFeedback) {
+      const submission = activity.submissions.find(s => s.student.toString() === req.user.userId);
+      if (submission) {
+        submission.aiFeedback = aiFeedback;
+        await activity.save();
+      }
+    }
 
     // Verify submission was saved
     const savedActivity = await Activity.findById(req.params.id);
@@ -446,7 +475,8 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
 
     res.json({
       success: true,
-      message: 'Activity submitted successfully'
+      message: 'Activity submitted successfully',
+      aiFeedback: aiFeedback
     });
   } catch (error) {
     if (req.files) {
@@ -577,6 +607,84 @@ router.post('/:id/grade/:studentId', authenticateToken, authorizeRole('teacher')
     res.status(500).json({ 
       success: false,
       message: error.message || 'Failed to grade activity',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+router.get('/:id/ai-feedback', authenticateToken, async (req, res) => {
+  try {
+    const activity = await Activity.findById(req.params.id);
+
+    if (!activity) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Activity not found' 
+      });
+    }
+
+    if (!activity.requiresCompiler) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'AI feedback is only available for compiler-based activities' 
+      });
+    }
+
+    const submission = activity.submissions.find(
+      s => s.student.toString() === req.user.userId
+    );
+
+    if (!submission) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No submission found' 
+      });
+    }
+
+    console.log('=== AI Feedback Debug ===');
+    console.log('Submission found:', !!submission);
+    console.log('Has content:', !!submission.content);
+    console.log('Content length:', submission.content?.length || 0);
+    console.log('Has codeBase:', !!submission.codeBase);
+    console.log('CodeBase length:', submission.codeBase?.length || 0);
+    console.log('Submission keys:', Object.keys(submission.toObject()));
+
+    const code = submission.codeBase || submission.content;
+
+    if (!code) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No code found in submission',
+        debug: {
+          hasContent: !!submission.content,
+          contentLength: submission.content?.length || 0,
+          hasCodeBase: !!submission.codeBase,
+          codeBaseLength: submission.codeBase?.length || 0,
+          submissionKeys: Object.keys(submission.toObject())
+        }
+      });
+    }
+
+    console.log(`Generating AI feedback for activity: ${activity.title} by ${req.user.email}`);
+    console.log(`Using code from: ${submission.codeBase ? 'codeBase' : 'content'} field`);
+
+    const activityDetails = {
+      title: activity.title,
+      description: activity.description,
+      instructions: activity.instructions || ''
+    };
+
+    const feedback = await generateActivityFeedback(activityDetails, code);
+
+    res.json({
+      success: true,
+      feedback: feedback.feedback
+    });
+  } catch (error) {
+    console.error('AI feedback error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message || 'Failed to generate AI feedback',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

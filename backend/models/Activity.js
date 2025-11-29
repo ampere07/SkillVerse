@@ -100,6 +100,10 @@ const activitySchema = new mongoose.Schema({
       type: String,
       trim: true
     },
+    codeBase: {
+      type: String,
+      trim: true
+    },
     attachments: [{
       fileName: String,
       fileUrl: String,
@@ -114,6 +118,14 @@ const activitySchema = new mongoose.Schema({
     feedback: {
       type: String,
       trim: true
+    },
+    aiFeedback: {
+      type: String,
+      trim: true
+    },
+    aiScore: {
+      type: Number,
+      min: 0
     },
     status: {
       type: String,
@@ -134,10 +146,11 @@ activitySchema.virtual('isOverdue').get(function() {
   return new Date() > this.dueDate;
 });
 
-activitySchema.methods.submitActivity = function(studentId, content, attachments = []) {
+activitySchema.methods.submitActivity = function(studentId, content, codeBase, attachments = []) {
   console.log('=== submitActivity Method ===');
   console.log('StudentId:', studentId);
   console.log('Content length:', content.length);
+  console.log('CodeBase length:', codeBase ? codeBase.length : 0);
   console.log('Attachments received:', JSON.stringify(attachments, null, 2));
   console.log('Attachments count:', attachments.length);
   
@@ -152,6 +165,7 @@ activitySchema.methods.submitActivity = function(studentId, content, attachments
   const newSubmission = {
     student: studentId,
     content,
+    codeBase,
     attachments
   };
 

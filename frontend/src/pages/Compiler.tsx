@@ -132,8 +132,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const [isStreaming, setIsStreaming] = useState(false);
   const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showNavigationWarning, setShowNavigationWarning] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [timerStarted, setTimerStarted] = useState(false);
   const [showTimeUpModal, setShowTimeUpModal] = useState(false);
@@ -152,15 +150,17 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const bracketHighlightRef = useRef<HTMLDivElement>(null);
 
+  const hasLoadedRef = useRef(false);
+
   useEffect(() => {
-    if (projectDetails) {
+    if (projectDetails && !hasLoadedRef.current) {
       const projectLang = projectDetails.language.toLowerCase();
       setLanguage(projectLang);
       loadSavedProgress();
+      hasLoadedRef.current = true;
     }
   }, [projectDetails]);
 
-  // Timer logic for activity mode
   useEffect(() => {
     if (isActivityMode && projectDetails && !timerStarted) {
       const durationHours = (projectDetails as any).duration?.hours || 0;
@@ -174,7 +174,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }
   }, [isActivityMode, projectDetails, timerStarted]);
 
-  // Countdown timer
   useEffect(() => {
     if (timeRemaining !== null && timeRemaining > 0 && isActivityMode) {
       timerIntervalRef.current = setInterval(() => {
@@ -198,7 +197,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }
   }, [timeRemaining, isActivityMode]);
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current) {
@@ -256,7 +254,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000');
     
     newSocket.on('connect', () => {
-      // Connected to server
     });
 
     newSocket.on('output', (data: { type: string; data: string }) => {
@@ -271,7 +268,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     newSocket.on('execution-complete', () => {
       setIsRunning(false);
       
-      // Restore AI assistant after execution completes
       if (projectDetails && !isActivityMode) {
         setTimeout(() => {
           setAiMessages([]);
@@ -292,7 +288,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     };
   }, []);
 
-  // AI Hint Timer - runs every 30 seconds when not running code
   useEffect(() => {
     if (!projectDetails || isRunning || isActivityMode) return;
     
@@ -407,7 +402,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setLibraries(data.libraries);
       }
     } catch (error) {
-      // Error fetching libraries
     }
   };
 
@@ -430,7 +424,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     setCompilationErrors([]);
     setIsRunning(true);
     
-    // Clear AI messages and stop streaming when running code
     if (projectDetails && !isActivityMode) {
       if (streamingIntervalRef.current) {
         clearInterval(streamingIntervalRef.current);
@@ -457,7 +450,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       }
       setIsRunning(false);
       
-      // Restore AI assistant after stopping
       if (projectDetails && !isActivityMode) {
         setTimeout(() => {
           setAiMessages([]);
@@ -572,7 +564,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     const newCode = e.target.value;
     setCode(newCode);
     
-    // Mark as having unsaved changes
     if (projectDetails) {
       setHasUnsavedChanges(true);
       if (onHasUnsavedChanges) {
@@ -580,7 +571,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       }
     }
     
-    // Clear bracket highlighting when typing
     setHighlightedBrackets(null);
     
     const cursorPos = e.target.selectionStart;
@@ -588,13 +578,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     const lines = textBeforeCursor.split('\n');
     const newLineNumber = lines.length;
     
-    // Check if we're on the same line
     if (newLineNumber !== currentLine) {
-      // Moved to a different line, hide suggestions but don't clear line cache
       setShowSuggestions(false);
       setCurrentLine(newLineNumber);
       
-      // Check if this line has cached suggestions
       const cachedData = lineSuggestions.get(newLineNumber);
       if (cachedData && cachedData.suggestions.length > 0) {
         setSuggestions(cachedData.suggestions);
@@ -624,7 +611,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         pos.left = currentLineText.length * charWidth + 70;
       }
       
-      // Store suggestions for this line
       const newLineSuggestions = new Map(lineSuggestions);
       newLineSuggestions.set(newLineNumber, { suggestions: newSuggestions, cursorPos: pos });
       setLineSuggestions(newLineSuggestions);
@@ -635,7 +621,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       setCursorPosition(pos);
     } else {
       setShowSuggestions(false);
-      // Clear suggestions for this line
       const newLineSuggestions = new Map(lineSuggestions);
       newLineSuggestions.delete(newLineNumber);
       setLineSuggestions(newLineSuggestions);
@@ -645,7 +630,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!textareaRef.current) return;
 
-    // Clear bracket highlighting on any key press
     if (highlightedBrackets) {
       setHighlightedBrackets(null);
     }
@@ -657,7 +641,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     const textAfter = code.substring(cursorPos);
     const nextChar = textAfter[0];
 
-    // Handle Ctrl+/ for commenting/uncommenting
     if ((e.ctrlKey || e.metaKey) && e.key === '/') {
       e.preventDefault();
       
@@ -731,17 +714,14 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       return;
     }
 
-    // Handle Tab key - insert spaces instead of tab character
     if (e.key === 'Tab') {
       e.preventDefault();
       
       if (e.shiftKey) {
-        // Shift+Tab: Remove indentation (un-indent)
         const lines = textBefore.split('\n');
         const currentLine = lines[lines.length - 1];
         const beforeCurrentLine = textBefore.substring(0, textBefore.length - currentLine.length);
         
-        // Remove up to 2 spaces from the beginning of the current line
         const spacesToRemove = currentLine.match(/^( {1,2})/);
         if (spacesToRemove) {
           const newCurrentLine = currentLine.substring(spacesToRemove[1].length);
@@ -754,11 +734,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
           }, 0);
         }
       } else if (showSuggestions) {
-        // Tab with suggestions: insert suggestion
         insertSuggestion(suggestions[selectedSuggestion]);
       } else {
-        // Tab without suggestions: insert spaces
-        const spaces = '  '; // 2 spaces (you can change to '    ' for 4 spaces)
+        const spaces = '  ';
         const newCode = textBefore + spaces + textAfter;
         setCode(newCode);
         
@@ -769,12 +747,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       return;
     }
 
-    // Hide suggestions when navigating with arrow keys (not when suggestions are open)
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !showSuggestions) {
-      // Let the handleCodeChange detect line changes and hide suggestions
     }
 
-    // Handle auto-closing brackets
     const closingPairs: Record<string, string> = {
       '(': ')',
       '[': ']',
@@ -783,7 +758,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       "'": "'"
     };
 
-    // Auto-close brackets, braces, and quotes
     if (closingPairs[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       const closing = closingPairs[e.key];
@@ -796,14 +770,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       return;
     }
 
-    // Skip over closing bracket if it's already there
     if ((e.key === ')' || e.key === ']' || e.key === '}' || e.key === '"' || e.key === "'") && nextChar === e.key) {
       e.preventDefault();
       textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
       return;
     }
 
-    // Handle suggestions
     if (showSuggestions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -838,20 +810,16 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       newText = beforeImport + suggestion.text + textAfter;
       newCursorPos = beforeImport.length + suggestion.text.length;
     } else {
-      // Find the partial text that the user has typed
       const lastWord = textBefore.split(/[\s\(\)\{\}\[\];,]/).pop() || '';
       const beforeWord = textBefore.substring(0, textBefore.length - lastWord.length);
       
-      // Check if suggestion starts with what user typed (case insensitive)
       const suggestionLower = suggestion.text.toLowerCase();
       const lastWordLower = lastWord.toLowerCase();
       
       if (suggestionLower.startsWith(lastWordLower)) {
-        // Replace the partial text with the full suggestion
         newText = beforeWord + suggestion.text + textAfter;
         newCursorPos = beforeWord.length + suggestion.text.length;
       } else {
-        // Just insert the suggestion after current position
         newText = textBefore + suggestion.text + textAfter;
         newCursorPos = textBefore.length + suggestion.text.length;
       }
@@ -860,7 +828,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     setCode(newText);
     setShowSuggestions(false);
     
-    // Clear cached suggestions for current line since we just inserted
     const newLineSuggestions = new Map(lineSuggestions);
     newLineSuggestions.delete(currentLine);
     setLineSuggestions(newLineSuggestions);
@@ -872,11 +839,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   };
 
   const addMissingImport = (importStatement: string) => {
-    // Find where to insert the import (after package if exists, or at the top)
     const lines = code.split('\n');
     let insertIndex = 0;
     
-    // Find the last import line or package line
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].trim().startsWith('package ')) {
         insertIndex = i + 1;
@@ -887,12 +852,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       }
     }
     
-    // Insert the import
     lines.splice(insertIndex, 0, importStatement);
     const newCode = lines.join('\n');
     setCode(newCode);
     
-    // Focus back to editor
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
@@ -907,12 +870,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     const lines = textBeforeCursor.split('\n');
     const newLineNumber = lines.length;
     
-    // If we moved to a different line
     if (newLineNumber !== currentLine) {
       setShowSuggestions(false);
       setCurrentLine(newLineNumber);
       
-      // Check if this line has cached suggestions
       const cachedData = lineSuggestions.get(newLineNumber);
       if (cachedData && cachedData.suggestions.length > 0) {
         setSuggestions(cachedData.suggestions);
@@ -1032,14 +993,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   };
 
   const handleBackClick = () => {
-    if (isActivityMode && timerStarted) {
-      // Show warning modal when trying to leave during activity
-      setPendingNavigation(() => onBack || (() => {}));
-      setShowNavigationWarning(true);
-    } else if (projectDetails && hasUnsavedChanges) {
-      setPendingNavigation(() => onBack || (() => {}));
-      setShowNavigationWarning(true);
-    } else if (onBack) {
+    if (onBack) {
       onBack();
     }
   };
@@ -1053,24 +1007,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleCancelNavigation = () => {
-    setShowNavigationWarning(false);
-    setPendingNavigation(null);
-  };
-
-  const handleConfirmNavigation = async () => {
-    if (isActivityMode && timerStarted) {
-      // Auto-submit the activity when leaving
-      await handleAutoSubmit();
-    }
-    
-    setShowNavigationWarning(false);
-    if (pendingNavigation) {
-      pendingNavigation();
-    }
-    setPendingNavigation(null);
   };
 
   const handleAutoSubmit = async () => {
@@ -1093,55 +1029,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
       if (!response.ok) {
         const error = await response.json();
-        if (error.message === 'You have already submitted this activity') {
-          console.log('Activity already submitted, closing compiler');
-        } else {
-          console.error('Auto-submit error:', error.message);
-        }
+        console.error('Auto-submit error:', error.message);
       }
     } catch (error) {
       console.error('Auto-submit error:', error);
-    }
-  };
-
-  const handleSaveAndNavigate = async () => {
-    if (!projectDetails || isSaving) return;
-
-    setIsSaving(true);
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        return;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/save-progress`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          projectTitle: projectDetails.title,
-          codeBase: code
-        })
-      });
-
-      if (response.ok) {
-        setHasUnsavedChanges(false);
-        if (onHasUnsavedChanges) {
-          onHasUnsavedChanges(false);
-        }
-        setShowNavigationWarning(false);
-        if (pendingNavigation) {
-          pendingNavigation();
-        }
-        setPendingNavigation(null);
-      }
-    } catch (error) {
-      console.error('Error saving:', error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -1183,7 +1074,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setShowGradingModal(true);
         setSaveMessage('');
         
-        // Start typing effect
         setTypedFeedback('');
         setIsTyping(true);
         const fullText = data.gradingResult.feedback || '';
@@ -1211,76 +1101,115 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-      {/* Project Details Banner */}
-      {projectDetails && !isActivityMode && (
-        <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                {onBack && (
-                  <button
-                    onClick={handleBackClick}
-                    className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
-                    title="Back"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </button>
-                )}
-                <h2 className="text-base font-semibold text-gray-900">{projectDetails.title}</h2>
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                  {projectDetails.language}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{projectDetails.description}</p>
-              {projectDetails.requirements && (
-                <div className="bg-white border border-gray-200 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-700 mb-1">Requirements:</p>
-                  <div className="text-xs text-gray-600 whitespace-pre-line">
-                    {projectDetails.requirements}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          {saveMessage && (
-            <div className={`mt-2 px-4 py-2 rounded-lg text-sm font-medium ${
-              saveMessage.includes('Error') 
-                ? 'bg-red-100 text-red-700' 
-                : 'bg-green-100 text-green-700'
-            }`}>
-              {saveMessage}
-            </div>
-          )}
-        </div>
-      )}
-      
       {/* Header */}
       <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {!projectDetails && !isActivityMode && (
-              <button
-                onClick={onMenuClick}
-                className="lg:hidden text-gray-600 hover:text-gray-900"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
+        <div className="flex items-start justify-between gap-4">
+          {/* Left side - Activity Details or Language Selector */}
+          <div className="flex-1">
+            {isActivityMode && projectDetails ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {onBack && (
+                    <button
+                      onClick={handleBackClick}
+                      className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                      title="Back"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                  )}
+                  <h2 className="text-base font-semibold text-gray-900">{projectDetails.title}</h2>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                    {projectDetails.language}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600">{projectDetails.description}</p>
+                {projectDetails.requirements && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">Requirements:</p>
+                    <div className="text-xs text-gray-600 whitespace-pre-line">
+                      {projectDetails.requirements}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 text-xs text-gray-600">
+                  {(projectDetails as any).points && (
+                    <span>{(projectDetails as any).points} points</span>
+                  )}
+                  {(projectDetails as any).duration && (
+                    <span>Duration: {(projectDetails as any).duration.hours}h {(projectDetails as any).duration.minutes}m</span>
+                  )}
+                  {(projectDetails as any).dueDate && (
+                    <span>Due: {new Date((projectDetails as any).dueDate).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </div>
+            ) : projectDetails && !isActivityMode ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {onBack && (
+                    <button
+                      onClick={handleBackClick}
+                      className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                      title="Back"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                  )}
+                  <h2 className="text-base font-semibold text-gray-900">{projectDetails.title}</h2>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                    {projectDetails.language}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600">{projectDetails.description}</p>
+                {projectDetails.requirements && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">Requirements:</p>
+                    <div className="text-xs text-gray-600 whitespace-pre-line">
+                      {projectDetails.requirements}
+                    </div>
+                  </div>
+                )}
+                {saveMessage && (
+                  <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    saveMessage.includes('Error') 
+                      ? 'bg-red-100 text-red-700' 
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    {saveMessage}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center space-x-3">
+                {!projectDetails && !isActivityMode && (
+                  <button
+                    onClick={onMenuClick}
+                    className="lg:hidden text-gray-600 hover:text-gray-900"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </button>
+                )}
+                {!isActivityMode && (
+                  <select
+                    value={language}
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isRunning || !!projectDetails}
+                  >
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             )}
-            {!isActivityMode && (
-              <select
-                value={language}
-                onChange={(e) => handleLanguageChange(e.target.value)}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isRunning || !!projectDetails}
-              >
-                {LANGUAGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            {/* Timer Display for Activity Mode */}
+          </div>
+
+          {/* Right side - Timer and Action Buttons */}
+          <div className="flex items-center space-x-2">
             {isActivityMode && timeRemaining !== null && (
               <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg font-mono text-sm font-semibold ${
                 timeRemaining <= 300 ? 'bg-red-100 text-red-700' :
@@ -1291,8 +1220,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 <span>{formatTime(timeRemaining)}</span>
               </div>
             )}
-          </div>
-          <div className="flex items-center space-x-2">
             {projectDetails && !isActivityMode && (
               <>
                 <button
@@ -1316,6 +1243,18 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                   <span className="text-sm font-medium">{isGrading ? 'Grading...' : isSaving ? 'Submitting...' : 'Submit'}</span>
                 </button>
               </>
+            )}
+            {isActivityMode && (
+              <button
+                onClick={() => {
+                  setShowActivitySubmitModal(true);
+                }}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-4 h-4" />
+                <span>Submit</span>
+              </button>
             )}
             {isRunning && (
               <button
@@ -1393,12 +1332,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       )}
 
       {/* Editor and Output */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden" style={{ height: isActivityMode ? '100%' : (projectDetails ? 'calc(100vh - 300px)' : 'calc(100vh - 200px)') }}>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden">
         {/* Code Editor */}
         <div className="flex flex-col border-r border-gray-200 bg-white overflow-hidden">
           <div className="px-4 py-2 border-b border-gray-200 flex-shrink-0">
             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-              Code Editor {language === 'java'}
+              Code Editor
             </h3>
           </div>
           <div className="flex-1 flex overflow-hidden min-h-0 relative">
@@ -1584,7 +1523,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
             style={{ cursor: isRunning ? 'text' : 'default' }}
           >
             {projectDetails && !isRunning && !isActivityMode ? (
-              // AI Assistant Mode
               <div className="space-y-2 p-2">
                 {aiMessages.length === 0 && !isStreaming && !isAiThinking ? (
                   <div className="text-sm text-gray-400 font-mono">
@@ -1632,7 +1570,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 )}
               </div>
             ) : (
-              // Regular Console Mode
               <div className="p-4">
                 <pre className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
                   {output || 'Click "Run Code" to execute your program.\n\nMissing imports are automatically detected!\nWhen the program asks for input, type directly here and press Enter.'}
@@ -1645,51 +1582,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         </div>
       </div>
 
-      {/* Navigation Warning Modal */}
-      {showNavigationWarning && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {isActivityMode ? 'Leave Activity?' : 'Unsaved Changes'}
-              </h2>
-            </div>
-
-            <div className="p-6">
-              <p className="text-sm text-gray-700">
-                {isActivityMode 
-                  ? 'If you leave now, your current code will be automatically submitted. Do you want to continue?'
-                  : 'You have unsaved changes. What would you like to do?'
-                }
-              </p>
-            </div>
-
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={handleCancelNavigation}
-                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              {!isActivityMode && (
-                <button
-                  onClick={handleSaveAndNavigate}
-                  disabled={isSaving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSaving ? 'Saving...' : 'Save & Leave'}
-                </button>
-              )}
-              <button
-                onClick={handleConfirmNavigation}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-              >
-                {isActivityMode ? 'Submit & Leave' : 'Leave Without Saving'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Navigation Warning Modal - Removed */}
 
       {/* Time Up Modal */}
       {showTimeUpModal && (
@@ -1711,8 +1604,8 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
               <button
                 onClick={async () => {
-                  await handleAutoSubmit();
                   setShowTimeUpModal(false);
+                  await handleAutoSubmit();
                   if (onBack) onBack();
                 }}
                 className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
@@ -1776,7 +1669,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Score Section */}
               <div className="text-center py-4">
                 <div className="text-6xl font-bold text-black mb-2">
                   {gradingResult.score}/100
@@ -1786,7 +1678,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 </div>
               </div>
 
-              {/* AI Feedback with Typing Effect */}
               <div className="border border-gray-300 rounded-lg p-6 bg-gray-50">
                 <div className="text-sm text-gray-800 whitespace-pre-line font-mono">
                   {typedFeedback}
@@ -1804,6 +1695,48 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
               >
                 Back to Projects
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activity Submit Modal */}
+      {showActivitySubmitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Submit Activity?</h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-700">
+                Are you sure you want to submit this activity? You cannot edit your submission after submitting.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowActivitySubmitModal(false)}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setShowActivitySubmitModal(false);
+                  await handleAutoSubmit();
+                  setHasUnsavedChanges(false);
+                  if (onHasUnsavedChanges) {
+                    onHasUnsavedChanges(false);
+                  }
+                  if (onBack) {
+                    setTimeout(() => onBack(), 100);
+                  }
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                Submit
               </button>
             </div>
           </div>
