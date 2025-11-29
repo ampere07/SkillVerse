@@ -97,7 +97,6 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const [showCompiler, setShowCompiler] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showActivitySubmitModal, setShowActivitySubmitModal] = useState(false);
-  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [submissionContent, setSubmissionContent] = useState('');
   const [submittedAttachments, setSubmittedAttachments] = useState<Attachment[]>([]);
@@ -106,7 +105,16 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number | null>(null);
   const [showCompilerGrading, setShowCompilerGrading] = useState(false);
   const [gradingSubmission, setGradingSubmission] = useState<Submission | null>(null);
+  const [showAIFeedbackModal, setShowAIFeedbackModal] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState('');
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
+  const [viewingSubmittedFeedback, setViewingSubmittedFeedback] = useState(false);
+  const [hasSavedCode, setHasSavedCode] = useState(false);
+  const [showFullSubmission, setShowFullSubmission] = useState(false);
+  const [showFullOwnSubmission, setShowFullOwnSubmission] = useState(false);
   const compilerRef = useRef<CompilerHandle>(null);
+
+  const SUBMISSION_PREVIEW_LINES = 15;
 
   const isStudent = user?.role === 'student';
   const isTeacher = user?.role === 'teacher';
@@ -197,20 +205,66 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
     }
   };
 
+  const handleViewAIFeedback = async () => {
+    try {
+      setIsGeneratingFeedback(true);
+      setShowAIFeedbackModal(true);
+      setViewingSubmittedFeedback(true);
+      
+      const response = await activityAPI.getAIFeedback(postId);
+      setAiFeedback(response.feedback);
+    } catch (err) {
+      setShowAIFeedbackModal(false);
+      alert(err instanceof Error ? err.message : 'Failed to get AI feedback');
+    } finally {
+      setIsGeneratingFeedback(false);
+    }
+  };
+
   const handleCompilerSubmit = async () => {
-    if (!compilerRef.current || !post) return;
+    if (!post) return;
     
     try {
       setSubmitting(true);
       setError('');
+      setIsGeneratingFeedback(true);
+      setShowAIFeedbackModal(true);
       
       const token = localStorage.getItem('token');
       if (!token) {
         setError('Not authenticated');
+        setIsGeneratingFeedback(false);
+        setShowAIFeedbackModal(false);
         return;
       }
 
-      const codeBase = (compilerRef.current as any).getCode?.() || '';
+      const progressResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/mini-projects/project-progress/${encodeURIComponent(post.title)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const progressData = await progressResponse.json();
+      console.log('Progress data:', progressData);
+      
+      let codeBase = '';
+      if (progressData.found && progressData.task) {
+        codeBase = progressData.task.codeBase || progressData.task.code || '';
+        console.log('CodeBase found:', codeBase ? codeBase.substring(0, 100) + '...' : 'EMPTY');
+      }
+
+      if (!codeBase) {
+        setError('No saved code found');
+        setIsGeneratingFeedback(false);
+        setShowAIFeedbackModal(false);
+        alert('No saved code found. Please write your code in the compiler first.');
+        return;
+      }
+
+      console.log('Submitting codeBase length:', codeBase.length);
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${post._id}/submit`, {
         method: 'POST',
@@ -224,29 +278,65 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
       const data = await response.json();
 
       if (response.ok) {
-        setShowCompiler(false);
-        setHasUnsavedChanges(false);
-        alert('Activity submitted successfully!');
+        if (data.aiFeedback) {
+          setAiFeedback(data.aiFeedback);
+        } else {
+          setAiFeedback('Great work completing this activity! Your submission has been received successfully.');
+        }
+        setHasSavedCode(false);
         await fetchPostDetails();
       } else {
+        setShowAIFeedbackModal(false);
         if (data.message === 'You have already submitted this activity') {
-          setShowCompiler(false);
           alert('You have already submitted this activity. You cannot resubmit.');
-          fetchPostDetails();
+          await fetchPostDetails();
         } else {
           setError(data.message || 'Failed to submit');
+          alert(data.message || 'Failed to submit');
         }
       }
     } catch (err) {
+      setShowAIFeedbackModal(false);
       setError(err instanceof Error ? err.message : 'Failed to submit');
+      alert(err instanceof Error ? err.message : 'Failed to submit');
     } finally {
       setSubmitting(false);
+      setIsGeneratingFeedback(false);
     }
   };
 
   useEffect(() => {
     fetchPostDetails();
   }, [postId, postType]);
+
+  useEffect(() => {
+    if (post?.requiresCompiler) {
+      checkSavedCode();
+    }
+  }, [post]);
+
+  const checkSavedCode = async () => {
+    if (!post?.requiresCompiler || !post?.title) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/mini-projects/project-progress/${encodeURIComponent(post.title)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = await response.json();
+      setHasSavedCode(data.found && data.task.codeBase);
+    } catch (error) {
+      setHasSavedCode(false);
+    }
+  };
 
   const fetchPostDetails = async () => {
     try {
@@ -328,8 +418,33 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Submission Content</h3>
                     <div className="bg-white rounded-lg p-6 border border-gray-200">
                       <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                        {selectedSubmission.content}
+                        {(() => {
+                          const lines = selectedSubmission.content.split('\n');
+                          const isLong = lines.length > SUBMISSION_PREVIEW_LINES;
+                          const displayContent = showFullSubmission || !isLong
+                            ? selectedSubmission.content
+                            : lines.slice(0, SUBMISSION_PREVIEW_LINES).join('\n');
+                          return displayContent;
+                        })()}
                       </p>
+                      {selectedSubmission.content.split('\n').length > SUBMISSION_PREVIEW_LINES && (
+                        <button
+                          onClick={() => setShowFullSubmission(!showFullSubmission)}
+                          className="mt-4 flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          {showFullSubmission ? (
+                            <>
+                              <ChevronUp className="w-4 h-4" />
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-4 h-4" />
+                              Show More
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -502,154 +617,68 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
 
     return (
       <div className="h-screen flex flex-col overflow-hidden">
-        <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0 bg-white">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center gap-2 mb-2">
-              <button
-                onClick={() => {
-                  // Check if activity has duration and compiler is in activity mode
-                  if (post.duration && (post.duration.hours > 0 || post.duration.minutes > 0)) {
-                    setShowLeaveWarning(true);
-                  } else if (hasUnsavedChanges) {
-                    if (confirm('You have unsaved changes. Do you want to leave without saving?')) {
-                      setShowCompiler(false);
-                      setHasUnsavedChanges(false);
-                    }
-                  } else {
-                    setShowCompiler(false);
-                  }
-                }}
-                className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <h2 className="text-base font-semibold text-gray-900">{post.title}</h2>
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                Java
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-2">{post.description}</p>
-            {post.instructions && (
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <p className="text-xs font-semibold text-gray-700 mb-1">Requirements:</p>
-                <div className="text-xs text-gray-600 whitespace-pre-line">
-                  {post.instructions}
-                </div>
-              </div>
-            )}
-            <div className="mt-3 flex items-center justify-between">
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                {post.points !== undefined && (
-                  <span>{post.points} points</span>
-                )}
-                {post.duration && (post.duration.hours > 0 || post.duration.minutes > 0) && (
-                  <span>
-                    Duration: {post.duration.hours > 0 && `${post.duration.hours}h `}
-                    {post.duration.minutes > 0 && `${post.duration.minutes}m`}
-                  </span>
-                )}
-                {dueDate && (
-                  <span className={isOverdue ? 'text-red-600' : ''}>
-                    Due: {formatDate(dueDate)}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setShowActivitySubmitModal(true)}
-                disabled={submitting}
-                className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-4 h-4" />
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
-            </div>
-          </div>
-        </div>
         <div className="flex-1 overflow-hidden">
           <Compiler
             ref={compilerRef}
             onMenuClick={() => {}}
             projectDetails={compilerProjectDetails as any}
-            onBack={() => {}}
+            onBack={() => {
+              setShowCompiler(false);
+              setTimeout(() => fetchPostDetails(), 200);
+            }}
             onHasUnsavedChanges={setHasUnsavedChanges}
             isActivityMode={true}
           />
         </div>
         
-        {/* Activity Submit Confirmation Modal */}
+        {/* Activity Submit Confirmation Modal for Compiler */}
         {showActivitySubmitModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Submit Activity?</h2>
-              </div>
+              {submitting ? (
+                <div className="p-8">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-gray-900 mb-4"></div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Submitting Activity</h3>
+                    <p className="text-sm text-gray-600 text-center">Please wait while we submit your code and generate AI feedback...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-900">Submit Activity?</h2>
+                  </div>
 
-              <div className="p-6">
-                <p className="text-sm text-gray-700">
-                  Are you sure you want to submit this activity? You cannot edit your submission after submitting.
-                </p>
-              </div>
+                  <div className="p-6">
+                    <p className="text-sm text-gray-700">
+                      Are you sure you want to submit this activity? You cannot edit your submission after submitting.
+                    </p>
+                  </div>
 
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                <button
-                  onClick={() => setShowActivitySubmitModal(false)}
-                  disabled={submitting}
-                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowActivitySubmitModal(false);
-                    handleCompilerSubmit();
-                  }}
-                  disabled={submitting}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowActivitySubmitModal(false)}
+                      className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowActivitySubmitModal(false);
+                        handleCompilerSubmit();
+                      }}
+                      className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
 
-        {/* Leave Activity Warning Modal */}
-        {showLeaveWarning && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Leave Activity?</h2>
-              </div>
-
-              <div className="p-6">
-                <p className="text-sm text-gray-700">
-                  If you leave now, your current code will be automatically submitted. Do you want to continue?
-                </p>
-              </div>
-
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                <button
-                  onClick={() => setShowLeaveWarning(false)}
-                  disabled={submitting}
-                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    setShowLeaveWarning(false);
-                    await handleCompilerSubmit();
-                    setShowCompiler(false);
-                  }}
-                  disabled={submitting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? 'Submitting...' : 'Submit & Leave'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Leave Activity Warning Modal - Removed */}
       </div>
     );
   }
@@ -766,16 +795,49 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
               
               {hasSubmitted && mySubmission ? (
                 <div className="space-y-4">
-                  <div className="pb-4 border-b border-gray-200">
+                  <div className="pb-4 border-b border-gray-200 flex items-center justify-between">
                     <span className="text-sm text-gray-600">Turned in</span>
+                    {post.requiresCompiler && (
+                      <button
+                        onClick={handleViewAIFeedback}
+                        className="text-purple-600 hover:text-purple-700 text-sm font-medium transition-colors"
+                      >
+                        View AI Feedback
+                      </button>
+                    )}
                   </div>
 
                   {mySubmission.content && (
                     <div className="bg-gray-50 rounded-lg p-3">
                       <p className="text-xs font-medium text-gray-700 mb-2">Submission:</p>
                       <p className="text-sm text-gray-900 whitespace-pre-wrap">
-                        {mySubmission.content}
+                        {(() => {
+                          const lines = mySubmission.content.split('\n');
+                          const isLong = lines.length > SUBMISSION_PREVIEW_LINES;
+                          const displayContent = showFullOwnSubmission || !isLong
+                            ? mySubmission.content
+                            : lines.slice(0, SUBMISSION_PREVIEW_LINES).join('\n');
+                          return displayContent;
+                        })()}
                       </p>
+                      {mySubmission.content.split('\n').length > SUBMISSION_PREVIEW_LINES && (
+                        <button
+                          onClick={() => setShowFullOwnSubmission(!showFullOwnSubmission)}
+                          className="mt-3 flex items-center gap-2 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          {showFullOwnSubmission ? (
+                            <>
+                              <ChevronUp className="w-3 h-3" />
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3 h-3" />
+                              Show More
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -799,24 +861,26 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                     </div>
                   )}
 
-                  <button
-                    onClick={() => {
-                      if (mySubmission) {
-                        setSubmissionContent(mySubmission.content || '');
-                        setSubmittedAttachments(mySubmission.attachments || []);
-                      }
-                      setIsSubmitMode(false);
-                      setShowSubmitModal(true);
-                    }}
-                    disabled={mySubmission.grade !== undefined}
-                    className={`w-full px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
-                      mySubmission.grade !== undefined
-                        ? 'bg-green-600 text-white cursor-not-allowed opacity-75'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    {mySubmission.grade !== undefined ? 'Graded' : 'Unsubmit'}
-                  </button>
+                  {!post.requiresCompiler && (
+                    <button
+                      onClick={() => {
+                        if (mySubmission) {
+                          setSubmissionContent(mySubmission.content || '');
+                          setSubmittedAttachments(mySubmission.attachments || []);
+                        }
+                        setIsSubmitMode(false);
+                        setShowSubmitModal(true);
+                      }}
+                      disabled={mySubmission.grade !== undefined}
+                      className={`w-full px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
+                        mySubmission.grade !== undefined
+                          ? 'bg-green-600 text-white cursor-not-allowed opacity-75'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {mySubmission.grade !== undefined ? 'Graded' : 'Unsubmit'}
+                    </button>
+                  )}
 
                   {mySubmission.grade !== undefined && (
                     <div className="pt-4 border-t border-gray-200">
@@ -841,6 +905,15 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                   <div className="pb-4 border-b border-gray-200">
                     <span className="text-sm text-gray-600">Not turned in</span>
                   </div>
+
+                  {post.requiresCompiler && hasSavedCode && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 font-medium mb-1">Code Ready</p>
+                      <p className="text-xs text-blue-600">
+                        Your code has been saved. Click Submit below to submit your work.
+                      </p>
+                    </div>
+                  )}
 
                   {submissionContent.trim() && (
                     <div className="bg-gray-50 rounded-lg p-3">
@@ -922,7 +995,17 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                     {hasSubmitted ? 'Already Submitted' : (isOverdue && !post.allowLateSubmission ? 'Submission Closed' : (post.requiresCompiler ? 'Open Compiler' : 'Add or create'))}
                   </button>
 
-                  {(pendingFiles.length > 0 || submissionContent.trim()) && (
+                  {post.requiresCompiler && hasSavedCode && (
+                    <button
+                      onClick={() => setShowActivitySubmitModal(true)}
+                      disabled={submitting}
+                      className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submitting ? 'Submitting...' : 'Submit Activity'}
+                    </button>
+                  )}
+
+                  {!post.requiresCompiler && (pendingFiles.length > 0 || submissionContent.trim()) && (
                     <button
                       onClick={() => setShowSubmitConfirmation(true)}
                       className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -1048,6 +1131,7 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
           postId={postId}
           postTitle={post.title}
           isUnsubmit={hasSubmitted}
+          requiresCompiler={post.requiresCompiler || false}
           pendingFiles={pendingFiles}
           isSubmitMode={isSubmitMode}
           submissionContent={submissionContent}
@@ -1065,6 +1149,84 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
           }}
           onFilesChange={setPendingFiles}
         />
+      )}
+
+      {/* AI Feedback Modal */}
+      {showAIFeedbackModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {viewingSubmittedFeedback ? 'AI Feedback' : 'Activity Feedback'}
+                </h2>
+                {!isGeneratingFeedback && (
+                  <button
+                    onClick={() => {
+                      setShowAIFeedbackModal(false);
+                      setViewingSubmittedFeedback(false);
+                      setAiFeedback('');
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6">
+              {isGeneratingFeedback ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
+                  <p className="text-gray-600 text-sm">
+                    {viewingSubmittedFeedback ? 'Loading AI feedback...' : 'Analyzing your code and generating feedback...'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {!viewingSubmittedFeedback && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800 font-medium mb-2">Your submission has been received!</p>
+                      <p className="text-xs text-blue-600">Here is some feedback on your performance:</p>
+                    </div>
+                  )}
+
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <div className="text-sm text-gray-800 whitespace-pre-line">
+                      {aiFeedback.split('\n').map((line, index) => {
+                        if (line.startsWith('**') && line.endsWith('**')) {
+                          const text = line.replace(/\*\*/g, '');
+                          return (
+                            <div key={index} className="font-semibold text-gray-900 mt-4 mb-2 first:mt-0">
+                              {text}
+                            </div>
+                          );
+                        }
+                        return line ? <div key={index}>{line}</div> : <div key={index} className="h-2" />;
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {!isGeneratingFeedback && (
+              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+                <button
+                  onClick={() => {
+                    setShowAIFeedbackModal(false);
+                    setViewingSubmittedFeedback(false);
+                    setAiFeedback('');
+                  }}
+                  className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+                >
+                  {viewingSubmittedFeedback ? 'Close' : 'Continue'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {showSubmitConfirmation && (
@@ -1128,6 +1290,7 @@ interface SubmitModalProps {
   postId: string;
   postTitle: string;
   isUnsubmit: boolean;
+  requiresCompiler: boolean;
   pendingFiles: File[];
   onClose: () => void;
   onSuccess: () => void;
@@ -1137,7 +1300,7 @@ interface SubmitModalProps {
   onContentChange: (content: string) => void;
 }
 
-function SubmitModal({ postId, postTitle, isUnsubmit, pendingFiles, onClose, onSuccess, onFilesChange, isSubmitMode = false, submissionContent, onContentChange }: SubmitModalProps) {
+function SubmitModal({ postId, postTitle, isUnsubmit, requiresCompiler, pendingFiles, onClose, onSuccess, onFilesChange, isSubmitMode = false, submissionContent, onContentChange }: SubmitModalProps) {
   const [content, setContent] = useState(submissionContent);
   const [files, setFiles] = useState<File[]>(pendingFiles);
   const [submitting, setSubmitting] = useState(false);
@@ -1166,6 +1329,11 @@ function SubmitModal({ postId, postTitle, isUnsubmit, pendingFiles, onClose, onS
     e.preventDefault();
     
     if (isUnsubmit) {
+      if (requiresCompiler) {
+        setError('Cannot unsubmit compiler-based activities');
+        return;
+      }
+      
       try {
         setSubmitting(true);
         setError('');
@@ -1259,9 +1427,20 @@ function SubmitModal({ postId, postTitle, isUnsubmit, pendingFiles, onClose, onS
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
           {isUnsubmit ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-700">
-                Are you sure you want to unsubmit your work? This will remove your submission and allow you to submit again.
-              </p>
+              {requiresCompiler ? (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800 font-medium">
+                    Compiler-based activities cannot be unsubmitted.
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-2">
+                    Once submitted, your code submission is final. This ensures the integrity of the AI feedback and grading process.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-700">
+                  Are you sure you want to unsubmit your work? This will remove your submission and allow you to submit again.
+                </p>
+              )}
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-700">{error}</p>
@@ -1363,7 +1542,7 @@ function SubmitModal({ postId, postTitle, isUnsubmit, pendingFiles, onClose, onS
           {isUnsubmit && (
             <button
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || requiresCompiler}
               className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Unsubmitting...' : 'Unsubmit'}

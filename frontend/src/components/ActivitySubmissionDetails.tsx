@@ -53,6 +53,9 @@ export default function ActivitySubmissionDetails({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [previewingIndex, setPreviewingIndex] = useState<number | null>(null);
+  const [showFullContent, setShowFullContent] = useState(false);
+
+  const CONTENT_PREVIEW_LINES = 15;
 
   const handleDownload = (url: string, fileName: string) => {
     const link = document.createElement('a');
@@ -149,8 +152,33 @@ export default function ActivitySubmissionDetails({
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Submission Content</h3>
                   <div className="bg-white rounded-lg p-6 border border-gray-200">
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {submission.content}
+                      {(() => {
+                        const lines = submission.content.split('\n');
+                        const isLong = lines.length > CONTENT_PREVIEW_LINES;
+                        const displayContent = showFullContent || !isLong
+                          ? submission.content
+                          : lines.slice(0, CONTENT_PREVIEW_LINES).join('\n');
+                        return displayContent;
+                      })()}
                     </p>
+                    {submission.content.split('\n').length > CONTENT_PREVIEW_LINES && (
+                      <button
+                        onClick={() => setShowFullContent(!showFullContent)}
+                        className="mt-4 flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        {showFullContent ? (
+                          <>
+                            <ChevronUp className="w-4 h-4" />
+                            Show Less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            Show More
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

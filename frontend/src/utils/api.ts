@@ -302,6 +302,17 @@ export const activityAPI = {
       throw new Error(error.message || 'Failed to grade activity');
     }
     return response.json();
+  },
+
+  getAIFeedback: async (activityId: string) => {
+    const response = await fetch(`${API_URL}/activities/${activityId}/ai-feedback`, {
+      headers: getAuthHeader()
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to get AI feedback');
+    }
+    return response.json();
   }
 };
 
