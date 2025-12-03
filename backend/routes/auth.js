@@ -114,7 +114,8 @@ router.post('/register', async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
+        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false,
+        primaryLanguage: user.primaryLanguage || null
       }
     });
   } catch (error) {
@@ -180,7 +181,8 @@ router.post('/login', async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
+        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false,
+        primaryLanguage: user.primaryLanguage || null
       }
     });
   } catch (error) {
@@ -206,7 +208,9 @@ router.get('/me', authenticateToken, async (req, res) => {
         role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
-        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false
+        surveyCompleted: user.onboardingSurvey?.surveyCompleted || false,
+        primaryLanguage: user.primaryLanguage || null,
+        surveyCompletedLanguages: user.surveyCompletedLanguages || []
       }
     });
   } catch (error) {
@@ -330,6 +334,134 @@ router.put('/change-password', authenticateToken, async (req, res) => {
 router.post('/logout', authenticateToken, (req, res) => {
   console.log(`User logged out: ${req.user.email}`);
   res.json({ message: 'Logout successful' });
+});
+
+router.get('/check-survey-status', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const needsSurvey = !user.surveyCompletedLanguages || 
+                        !user.surveyCompletedLanguages.includes(user.primaryLanguage);
+    
+    res.json({ needsSurvey });
+  } catch (error) {
+    console.error('Check survey status error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/change-language', authenticateToken, async (req, res) => {
+  try {
+    const { language } = req.body;
+
+    if (!language || !['java', 'python'].includes(language)) {
+      return res.status(400).json({ message: 'Valid language is required (java or python)' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const oldLanguage = user.primaryLanguage;
+    user.primaryLanguage = language;
+    await user.save();
+
+    if (oldLanguage !== language) {
+      const miniProject = await MiniProject.findOne({ userId: req.user.userId });
+      
+      if (miniProject) {
+        miniProject.availableProjects = [];
+        miniProject.weekStartDate = null;
+        miniProject.currentWeekNumber = 0;
+        miniProject.weeklyProjectHistory = [];
+        await miniProject.save();
+        console.log(`Cleared projects for user ${user.email} when switching from ${oldLanguage} to ${language}`);
+      }
+    }
+
+    console.log(`Language changed to ${language} for user: ${user.email}`);
+
+    res.json({ 
+      success: true,
+      message: 'Language changed successfully',
+      user: {
+        _id: user._id.toString(),
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        primaryLanguage: user.primaryLanguage
+      }
+    });
+  } catch (error) {
+    console.error('Change language error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/update-language', authenticateToken, async (req, res) => {
+  try {
+    const { primaryLanguage } = req.body;
+
+    if (!primaryLanguage || !['java', 'python'].includes(primaryLanguage)) {
+      return res.status(400).json({ message: 'Valid language is required (java or python)' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const completedLanguages = user.surveyCompletedLanguages || [];
+    if (!completedLanguages.includes(primaryLanguage)) {
+      return res.status(400).json({ 
+        message: `You must complete the ${primaryLanguage.toUpperCase()} survey before switching to this language` 
+      });
+    }
+
+    const oldLanguage = user.primaryLanguage;
+    user.primaryLanguage = primaryLanguage;
+    await user.save();
+
+    if (oldLanguage !== primaryLanguage) {
+      const miniProject = await MiniProject.findOne({ userId: req.user.userId });
+      
+      if (miniProject) {
+        miniProject.availableProjects = [];
+        miniProject.weekStartDate = null;
+        miniProject.currentWeekNumber = 0;
+        miniProject.weeklyProjectHistory = [];
+        await miniProject.save();
+        console.log(`Cleared projects for user ${user.email} when switching from ${oldLanguage} to ${primaryLanguage}`);
+      }
+    }
+
+    console.log(`Language changed to ${primaryLanguage} for user: ${user.email}`);
+
+    res.json({ 
+      success: true,
+      message: 'Language updated successfully',
+      user: {
+        _id: user._id.toString(),
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        primaryLanguage: user.primaryLanguage,
+        surveyCompletedLanguages: user.surveyCompletedLanguages
+      }
+    });
+  } catch (error) {
+    console.error('Update language error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 export default router;

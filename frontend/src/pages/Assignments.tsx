@@ -57,7 +57,6 @@ export default function Assignments() {
 
       const response = await classroomAPI.getStudentClassrooms();
       const userClassrooms = response.classrooms || [];
-      console.log('Fetched classrooms:', userClassrooms);
       setClassrooms(userClassrooms);
 
       const allAssignments: Assignment[] = [];
@@ -74,12 +73,9 @@ export default function Assignments() {
               }
             }
           );
-
-          console.log(`Fetching activities for classroom ${classroom._id}`);
           
           if (activityResponse.ok) {
             const activityData = await activityResponse.json();
-            console.log(`Activity data for ${classroom.name}:`, activityData);
             
             if (activityData.success && activityData.activities) {
               const classroomActivities = activityData.activities.map((a: any) => ({
@@ -90,18 +86,13 @@ export default function Assignments() {
                   code: classroom.code
                 }
               }));
-              console.log('Mapped activities:', classroomActivities);
               allAssignments.push(...classroomActivities);
             }
-          } else {
-            console.error(`Failed to fetch activities: ${activityResponse.status}`);
           }
         } catch (err) {
           console.error(`Error fetching activities for classroom ${classroom._id}:`, err);
         }
       }
-
-      console.log('All activities fetched:', allAssignments);
 
       allAssignments.sort((a, b) => {
         if (!a.dueDate) return 1;
@@ -111,7 +102,6 @@ export default function Assignments() {
 
       setAssignments(allAssignments);
     } catch (err) {
-      console.error('Fetch data error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
       setLoading(false);
@@ -166,12 +156,8 @@ export default function Assignments() {
     const dueToday: Assignment[] = [];
     const missing: Assignment[] = [];
 
-    console.log('Categorizing assignments:', filteredAssignments);
-    console.log('Current user:', user);
-
     filteredAssignments.forEach(assignment => {
       const status = getSubmissionStatus(assignment);
-      console.log(`Assignment: ${assignment.title}, Status: ${status}, DueDate: ${assignment.dueDate}`);
       
       if (status === 'overdue') {
         missing.push(assignment);
@@ -183,8 +169,6 @@ export default function Assignments() {
         }
       }
     });
-
-    console.log('Categorized - To Do:', toDo.length, 'Due Today:', dueToday.length, 'Missing:', missing.length);
 
     return { toDo, dueToday, missing };
   };
@@ -231,7 +215,7 @@ export default function Assignments() {
   }
 
   return (
-    <div>
+    <div className="p-6" style={{ backgroundColor: '#FAFAFA', minHeight: '100vh' }}>
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-6">
           <p className="text-sm text-red-700">{error}</p>
@@ -239,25 +223,31 @@ export default function Assignments() {
       )}
 
       {classrooms.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No classes yet</h3>
-          <p className="text-sm text-gray-600">
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
+          </div>
+          <h3 className="text-lg font-semibold" style={{ color: '#212121' }}>No classes yet</h3>
+          <p className="text-sm mt-2" style={{ color: '#757575' }}>
             Join a class to see assignments
           </p>
         </div>
       ) : (
         <>
-          <div>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="border-b border-gray-200">
               <nav className="flex">
                 <button
                   onClick={() => setActiveTab('todo')}
                   className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === 'todo'
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'text-white'
+                      : 'border-transparent hover:border-gray-300'
                   }`}
+                  style={activeTab === 'todo' ? { 
+                    borderColor: '#1B5E20',
+                    color: '#1B5E20'
+                  } : { color: '#757575' }}
                 >
                   To Do
                 </button>
@@ -265,9 +255,13 @@ export default function Assignments() {
                   onClick={() => setActiveTab('dueToday')}
                   className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === 'dueToday'
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'text-white'
+                      : 'border-transparent hover:border-gray-300'
                   }`}
+                  style={activeTab === 'dueToday' ? { 
+                    borderColor: '#1B5E20',
+                    color: '#1B5E20'
+                  } : { color: '#757575' }}
                 >
                   Due Today
                 </button>
@@ -275,9 +269,13 @@ export default function Assignments() {
                   onClick={() => setActiveTab('missing')}
                   className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === 'missing'
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'text-white'
+                      : 'border-transparent hover:border-gray-300'
                   }`}
+                  style={activeTab === 'missing' ? { 
+                    borderColor: '#1B5E20',
+                    color: '#1B5E20'
+                  } : { color: '#757575' }}
                 >
                   Missing
                 </button>
@@ -289,7 +287,11 @@ export default function Assignments() {
                 <select
                   value={selectedClassroom}
                   onChange={(e) => setSelectedClassroom(e.target.value)}
-                  className="w-full max-w-md px-4 py-2.5 border border-blue-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full max-w-md px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                  style={{ 
+                    borderColor: '#1B5E20',
+                    color: '#212121'
+                  }}
                 >
                   <option value="all">All classes</option>
                   {classrooms.map((classroom) => (
@@ -388,7 +390,7 @@ function AssignmentList({ assignments, activeTab, getSubmissionStatus, getDaysUn
   if (assignments.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-sm text-gray-500">{getEmptyMessage()}</p>
+        <p className="text-sm" style={{ color: '#757575' }}>{getEmptyMessage()}</p>
       </div>
     );
   }
@@ -426,16 +428,18 @@ function AssignmentGroup({ title, assignments, getSubmissionStatus, getDaysUntil
     <div className="border-b border-gray-200 last:border-b-0">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between py-3 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between py-3 hover:bg-gray-50 transition-colors rounded-lg px-2"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">{title}</span>
-          <span className="text-sm text-gray-500">{assignments.length}</span>
+          <span className="text-sm font-medium" style={{ color: '#212121' }}>{title}</span>
+          <span className="text-sm px-2 py-0.5 bg-gray-100 rounded-full" style={{ color: '#757575' }}>
+            {assignments.length}
+          </span>
         </div>
         {isExpanded ? (
-          <ChevronUp className="w-5 h-5 text-gray-400" />
+          <ChevronUp className="w-5 h-5" style={{ color: '#757575' }} strokeWidth={1.5} />
         ) : (
-          <ChevronDown className="w-5 h-5 text-gray-400" />
+          <ChevronDown className="w-5 h-5" style={{ color: '#757575' }} strokeWidth={1.5} />
         )}
       </button>
 
@@ -491,17 +495,17 @@ function AssignmentCard({ assignment, status, daysUntilDue, onNavigate }: Assign
   return (
     <div 
       onClick={handleClick}
-      className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow cursor-pointer"
+      className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all cursor-pointer"
     >
-      <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-        <FileText className="w-5 h-5 text-white" />
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#E8F5E9' }}>
+        <FileText className="w-5 h-5" style={{ color: '#1B5E20' }} strokeWidth={1.5} />
       </div>
       
       <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-medium text-gray-900 mb-1">{assignment.title}</h4>
-        <p className="text-xs text-gray-600 mb-1">{assignment.classroom.name}</p>
+        <h4 className="text-sm font-medium mb-1" style={{ color: '#212121' }}>{assignment.title}</h4>
+        <p className="text-xs mb-1" style={{ color: '#757575' }}>{assignment.classroom.name}</p>
         {dueDateDisplay && (
-          <p className="text-xs text-gray-500">Posted {dueDateDisplay}</p>
+          <p className="text-xs" style={{ color: '#757575' }}>Posted {dueDateDisplay}</p>
         )}
       </div>
     </div>

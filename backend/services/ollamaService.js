@@ -82,13 +82,7 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
   try {
     console.log('Starting AI analysis for student skills...');
     
-    const uncertainPhrases = ['dont know', 'diko alam', 'di ko alam', 'wala pa', 'not sure', 'idk', 'dunno', 'hindi ko alam'];
-    const isUncertain = uncertainPhrases.some(phrase => 
-      surveyData.courseInterest.toLowerCase().includes(phrase) || 
-      surveyData.learningGoals.toLowerCase().includes(phrase)
-    );
-    
-    const prompt = constructPrompt(surveyData, fullName, isUncertain);
+    const prompt = constructPrompt(surveyData, fullName);
     
     const response = await ollama.chat({
       model: MODEL_NAME,
@@ -122,33 +116,21 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
   }
 };
 
-const constructPrompt = (surveyData, fullName = 'Student', isUncertain = false) => {
-  const { primaryLanguage, courseInterest, learningGoals, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = surveyData;
+const constructPrompt = (surveyData, fullName = 'Student') => {
+  const { primaryLanguage, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = surveyData;
   
-  const languages = primaryLanguage.join(' and ');
-  const javaLevel = javaExpertise || 'not specified';
-  const pythonLevel = pythonExpertise || 'not specified';
+  const language = primaryLanguage;
+  const currentLevel = primaryLanguage === 'java' ? (javaExpertise || 'not specified') : (pythonExpertise || 'not specified');
 
   let prompt = `Analyze this student's programming skills and provide personalized learning recommendations.
 
-IMPORTANT: The student may have answered in very informal mixed languages (Taglish with shortcuts like "ng", "yung", "ano", "pag make"). Understand their intent even if grammar is casual or uses shortcuts. Provide your analysis in English.
-
 Student Profile:
-Languages: ${languages}
-Interest: ${courseInterest}
-Goals: ${learningGoals}
-Java Level (Self-Assessment): ${javaLevel}
-Python Level (Self-Assessment): ${pythonLevel}
+Primary Language: ${language === 'java' ? 'Java' : 'Python'}
+Self-Assessment Level: ${currentLevel}
 
 `;
 
-  if (isUncertain) {
-    prompt += `NOTE: This student is UNSURE about what they want to learn (they said things like "I don't know" or "diko alam"). Do NOT say their interest is "awesome" or treat uncertainty as a valid interest. Instead, acknowledge that it's okay to be unsure and focus on helping them explore.
-
-`;
-  }
-
-  if (javaQuestions?.score) {
+  if (primaryLanguage === 'java' && javaQuestions?.score) {
     const score = javaQuestions.score;
     prompt += `Java Assessment Results:
 - Overall Score: ${score.total}/10 (${score.percentage}%)
@@ -159,7 +141,7 @@ Python Level (Self-Assessment): ${pythonLevel}
 `;
   }
 
-  if (pythonQuestions?.score) {
+  if (primaryLanguage === 'python' && pythonQuestions?.score) {
     const score = pythonQuestions.score;
     prompt += `Python Assessment Results:
 - Overall Score: ${score.total}/10 (${score.percentage}%)
@@ -182,11 +164,11 @@ Write a friendly, conversational message about their programming skills. Keep it
 FORMAT (must follow exactly):
 1. FIRST: Start with "Hi ${fullName},\n\nWelcome to SkillVerse!"
 2. Then write ONE paragraph covering:
-   - Their current skill level in simple terms
-   - What they want to learn
+   - Their current skill level in ${language === 'java' ? 'Java' : 'Python'}
+   - What the assessment results show
    - One thing they're doing well
    - One thing to focus on improving
-   - Brief encouragement
+   - Brief encouragement to start with mini projects
 
 CRITICAL RULES:
 - Write like talking to a friend, not a formal report
@@ -207,10 +189,7 @@ WORDS YOU SHOULD USE:
 ✓ basic, simple, important, great, awesome
 
 Example format:
-"Hi ${fullName},\n\nWelcome to SkillVerse! Based on your answers, you're at a beginner level in Java and want to learn Web Development. That's great! You know the basic syntax which is super important for building web apps. Keep practicing object-oriented programming to make better web systems. You're on the right track!"
-
-Example for UNCERTAIN student:
-"Hi ${fullName},\n\nWelcome to SkillVerse! No worries if you're still figuring out what you want to learn - that's completely normal! You're at a beginner level in Java right now. We'll help you explore different areas through fun projects, and you'll discover what interests you as you practice. Let's get started!"
+"Hi ${fullName},\n\nWelcome to SkillVerse! Based on your assessment, you're at a ${currentLevel} level in ${language === 'java' ? 'Java' : 'Python'}. You scored well on the basic concepts which is super important. Keep working on the more advanced topics to build better projects. Start with the mini projects to practice what you know!"
 
 Now write the analysis. REMEMBER: Start with "Hi ${fullName},\n\nWelcome to SkillVerse!" then ONE short paragraph:`;
 

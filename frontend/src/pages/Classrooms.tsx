@@ -128,7 +128,7 @@ export default function Classrooms() {
   }
 
   return (
-    <div>
+    <div className="p-6" style={{ backgroundColor: '#FAFAFA', minHeight: '100vh' }}>
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-6">
           <p className="text-sm text-red-700">{error}</p>
@@ -136,15 +136,18 @@ export default function Classrooms() {
       )}
 
       {classrooms.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-          <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No classrooms yet</h3>
-          <p className="text-sm text-gray-600 mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
+          </div>
+          <h3 className="text-lg font-semibold" style={{ color: '#212121' }}>No classrooms yet</h3>
+          <p className="text-sm mt-2" style={{ color: '#757575' }}>
             {isTeacher ? 'Create your first classroom to get started' : 'Join your first classroom to get started'}
           </p>
           <button
             onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+            className="mt-6 px-6 py-2.5 text-white rounded-lg transition-all text-sm font-medium hover:shadow-md"
+            style={{ backgroundColor: '#1B5E20' }}
           >
             {isTeacher ? 'Create Classroom' : 'Join Class'}
           </button>
@@ -169,10 +172,11 @@ export default function Classrooms() {
 
       <button
         onClick={() => setShowModal(true)}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-gray-900 text-white rounded-full shadow-lg hover:bg-gray-800 transition-all hover:scale-110 flex items-center justify-center z-10"
+        className="fixed bottom-8 right-8 w-14 h-14 text-white rounded-full shadow-lg transition-all hover:scale-110 flex items-center justify-center z-10"
+        style={{ backgroundColor: '#1B5E20' }}
         aria-label={isTeacher ? 'Create classroom' : 'Join class'}
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="w-6 h-6" strokeWidth={2} />
       </button>
 
       {showModal && (
@@ -220,11 +224,11 @@ function ClassroomCard({
     : 'Unknown Teacher';
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full cursor-pointer">
-      <div onClick={onView} className="p-4 flex flex-col flex-1">
-        <div className="flex items-start justify-between mb-2">
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-all flex flex-col h-full cursor-pointer">
+      <div onClick={onView} className="p-5 flex flex-col flex-1">
+        <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+            <h3 className="text-lg font-semibold line-clamp-2" style={{ color: '#212121' }}>
               {classroom.name}
             </h3>
           </div>
@@ -234,9 +238,10 @@ function ClassroomCard({
                 e.stopPropagation();
                 setShowMenu(!showMenu);
               }}
-              className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: '#757575' }}
             >
-              <MoreVertical className="w-4 h-4" />
+              <MoreVertical className="w-4 h-4" strokeWidth={1.5} />
             </button>
             {showMenu && (
               <>
@@ -253,9 +258,10 @@ function ClassroomCard({
                           onView();
                           setShowMenu(false);
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center space-x-2"
+                        style={{ color: '#212121' }}
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-4 h-4" strokeWidth={1.5} />
                         <span>View Details</span>
                       </button>
                       <button
@@ -266,7 +272,7 @@ function ClassroomCard({
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" strokeWidth={1.5} />
                         <span>Delete</span>
                       </button>
                     </>
@@ -288,10 +294,12 @@ function ClassroomCard({
           </div>
         </div>
 
-        {!isTeacher && <p className="text-sm text-gray-600 mb-3">by {teacherName}</p>}
+        {!isTeacher && (
+          <p className="text-sm mb-3" style={{ color: '#757575' }}>by {teacherName}</p>
+        )}
 
         {classroom.description && (
-          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+          <p className="text-sm mb-4 line-clamp-2" style={{ color: '#757575' }}>
             {classroom.description}
           </p>
         )}
@@ -302,30 +310,30 @@ function ClassroomCard({
               e.stopPropagation();
               onCopyCode(classroom.code);
             }}
-            className="flex items-center space-x-2 w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+            className="flex items-center space-x-2 w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {copiedCode === classroom.code ? (
-              <Check className="w-4 h-4 text-green-600" />
+              <Check className="w-4 h-4" style={{ color: '#1B5E20' }} strokeWidth={1.5} />
             ) : (
-              <Copy className="w-4 h-4 text-gray-600" />
+              <Copy className="w-4 h-4" style={{ color: '#757575' }} strokeWidth={1.5} />
             )}
             <div className="flex-1 text-left">
-              <p className="text-xs text-gray-500">Classroom Code</p>
-              <p className="text-sm font-mono font-semibold text-gray-900">
+              <p className="text-xs" style={{ color: '#757575' }}>Classroom Code</p>
+              <p className="text-sm font-mono font-semibold" style={{ color: '#212121' }}>
                 {classroom.code}
               </p>
             </div>
           </button>
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-gray-500 pt-3 border-t border-gray-100 mt-auto">
-          <div className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-4 text-xs pt-3 border-t border-gray-100 mt-auto" style={{ color: '#757575' }}>
+          <div className="flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" strokeWidth={1.5} />
             <span>{classroom.students.length} student{classroom.students.length !== 1 ? 's' : ''}</span>
           </div>
           {isTeacher && assignmentCount !== undefined && (
-            <div className="flex items-center gap-1">
-              <BookOpen className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span>{assignmentCount} assignment{assignmentCount !== 1 ? 's' : ''}</span>
             </div>
           )}
@@ -377,18 +385,18 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full">
+      <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Create Classroom</h3>
-              <p className="text-sm text-gray-500 mt-1">Fill in the details to create a new classroom</p>
+              <h3 className="text-lg font-semibold" style={{ color: '#212121' }}>Create Classroom</h3>
+              <p className="text-sm mt-1" style={{ color: '#757575' }}>Fill in the details to create a new classroom</p>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5" style={{ color: '#757575' }} strokeWidth={1.5} />
             </button>
           </div>
         </div>
@@ -401,8 +409,8 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
           )}
 
           <div className="mb-4">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Classroom Name *
+            <label htmlFor="name" className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
+              Classroom Name
             </label>
             <input
               type="text"
@@ -410,13 +418,14 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Java Programming 101"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+              style={{ focusRing: '#1B5E20' }}
               disabled={loading}
             />
           </div>
 
           <div className="mb-4">
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="description" className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
               Description (Optional)
             </label>
             <textarea
@@ -425,13 +434,14 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of the classroom"
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent resize-none"
+              style={{ focusRing: '#1B5E20' }}
               disabled={loading}
             />
           </div>
 
           <div className="mb-4">
-            <label htmlFor="yearLevelSection" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="yearLevelSection" className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
               Course Year Level and Section (Optional)
             </label>
             <input
@@ -440,7 +450,8 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
               value={yearLevelSection}
               onChange={(e) => setYearLevelSection(e.target.value)}
               placeholder="e.g., BSCS 3-A, BSIT 2-B"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+              style={{ focusRing: '#1B5E20' }}
               disabled={loading}
             />
           </div>
@@ -449,7 +460,8 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              style={{ color: '#212121' }}
               disabled={loading}
             >
               Cancel
@@ -457,7 +469,8 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2.5 text-white rounded-lg transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
+              style={{ backgroundColor: '#1B5E20' }}
             >
               {loading ? 'Creating...' : 'Create Classroom'}
             </button>
@@ -500,18 +513,18 @@ function JoinClassroomModal({ onSuccess, onClose }: JoinClassroomModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full">
+      <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Join Classroom</h3>
-              <p className="text-sm text-gray-500 mt-1">Enter the classroom code to join</p>
+              <h3 className="text-lg font-semibold" style={{ color: '#212121' }}>Join Classroom</h3>
+              <p className="text-sm mt-1" style={{ color: '#757575' }}>Enter the classroom code to join</p>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5" style={{ color: '#757575' }} strokeWidth={1.5} />
             </button>
           </div>
         </div>
@@ -519,7 +532,7 @@ function JoinClassroomModal({ onSuccess, onClose }: JoinClassroomModalProps) {
 
         <form onSubmit={handleJoin} className="p-6">
           <div className="mb-4">
-            <label htmlFor="classCode" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="classCode" className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
               Classroom Code
             </label>
             <input
@@ -528,7 +541,8 @@ function JoinClassroomModal({ onSuccess, onClose }: JoinClassroomModalProps) {
               value={classCode}
               onChange={(e) => setClassCode(e.target.value)}
               placeholder="Enter classroom code"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+              style={{ focusRing: '#1B5E20' }}
               disabled={loading}
             />
           </div>
@@ -543,7 +557,8 @@ function JoinClassroomModal({ onSuccess, onClose }: JoinClassroomModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              style={{ color: '#212121' }}
               disabled={loading}
             >
               Cancel
@@ -551,7 +566,8 @@ function JoinClassroomModal({ onSuccess, onClose }: JoinClassroomModalProps) {
             <button
               type="submit"
               disabled={loading || !classCode.trim()}
-              className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2.5 text-white rounded-lg transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
+              style={{ backgroundColor: '#1B5E20' }}
             >
               {loading ? 'Joining...' : 'Join'}
             </button>

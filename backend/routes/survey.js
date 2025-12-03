@@ -43,8 +43,6 @@ router.post('/submit', async (req, res) => {
     const {
       userId,
       primaryLanguage,
-      courseInterest,
-      learningGoals,
       javaExpertise,
       pythonExpertise,
       javaQuestions,
@@ -55,38 +53,44 @@ router.post('/submit', async (req, res) => {
       return res.status(400).json({ message: 'User ID is required' });
     }
 
+    if (!primaryLanguage) {
+      return res.status(400).json({ message: 'Primary language is required' });
+    }
+
     const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const aiAnalysisResult = await analyzeStudentSkills({
-      primaryLanguage,
-      courseInterest,
-      learningGoals,
-      javaExpertise,
-      pythonExpertise,
-      javaQuestions,
-      pythonQuestions
-    }, user.name);
+    let aiAnalysis = null;
+    
+    try {
+      const aiAnalysisResult = await analyzeStudentSkills({
+        primaryLanguage,
+        javaExpertise,
+        pythonExpertise,
+        javaQuestions,
+        pythonQuestions
+      }, user.name);
 
-    if (!aiAnalysisResult.success) {
-      console.error('AI Analysis failed:', aiAnalysisResult.error);
-      return res.status(503).json({ 
-        message: 'AI analysis service is currently unavailable. Please try again later.',
-        error: aiAnalysisResult.error
-      });
+      if (aiAnalysisResult.success) {
+        aiAnalysis = aiAnalysisResult.analysis;
+      } else {
+        console.warn('AI Analysis failed, continuing without it:', aiAnalysisResult.error);
+        aiAnalysis = `Welcome to SkillVerse! Based on your ${primaryLanguage === 'java' ? 'Java' : 'Python'} selection and ${primaryLanguage === 'java' ? javaExpertise : pythonExpertise} level, we'll create personalized projects to help you improve your skills. Start with the mini projects to practice and enhance your programming abilities!`;
+      }
+    } catch (aiError) {
+      console.error('AI Analysis error:', aiError);
+      aiAnalysis = `Welcome to SkillVerse! Based on your ${primaryLanguage === 'java' ? 'Java' : 'Python'} selection and ${primaryLanguage === 'java' ? javaExpertise : pythonExpertise} level, we'll create personalized projects to help you improve your skills. Start with the mini projects to practice and enhance your programming abilities!`;
     }
 
     let survey = await Survey.findOne({ userId });
 
     const surveyData = {
       primaryLanguage,
-      courseInterest,
-      learningGoals,
       completed: true,
-      aiAnalysis: aiAnalysisResult.analysis,
+      aiAnalysis: aiAnalysis,
       analysisGeneratedAt: new Date()
     };
     
@@ -109,6 +113,19 @@ router.post('/submit', async (req, res) => {
     user.onboardingSurvey = {
       surveyCompleted: true
     };
+    
+    if (!user.primaryLanguage) {
+      user.primaryLanguage = primaryLanguage;
+    }
+    
+    if (!user.surveyCompletedLanguages) {
+      user.surveyCompletedLanguages = [];
+    }
+    
+    if (!user.surveyCompletedLanguages.includes(primaryLanguage)) {
+      user.surveyCompletedLanguages.push(primaryLanguage);
+    }
+    
     await user.save();
 
     let miniProject = await MiniProject.findOne({ userId });
@@ -193,6 +210,32 @@ router.get('/:userId', async (req, res) => {
   } catch (error) {
     console.error('Survey fetch error:', error);
     res.status(500).json({ message: 'Server error fetching survey data' });
+  }
+});
+
+router.get('/check-language/:userId/:language', async (req, res) => {
+  try {
+    const { userId, language } = req.params;
+
+    if (!['java', 'python'].includes(language)) {
+      return res.status(400).json({ message: 'Invalid language' });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const hasCompleted = user.surveyCompletedLanguages?.includes(language) || false;
+
+    res.status(200).json({
+      hasCompleted,
+      language
+    });
+  } catch (error) {
+    console.error('Survey check error:', error);
+    res.status(500).json({ message: 'Server error checking survey status' });
   }
 });
 

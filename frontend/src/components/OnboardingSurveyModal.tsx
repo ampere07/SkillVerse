@@ -5,17 +5,17 @@ import { javaQuestions, pythonQuestions } from '../data/surveyQuestions';
 interface OnboardingSurveyModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onCancel?: () => void;
+  preselectedLanguage?: string;
 }
 
-const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) => {
+const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage }: OnboardingSurveyModalProps) => {
   const { user } = useAuth();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(preselectedLanguage ? 2 : 1);
   const [formData, setFormData] = useState({
-    primaryLanguage: [] as string[],
-    javaExpertise: '',
-    pythonExpertise: '',
-    courseInterest: '',
-    learningGoals: ''
+    primaryLanguage: preselectedLanguage || '',
+    javaExpertise: preselectedLanguage === 'java' ? 'beginner' : '',
+    pythonExpertise: preselectedLanguage === 'python' ? 'beginner' : ''
   });
   const [javaAnswers, setJavaAnswers] = useState<number[]>(Array(10).fill(-1));
   const [pythonAnswers, setPythonAnswers] = useState<number[]>(Array(10).fill(-1));
@@ -26,7 +26,6 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [validationError, setValidationError] = useState('');
-  const [isValidating, setIsValidating] = useState(false);
   const [unansweredQuestions, setUnansweredQuestions] = useState<{java: number[], python: number[]}>({java: [], python: []});
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -36,14 +35,11 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
     }));
   };
 
-  const handleMultiSelect = (field: 'primaryLanguage', value: string) => {
-    setFormData(prev => {
-      const currentValues = prev[field];
-      const newValues = currentValues.includes(value)
-        ? currentValues.filter(v => v !== value)
-        : [...currentValues, value];
-      return { ...prev, [field]: newValues };
-    });
+  const handleLanguageSelect = (language: string) => {
+    setFormData(prev => ({
+      ...prev,
+      primaryLanguage: language
+    }));
   };
 
   const handleQuestionAnswer = (language: 'java' | 'python', questionIndex: number, answerIndex: number) => {
@@ -100,57 +96,23 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
     };
   };
 
-  const handleNextStep = async () => {
+  const handleNextStep = () => {
     if (step === 1) {
-      if (formData.primaryLanguage.length === 0) {
-        setError('Please select at least one programming language');
+      if (!formData.primaryLanguage) {
+        setError('Please select a programming language');
         return;
       }
-      if (formData.primaryLanguage.includes('java') && !formData.javaExpertise) {
+      if (formData.primaryLanguage === 'java' && !formData.javaExpertise) {
         setError('Please select your Java expertise level');
         return;
       }
-      if (formData.primaryLanguage.includes('python') && !formData.pythonExpertise) {
+      if (formData.primaryLanguage === 'python' && !formData.pythonExpertise) {
         setError('Please select your Python expertise level');
-        return;
-      }
-      if (!formData.courseInterest.trim()) {
-        setError('Please enter your course interest');
-        return;
-      }
-      if (!formData.learningGoals.trim()) {
-        setError('Please tell us what you want to learn');
         return;
       }
 
       setError('');
-      setIsValidating(true);
-
-      try {
-        const response = await fetch('http://localhost:5000/api/survey/validate-inputs', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            courseInterest: formData.courseInterest,
-            learningGoals: formData.learningGoals
-          }),
-        });
-
-        const data = await response.json();
-
-        if (data.valid) {
-          setError('');
-          setStep(2);
-        } else {
-          setError(data.message || 'Please provide genuine responses related to programming and learning.');
-        }
-      } catch (error) {
-        setError('Unable to validate your responses. Please try again.');
-      } finally {
-        setIsValidating(false);
-      }
+      setStep(2);
     }
   };
 
@@ -168,7 +130,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
 
     const unanswered = {java: [] as number[], python: [] as number[]};
     
-    if (formData.primaryLanguage.includes('java')) {
+    if (formData.primaryLanguage === 'java') {
       javaAnswers.forEach((answer, index) => {
         if (answer === -1) {
           unanswered.java.push(index);
@@ -176,7 +138,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
       });
     }
     
-    if (formData.primaryLanguage.includes('python')) {
+    if (formData.primaryLanguage === 'python') {
       pythonAnswers.forEach((answer, index) => {
         if (answer === -1) {
           unanswered.python.push(index);
@@ -191,21 +153,19 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
       return;
     }
 
-    const javaScore = formData.primaryLanguage.includes('java') 
+    const javaScore = formData.primaryLanguage === 'java' 
       ? calculateScore(javaAnswers, javaQuestions) 
       : null;
-    const pythonScore = formData.primaryLanguage.includes('python') 
+    const pythonScore = formData.primaryLanguage === 'python' 
       ? calculateScore(pythonAnswers, pythonQuestions) 
       : null;
 
     const requestData: any = {
       userId: user.id,
-      primaryLanguage: formData.primaryLanguage,
-      courseInterest: formData.courseInterest,
-      learningGoals: formData.learningGoals
+      primaryLanguage: formData.primaryLanguage
     };
     
-    if (formData.primaryLanguage.includes('java')) {
+    if (formData.primaryLanguage === 'java') {
       requestData.javaExpertise = formData.javaExpertise;
       requestData.javaQuestions = {
         answers: javaAnswers,
@@ -213,7 +173,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
       };
     }
     
-    if (formData.primaryLanguage.includes('python')) {
+    if (formData.primaryLanguage === 'python') {
       requestData.pythonExpertise = formData.pythonExpertise;
       requestData.pythonQuestions = {
         answers: pythonAnswers,
@@ -364,30 +324,32 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    What language do you use? (Select all that apply)
+                    What programming language do you use?
                   </label>
                   <div className="flex space-x-6">
                     <label className="flex items-center space-x-2 cursor-pointer">
                       <input
-                        type="checkbox"
-                        checked={formData.primaryLanguage.includes('java')}
-                        onChange={() => handleMultiSelect('primaryLanguage', 'java')}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        type="radio"
+                        name="language"
+                        checked={formData.primaryLanguage === 'java'}
+                        onChange={() => handleLanguageSelect('java')}
+                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
                       <span className="text-sm text-gray-700">Java</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
                       <input
-                        type="checkbox"
-                        checked={formData.primaryLanguage.includes('python')}
-                        onChange={() => handleMultiSelect('primaryLanguage', 'python')}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        type="radio"
+                        name="language"
+                        checked={formData.primaryLanguage === 'python'}
+                        onChange={() => handleLanguageSelect('python')}
+                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
                       <span className="text-sm text-gray-700">Python</span>
                     </label>
                   </div>
 
-                  {formData.primaryLanguage.includes('java') && (
+                  {formData.primaryLanguage === 'java' && (
                     <div className="mt-6 px-8 pb-6 border-b border-gray-200">
                       <label className="block text-sm font-semibold text-gray-900 mb-4">
                         Java expertise level
@@ -454,7 +416,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
                     </div>
                   )}
 
-                  {formData.primaryLanguage.includes('python') && (
+                  {formData.primaryLanguage === 'python' && (
                     <div className="mt-6 px-8 pb-6">
                       <label className="block text-sm font-semibold text-gray-900 mb-4">
                         Python expertise level
@@ -522,39 +484,12 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    What are you interested in learning? *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.courseInterest}
-                    onChange={(e) => handleInputChange('courseInterest', e.target.value)}
-                    placeholder="e.g., Web Development, Mobile Apps, 'diko pa alam', or any language (Answer in any language you're comfortable with)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    What do you want to achieve with programming? *
-                  </label>
-                  <textarea
-                    value={formData.learningGoals}
-                    onChange={(e) => handleInputChange('learningGoals', e.target.value)}
-                    placeholder="e.g., Build a website, Gumawa ng apps, 'wala pa kong idea', or any language"
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 resize-none"
-                  />
-                </div>
-
                 <div className="flex justify-end pt-4 border-t">
                   <button
                     onClick={handleNextStep}
-                    disabled={isValidating}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                   >
-                    {isValidating ? 'Validating...' : 'Next'}
+                    Next
                   </button>
                 </div>
               </div>
@@ -562,7 +497,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
 
             {step === 2 && (
               <div className="space-y-8">
-                {formData.primaryLanguage.includes('java') && (
+                {formData.primaryLanguage === 'java' && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                       <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm mr-3">Java</span>
@@ -605,7 +540,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
                   </div>
                 )}
 
-                {formData.primaryLanguage.includes('python') && (
+                {formData.primaryLanguage === 'python' && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                       <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm mr-3">Python</span>
@@ -655,12 +590,22 @@ const OnboardingSurveyModal = ({ isOpen, onClose }: OnboardingSurveyModalProps) 
                 )}
 
                 <div className="flex justify-between pt-4 border-t">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    Back
-                  </button>
+                  {!preselectedLanguage && (
+                    <button
+                      onClick={() => setStep(1)}
+                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                    >
+                      Back
+                    </button>
+                  )}
+                  {preselectedLanguage && (
+                    <button
+                      onClick={onCancel || onClose}
+                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
                   <button
                     onClick={handleSubmit}
                     disabled={isSubmitting}

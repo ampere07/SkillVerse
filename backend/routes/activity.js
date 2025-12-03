@@ -159,6 +159,7 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
       instructions,
       duration,
       requiresCompiler,
+      compilerLanguage,
       isPublished,
       allowLateSubmission,
       attachments
@@ -205,6 +206,7 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
         minutes: duration.minutes || 0
       } : { hours: 0, minutes: 0 },
       requiresCompiler: requiresCompiler || false,
+      compilerLanguage: compilerLanguage || 'python',
       attachments: attachments || [],
       students: classroomStudents,
       isPublished: isPublished !== undefined ? isPublished : true,
@@ -258,6 +260,7 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
       instructions,
       duration,
       requiresCompiler,
+      compilerLanguage,
       isPublished,
       allowLateSubmission
     } = req.body;
@@ -269,6 +272,7 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
     if (instructions !== undefined) activity.instructions = instructions;
     if (duration !== undefined) activity.duration = duration;
     if (requiresCompiler !== undefined) activity.requiresCompiler = requiresCompiler;
+    if (compilerLanguage !== undefined) activity.compilerLanguage = compilerLanguage;
     if (isPublished !== undefined) activity.isPublished = isPublished;
     if (allowLateSubmission !== undefined) activity.allowLateSubmission = allowLateSubmission;
 

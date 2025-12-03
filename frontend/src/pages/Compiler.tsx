@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Play, Menu, BookOpen, X, Square, Lightbulb, ArrowLeft, Save, Send, Clock } from 'lucide-react';
 import UnsavedChangesModal from '../components/UnsavedChangesModal';
+import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
+import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
 import {
   JAVA_SUGGESTIONS,
@@ -98,8 +100,11 @@ interface CompilerProps {
 }
 
 const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges, isActivityMode = false, readOnly = false }, ref) => {
+  const { user } = useAuth();
   const [language, setLanguage] = useState('java');
   const [code, setCode] = useState(DEFAULT_CODE.java);
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [pendingLanguage, setPendingLanguage] = useState<string | null>(null);
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [lineNumbers, setLineNumbers] = useState<number[]>([]);
@@ -405,12 +410,71 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }
   };
 
-  const handleLanguageChange = (newLanguage: string) => {
-    setLanguage(newLanguage);
-    setCode(DEFAULT_CODE[newLanguage]);
-    setOutput('');
-    setCurrentInput('');
-    setShowSuggestions(false);
+  const handleLanguageChange = async (newLanguage: string) => {
+    if (!user?.id) {
+      console.error('User ID not found');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Authentication token not found');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/survey/check-language/${user.id}/${newLanguage}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        console.error('Failed to check survey status:', response.statusText);
+        setPendingLanguage(newLanguage);
+        setShowSurveyModal(true);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.hasCompleted) {
+        setLanguage(newLanguage);
+        setCode(DEFAULT_CODE[newLanguage]);
+        setOutput('');
+        setCurrentInput('');
+        setShowSuggestions(false);
+        setCompilationErrors([]);
+        setMissingImports([]);
+      } else {
+        setPendingLanguage(newLanguage);
+        setShowSurveyModal(true);
+      }
+    } catch (error) {
+      console.error('Error checking survey status:', error);
+      setPendingLanguage(newLanguage);
+      setShowSurveyModal(true);
+    }
+  };
+
+  const handleSurveyComplete = () => {
+    setShowSurveyModal(false);
+    if (pendingLanguage) {
+      setLanguage(pendingLanguage);
+      setCode(DEFAULT_CODE[pendingLanguage]);
+      setOutput('');
+      setCurrentInput('');
+      setShowSuggestions(false);
+      setPendingLanguage(null);
+    }
+  };
+
+  const handleSurveyCancel = () => {
+    setShowSurveyModal(false);
+    setPendingLanguage(null);
   };
 
   const handleRun = () => {
@@ -1742,6 +1806,14 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
           </div>
         </div>
       )}
+
+      {/* Language Survey Modal */}
+      <OnboardingSurveyModal
+        isOpen={showSurveyModal}
+        onClose={handleSurveyComplete}
+        onCancel={handleSurveyCancel}
+        preselectedLanguage={pendingLanguage || undefined}
+      />
     </div>
   );
 });
