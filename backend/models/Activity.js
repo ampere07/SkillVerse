@@ -57,6 +57,11 @@ const activitySchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  compilerLanguage: {
+    type: String,
+    enum: ['java', 'python'],
+    default: 'python'
+  },
   attachments: [{
     fileName: String,
     fileUrl: String,

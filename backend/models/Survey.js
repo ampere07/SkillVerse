@@ -8,18 +8,18 @@ const surveySchema = new mongoose.Schema({
     unique: true,
     index: true
   },
-  primaryLanguage: [{
+  primaryLanguage: {
     type: String,
     enum: ['java', 'python'],
     required: true
-  }],
+  },
   courseInterest: {
     type: String,
-    required: true
+    required: false
   },
   learningGoals: {
     type: String,
-    required: true
+    required: false
   },
   javaExpertise: {
     type: String,

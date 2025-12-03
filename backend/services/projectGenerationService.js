@@ -13,10 +13,21 @@ console.log(`URL: ${OLLAMA_URL}`);
 
 export const generateWeeklyProjects = async (userId) => {
   try {
-    const survey = await Survey.findOne({ userId }).sort({ createdAt: -1 });
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(userId);
+    
+    if (!user || !user.primaryLanguage) {
+      console.error(`No user or primaryLanguage found for user ${userId}`);
+      return [];
+    }
+
+    const survey = await Survey.findOne({ 
+      userId, 
+      primaryLanguage: user.primaryLanguage 
+    }).sort({ createdAt: -1 });
     
     if (!survey) {
-      console.error(`No survey found for user ${userId}`);
+      console.error(`No survey found for user ${userId} with language ${user.primaryLanguage}`);
       return [];
     }
 
@@ -29,6 +40,7 @@ export const generateWeeklyProjects = async (userId) => {
     
     console.log(`[ProjectGen] ========== GENERATING PROJECTS ==========`);
     console.log(`[ProjectGen] User ID: ${userId}`);
+    console.log(`[ProjectGen] Primary Language: ${user.primaryLanguage.toUpperCase()}`);
     console.log(`[ProjectGen] Interest: ${survey.courseInterest}`);
     console.log(`[ProjectGen] Goals: ${survey.learningGoals}`);
     console.log(`[ProjectGen] Skill Level: ${skillLevel}`);
@@ -59,23 +71,19 @@ export const generateWeeklyProjects = async (userId) => {
       return projects.slice(0, 6);
     } catch (apiError) {
       console.error('[ProjectGen] Ollama Error:', apiError.message);
-      return generateFallbackProjects(userId);
+      return generateFallbackProjects(userId, user.primaryLanguage);
     }
   } catch (error) {
     console.error('Generate projects error:', error);
-    return generateFallbackProjects(userId);
+    return generateFallbackProjects(userId, 'java');
   }
 };
 
 const constructPersonalizedPrompt = (survey) => {
   const { primaryLanguage, courseInterest, learningGoals, javaExpertise, pythonExpertise, aiAnalysis } = survey;
   
-  const languages = primaryLanguage && primaryLanguage.length > 0 
-    ? primaryLanguage.map(lang => lang.charAt(0).toUpperCase() + lang.slice(1)).join(' and ') 
-    : 'Java';
-  
-  const allowedLanguages = primaryLanguage && primaryLanguage.length > 0
-    ? primaryLanguage.map(lang => lang.charAt(0).toUpperCase() + lang.slice(1)).join(' or ')
+  const language = primaryLanguage 
+    ? primaryLanguage.charAt(0).toUpperCase() + primaryLanguage.slice(1)
     : 'Java';
   
   const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, survey.javaQuestions?.score, survey.pythonQuestions?.score);
@@ -85,18 +93,18 @@ const constructPersonalizedPrompt = (survey) => {
   return `You are creating 6 UNIQUE mini programming projects that teach FUNDAMENTAL PROGRAMMING CONCEPTS needed for the student's goal.
 
 STUDENT PROFILE:
-Student Interest: "${courseInterest}"
-Student Goals: "${learningGoals}"
+Student Interest: "${courseInterest || 'General Programming'}"
+Student Goals: "${learningGoals || 'Improve programming skills'}"
 AI Analysis: ${aiAnalysis || 'No analysis available'}
-Primary Languages: ${languages}
+Primary Language: ${language}
 Skill Level: ${skillLevel}
 
 CRITICAL UNDERSTANDING:
-The student wants to learn "${courseInterest}", but we have a SINGLE FILE CONSOLE COMPILER with ONE code editor and ONE output window.
+The student wants to learn "${courseInterest || 'programming'}", but we have a SINGLE FILE CONSOLE COMPILER with ONE code editor and ONE output window.
 
-Therefore, create CONSOLE PROJECTS that teach PROGRAMMING CONCEPTS that are foundational to "${courseInterest}".
+Therefore, create CONSOLE PROJECTS that teach PROGRAMMING CONCEPTS that are foundational to "${courseInterest || 'programming'}".
 
-CONCEPT MAPPING FOR "${courseInterest}":
+CONCEPT MAPPING FOR "${courseInterest || 'programming'}":
 ${conceptsMapping}
 
 PROJECT APPROACH:
@@ -114,7 +122,7 @@ Create: "Log Entry Manager - Learn arrays and data structures used in logging sy
 
 PERSONALIZATION REQUIREMENTS:
 1. Each project teaches a DIFFERENT programming concept
-2. Each concept is RELEVANT to "${courseInterest}"
+2. Each concept is RELEVANT to "${courseInterest || 'programming'}"
 3. Explain WHY this concept matters for their goal
 4. All projects are SINGLE FILE console programs
 5. Use Scanner (Java) or input() (Python) for user interaction
@@ -156,8 +164,8 @@ FORMAT EACH PROJECT:
 
 PROJECT 1:
 Title: [Concept Name + Application] (e.g., "Inheritance - User Account System")
-Description: This project teaches [CONCEPT] which is essential for ${courseInterest}. In ${courseInterest}, [explain how concept is used]. You will create a console program that [what they build]. This helps you understand [why it matters for their goal].
-Language: ${allowedLanguages}
+Description: This project teaches [CONCEPT] which is essential for ${courseInterest || 'programming'}. In ${courseInterest || 'this field'}, [explain how concept is used]. You will create a console program that [what they build]. This helps you understand [why it matters for their goal].
+Language: ${language}
 Requirements:
 - [Requirement focused on the programming concept]
 - [Requirement showing practical application]
@@ -220,7 +228,7 @@ Average grade: 85.0
 Total students: 1
 
 IMPORTANT REMINDERS:
-- Connect EVERY project to "${courseInterest}"
+- Connect EVERY project to "${courseInterest || 'programming'}"
 - Teach programming concepts that matter for their goal
 - Each project must be completely different
 - All single-file console programs
@@ -232,11 +240,11 @@ IMPORTANT REMINDERS:
 - NO FILE READING/WRITING - All data via Scanner/input()
 - Users enter data through console, not files
 
-Generate 6 CONCEPT-FOCUSED projects for ${courseInterest}:`;
+Generate 6 CONCEPT-FOCUSED projects for ${courseInterest || 'programming'}:`;
 };
 
 const getConceptsForGoal = (interest, goals, skillLevel) => {
-  const text = `${interest} ${goals}`.toLowerCase();
+  const text = `${interest || ''} ${goals || ''}`.toLowerCase();
   
   if (text.includes('web') || text.includes('website') || text.includes('html')) {
     if (skillLevel === 'Beginner') {
@@ -397,7 +405,7 @@ const getConcepts = (skillLevel) => {
 };
 
 const getSkillLevelExamples = (level, interest) => {
-  const interestText = interest.toLowerCase();
+  const interestText = (interest || '').toLowerCase();
   const isWeb = interestText.includes('web');
   const isGame = interestText.includes('game');
   const isData = interestText.includes('data') || interestText.includes('analytics');
@@ -579,49 +587,51 @@ const parseProjectsFromAI = (text) => {
   return projects;
 };
 
-const generateFallbackProjects = (userId) => {
-  console.log(`[ProjectGen] Using fallback projects for user ${userId}`);
+const generateFallbackProjects = (userId, language = 'java') => {
+  console.log(`[ProjectGen] Using fallback projects for user ${userId} in ${language.toUpperCase()}`);
+  
+  const languageFormatted = language.charAt(0).toUpperCase() + language.slice(1);
   
   return [
     {
       title: 'Simple Calculator',
       description: 'Create a console calculator that performs basic arithmetic operations.',
-      language: 'Java',
+      language: languageFormatted,
       requirements: '- Support addition, subtraction, multiplication, division\n- Handle user input\n- Display results',
       sampleOutput: 'Enter operation: 5 + 3\nResult: 8'
     },
     {
       title: 'Student Grade Manager',
       description: 'Build a program to manage student grades and calculate averages.',
-      language: 'Java',
+      language: languageFormatted,
       requirements: '- Store student names and grades\n- Calculate average grade\n- Display all students',
       sampleOutput: 'Add student: John 85\nAverage: 85.0'
     },
     {
       title: 'Number Guessing Game',
       description: 'Create a game where the user guesses a random number.',
-      language: 'Java',
+      language: languageFormatted,
       requirements: '- Generate random number\n- Accept user guesses\n- Provide hints',
       sampleOutput: 'Guess: 50\nHigher!'
     },
     {
       title: 'Temperature Converter',
       description: 'Convert temperatures between Celsius and Fahrenheit.',
-      language: 'Java',
+      language: languageFormatted,
       requirements: '- Convert C to F and F to C\n- Handle user input\n- Display results',
       sampleOutput: 'Enter temp: 32F\nResult: 0C'
     },
     {
       title: 'Task List Manager',
       description: 'Manage a simple to-do list with console commands.',
-      language: 'Java',
+      language: languageFormatted,
       requirements: '- Add tasks\n- Mark as complete\n- Display list',
       sampleOutput: 'Task added: Buy groceries'
     },
     {
       title: 'Prime Number Finder',
       description: 'Find all prime numbers in a given range.',
-      language: 'Java',
+      language: languageFormatted,
       requirements: '- Check if number is prime\n- Find primes in range\n- Display results',
       sampleOutput: 'Primes: 2, 3, 5, 7, 11'
     }

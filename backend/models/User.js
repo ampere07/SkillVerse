@@ -33,6 +33,15 @@ const userSchema = new mongoose.Schema({
       default: false
     }
   },
+  primaryLanguage: {
+    type: String,
+    enum: ['java', 'python'],
+    required: false
+  },
+  surveyCompletedLanguages: [{
+    type: String,
+    enum: ['java', 'python']
+  }],
   enrolledCourses: [{
     courseId: {
       type: mongoose.Schema.Types.ObjectId,
