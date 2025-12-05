@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Play, Menu, BookOpen, X, Square, Lightbulb, ArrowLeft, Save, Send, Clock } from 'lucide-react';
+import { Play, Menu, BookOpen, X, Square, Lightbulb, ArrowLeft, Save, Send, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import UnsavedChangesModal from '../components/UnsavedChangesModal';
 import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -104,6 +104,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const [language, setLanguage] = useState('java');
   const [code, setCode] = useState(DEFAULT_CODE.java);
   const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingLanguage, setPendingLanguage] = useState<string | null>(null);
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -141,6 +142,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const [timerStarted, setTimerStarted] = useState(false);
   const [showTimeUpModal, setShowTimeUpModal] = useState(false);
   const [showActivitySubmitModal, setShowActivitySubmitModal] = useState(false);
+  const [isSubmittingActivity, setIsSubmittingActivity] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useImperativeHandle(ref, () => ({
@@ -160,9 +164,14 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   useEffect(() => {
     if (projectDetails && !hasLoadedRef.current) {
       const projectLang = projectDetails.language.toLowerCase();
+      console.log('[Compiler] ========== PROJECT LOADED ==========');
+      console.log('[Compiler] Project title:', projectDetails.title);
+      console.log('[Compiler] Project language from details:', projectDetails.language);
+      console.log('[Compiler] Setting compiler language to:', projectLang);
       setLanguage(projectLang);
       loadSavedProgress();
       hasLoadedRef.current = true;
+      console.log('[Compiler] ========================================');
     }
   }, [projectDetails]);
 
@@ -212,6 +221,13 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   const loadSavedProgress = async () => {
     if (!projectDetails) return;
+
+    // Don't load saved progress for activities - activities should start fresh
+    if (isActivityMode) {
+      const projectLang = projectDetails.language.toLowerCase();
+      setCode(DEFAULT_CODE[projectLang] || DEFAULT_CODE.java);
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -411,6 +427,20 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   };
 
   const handleLanguageChange = async (newLanguage: string) => {
+    // If no project details, allow free switching without survey check
+    if (!projectDetails) {
+      setLanguage(newLanguage);
+      setCode(DEFAULT_CODE[newLanguage]);
+      setOutput('');
+      setCurrentInput('');
+      setShowSuggestions(false);
+      setCompilationErrors([]);
+      setMissingImports([]);
+      return;
+    }
+
+    // If there's a project, this code should not run anyway
+    // because the dropdown is disabled
     if (!user?.id) {
       console.error('User ID not found');
       return;
@@ -451,12 +481,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setMissingImports([]);
       } else {
         setPendingLanguage(newLanguage);
-        setShowSurveyModal(true);
+        setShowConfirmationModal(true);
       }
     } catch (error) {
       console.error('Error checking survey status:', error);
       setPendingLanguage(newLanguage);
-      setShowSurveyModal(true);
+      setShowConfirmationModal(true);
     }
   };
 
@@ -1073,12 +1103,16 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleAutoSubmit = async () => {
-    if (!isActivityMode || !projectDetails) return;
+  const handleAutoSubmit = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!isActivityMode || !projectDetails) {
+      return { success: false, error: 'Invalid activity mode or project details' };
+    }
 
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        return { success: false, error: 'Authentication required' };
+      }
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${(projectDetails as any)._id}/submit`, {
         method: 'POST',
@@ -1093,10 +1127,15 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
       if (!response.ok) {
         const error = await response.json();
-        console.error('Auto-submit error:', error.message);
+        return { success: false, error: error.message || 'Failed to submit activity' };
       }
+
+      return { success: true };
     } catch (error) {
-      console.error('Auto-submit error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Network error occurred' 
+      };
     }
   };
 
@@ -1313,11 +1352,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 onClick={() => {
                   setShowActivitySubmitModal(true);
                 }}
-                disabled={isSaving}
+                disabled={isSaving || isSubmittingActivity}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
-                <span>Submit</span>
+                <span>{isSubmittingActivity ? 'Submitting...' : 'Submit'}</span>
               </button>
             )}
             {isRunning && (
@@ -1765,8 +1804,8 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         </div>
       )}
 
-      {/* Activity Submit Modal */}
-      {showActivitySubmitModal && (
+      {/* Activity Submit Confirmation Modal */}
+      {showActivitySubmitModal && !isSubmittingActivity && !submitSuccess && !submitError && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -1788,8 +1827,62 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
               </button>
               <button
                 onClick={async () => {
+                  setIsSubmittingActivity(true);
+                  const result = await handleAutoSubmit();
+                  setIsSubmittingActivity(false);
+                  
+                  if (result.success) {
+                    setSubmitSuccess(true);
+                  } else {
+                    setSubmitError(result.error || 'Failed to submit activity');
+                  }
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Modal */}
+      {isSubmittingActivity && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+            <div className="flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-gray-900 mb-4"></div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Submitting Activity</h3>
+              <p className="text-sm text-gray-600 text-center">Please wait while we submit your code...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {submitSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-green-600">Submission Successful!</h2>
+            </div>
+
+            <div className="p-6">
+              <div className="flex flex-col items-center mb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle className="w-10 h-10 text-green-600" />
+                </div>
+                <p className="text-sm text-gray-700 text-center">
+                  Your activity has been submitted successfully! Your teacher will review your submission.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => {
+                  setSubmitSuccess(false);
                   setShowActivitySubmitModal(false);
-                  await handleAutoSubmit();
                   setHasUnsavedChanges(false);
                   if (onHasUnsavedChanges) {
                     onHasUnsavedChanges(false);
@@ -1798,9 +1891,124 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                     setTimeout(() => onBack(), 100);
                   }
                 }}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
               >
-                Submit
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {submitError && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-red-600">Submission Failed</h2>
+            </div>
+
+            <div className="p-6">
+              <div className="flex flex-col items-center mb-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle className="w-10 h-10 text-red-600" />
+                </div>
+                <p className="text-sm text-gray-700 text-center mb-2">
+                  We encountered an error while submitting your activity.
+                </p>
+                <p className="text-xs text-red-600 text-center">
+                  {submitError}
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setSubmitError(null);
+                  setShowActivitySubmitModal(false);
+                }}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setSubmitError(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Language Confirmation Modal */}
+      {showConfirmationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Switch Programming Language</h2>
+            </div>
+            
+            <div className="px-6 py-6 space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: language === 'java' ? '#DBEAFE' : '#FEF3C7' }}>
+                  <span className="text-lg font-bold" style={{ color: language === 'java' ? '#3B82F6' : '#F59E0B' }}>
+                    {language === 'java' ? 'Jv' : 'Py'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700">Current Language</p>
+                  <p className="text-lg font-bold text-gray-900">{language === 'java' ? 'Java' : 'Python'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </div>
+
+              <div className="flex items-center gap-4 p-4 border-2 rounded-lg" style={{ borderColor: '#1B5E20', backgroundColor: '#E8F5E9' }}>
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: pendingLanguage === 'java' ? '#DBEAFE' : '#FEF3C7' }}>
+                  <span className="text-lg font-bold" style={{ color: pendingLanguage === 'java' ? '#3B82F6' : '#F59E0B' }}>
+                    {pendingLanguage === 'java' ? 'Jv' : 'Py'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-700">Switch To</p>
+                  <p className="text-lg font-bold text-gray-900">{pendingLanguage === 'java' ? 'Java' : 'Python'}</p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-sm text-gray-600">
+                  You will need to complete a quick survey to assess your skills in {pendingLanguage === 'java' ? 'Java' : 'Python'}. This helps us personalize your learning experience.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowConfirmationModal(false);
+                  setPendingLanguage(null);
+                }}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmationModal(false);
+                  setShowSurveyModal(true);
+                }}
+                className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium transition-all hover:bg-gray-800"
+              >
+                Continue
               </button>
             </div>
           </div>

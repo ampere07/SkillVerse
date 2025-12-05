@@ -64,6 +64,7 @@ router.post('/submit', async (req, res) => {
     }
 
     let aiAnalysis = null;
+    let learningRoadmap = null;
     
     try {
       const aiAnalysisResult = await analyzeStudentSkills({
@@ -76,6 +77,8 @@ router.post('/submit', async (req, res) => {
 
       if (aiAnalysisResult.success) {
         aiAnalysis = aiAnalysisResult.analysis;
+        learningRoadmap = aiAnalysisResult.roadmap;
+        console.log('[Survey] Learning roadmap generated:', learningRoadmap);
       } else {
         console.warn('AI Analysis failed, continuing without it:', aiAnalysisResult.error);
         aiAnalysis = `Welcome to SkillVerse! Based on your ${primaryLanguage === 'java' ? 'Java' : 'Python'} selection and ${primaryLanguage === 'java' ? javaExpertise : pythonExpertise} level, we'll create personalized projects to help you improve your skills. Start with the mini projects to practice and enhance your programming abilities!`;
@@ -91,6 +94,7 @@ router.post('/submit', async (req, res) => {
       primaryLanguage,
       completed: true,
       aiAnalysis: aiAnalysis,
+      learningRoadmap: learningRoadmap,
       analysisGeneratedAt: new Date()
     };
     

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { javaQuestions, pythonQuestions } from '../data/surveyQuestions';
 
@@ -11,22 +11,60 @@ interface OnboardingSurveyModalProps {
 
 const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage }: OnboardingSurveyModalProps) => {
   const { user } = useAuth();
-  const [step, setStep] = useState(preselectedLanguage ? 2 : 1);
+  const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({
-    primaryLanguage: preselectedLanguage || '',
-    javaExpertise: preselectedLanguage === 'java' ? 'beginner' : '',
-    pythonExpertise: preselectedLanguage === 'python' ? 'beginner' : ''
+    primaryLanguage: '',
+    javaExpertise: '',
+    pythonExpertise: ''
   });
   const [javaAnswers, setJavaAnswers] = useState<number[]>(Array(10).fill(-1));
   const [pythonAnswers, setPythonAnswers] = useState<number[]>(Array(10).fill(-1));
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [unansweredQuestions, setUnansweredQuestions] = useState<{java: number[], python: number[]}>({java: [], python: []});
+
+  // Reset states when modal opens or language changes
+  useEffect(() => {
+    if (isOpen) {
+      // Reset all states to initial values
+      setIsSubmitted(false);
+      setShowAnalysis(false);
+      setAiAnalysis(null);
+      setDisplayedText('');
+      setIsTyping(false);
+      setError('');
+      setValidationError('');
+      setUnansweredQuestions({java: [], python: []});
+      
+      // Reset form based on preselected language
+      if (preselectedLanguage) {
+        setStep(1);
+        setFormData({
+          primaryLanguage: preselectedLanguage,
+          javaExpertise: preselectedLanguage === 'java' ? 'beginner' : '',
+          pythonExpertise: preselectedLanguage === 'python' ? 'beginner' : ''
+        });
+        // Reset answers for the new language
+        setJavaAnswers(Array(10).fill(-1));
+        setPythonAnswers(Array(10).fill(-1));
+      } else {
+        setStep(0);
+        setFormData({
+          primaryLanguage: '',
+          javaExpertise: '',
+          pythonExpertise: ''
+        });
+        setJavaAnswers(Array(10).fill(-1));
+        setPythonAnswers(Array(10).fill(-1));
+      }
+    }
+  }, [isOpen, preselectedLanguage]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
@@ -97,7 +135,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
   };
 
   const handleNextStep = () => {
-    if (step === 1) {
+    if (step === 0) {
       if (!formData.primaryLanguage) {
         setError('Please select a programming language');
         return;
@@ -112,7 +150,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       }
 
       setError('');
-      setStep(2);
+      setStep(1);
     }
   };
 
@@ -194,6 +232,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
 
       if (response.ok) {
         if (data.survey.aiAnalysis) {
+          setIsSubmitted(true);
           setAiAnalysis(data.survey.aiAnalysis);
           setShowAnalysis(true);
           setDisplayedText('');
@@ -254,18 +293,18 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
             </div>
 
             <div className="px-6 py-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </div>
                   <div className="ml-3 flex-1">
-                    <h3 className="text-sm font-medium text-blue-900">Analysis Generated</h3>
-                    <div className="mt-2 text-sm text-blue-800 whitespace-pre-line">
+                    <h3 className="text-sm font-medium text-green-900">Analysis Generated</h3>
+                    <div className="mt-2 text-sm text-green-800 whitespace-pre-line">
                       {displayedText}
-                      {isTyping && <span className="inline-block w-1 h-4 ml-1 bg-blue-600 animate-pulse"></span>}
+                      {isTyping && <span className="inline-block w-1 h-4 ml-1 bg-green-600 animate-pulse"></span>}
                     </div>
                   </div>
                 </div>
@@ -275,7 +314,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                 <button
                   onClick={onClose}
                   disabled={isTyping}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                  className="px-6 py-2 text-white rounded-md transition-colors"
+                  style={{ backgroundColor: '#1B5E20' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2E7D32'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1B5E20'}
                 >
                   {isTyping ? 'Analyzing...' : 'Get Started'}
                 </button>
@@ -305,11 +347,11 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
             <h2 className="text-2xl font-bold text-gray-900">Welcome to SkillVerse</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {step === 1 ? 'Help us personalize your learning experience' : 'Answer 10 questions to assess your skills'}
+              {step === 0 ? 'Select your programming language and expertise level' : 'Answer 10 questions to assess your skills'}
             </p>
             <div className="mt-3 flex items-center space-x-2">
-              <div className={`h-2 flex-1 rounded-full ${step >= 1 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-              <div className={`h-2 flex-1 rounded-full ${step >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+              <div className={`h-2 flex-1 rounded-full ${step >= 0 ? 'bg-green-600' : 'bg-gray-200'}`}></div>
+              <div className={`h-2 flex-1 rounded-full ${step >= 1 ? 'bg-green-600' : 'bg-gray-200'}`}></div>
             </div>
           </div>
 
@@ -320,37 +362,27 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
               </div>
             )}
 
-            {step === 1 && (
+            {step === 0 && (
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    What programming language do you use?
+                    What programming language do you want to learn?
                   </label>
-                  <div className="flex space-x-6">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="language"
-                        checked={formData.primaryLanguage === 'java'}
-                        onChange={() => handleLanguageSelect('java')}
-                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">Java</span>
-                    </label>
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="language"
-                        checked={formData.primaryLanguage === 'python'}
-                        onChange={() => handleLanguageSelect('python')}
-                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">Python</span>
-                    </label>
-                  </div>
+                  <select
+                    value={formData.primaryLanguage}
+                    onChange={(e) => handleLanguageSelect(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm"
+                    style={{ focusRingColor: '#1B5E20' }}
+                  >
+                    <option value="">Select a language</option>
+                    <option value="java">Java</option>
+                    <option value="python">Python</option>
+                  </select>
+                </div>
 
-                  {formData.primaryLanguage === 'java' && (
-                    <div className="mt-6 px-8 pb-6 border-b border-gray-200">
+                {formData.primaryLanguage === 'java' && (
+                  <div>
+                    <div className="pb-6">
                       <label className="block text-sm font-semibold text-gray-900 mb-4">
                         Java expertise level
                       </label>
@@ -395,29 +427,31 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
                           }
                         `}</style>
-                        <div className="relative mt-3 px-2">
-                          <div className="absolute left-0 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.javaExpertise === 'no-experience' ? 'font-medium text-gray-900' : ''}>No experience</span>
+                        <div className="relative mt-6">
+                          <div className="absolute" style={{ left: '0%', transform: 'translateX(0%)', top: '0' }}>
+                            <span className={`text-xs ${formData.javaExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>No experience</span>
                           </div>
-                          <div className="absolute left-1/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.javaExpertise === 'beginner' ? 'font-medium text-gray-900' : ''}>Beginner</span>
+                          <div className="absolute" style={{ left: '25%', transform: 'translateX(-50%)', top: '0' }}>
+                            <span className={`text-xs ${formData.javaExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
                           </div>
-                          <div className="absolute left-1/2 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.javaExpertise === 'intermediate' ? 'font-medium text-gray-900' : ''}>Intermediate</span>
+                          <div className="absolute" style={{ left: '50%', transform: 'translateX(-50%)', top: '0' }}>
+                            <span className={`text-xs ${formData.javaExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
                           </div>
-                          <div className="absolute left-3/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.javaExpertise === 'advanced' ? 'font-medium text-gray-900' : ''}>Advanced</span>
+                          <div className="absolute" style={{ left: '75%', transform: 'translateX(-50%)', top: '0' }}>
+                            <span className={`text-xs ${formData.javaExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
                           </div>
-                          <div className="absolute right-0 text-xs text-gray-500" style={{ transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.javaExpertise === 'expert' ? 'font-medium text-gray-900' : ''}>Expert</span>
+                          <div className="absolute" style={{ left: '100%', transform: 'translateX(-100%)', top: '0' }}>
+                            <span className={`text-xs ${formData.javaExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {formData.primaryLanguage === 'python' && (
-                    <div className="mt-6 px-8 pb-6">
+                {formData.primaryLanguage === 'python' && (
+                  <div>
+                    <div className="pb-6">
                       <label className="block text-sm font-semibold text-gray-900 mb-4">
                         Python expertise level
                       </label>
@@ -462,32 +496,35 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
                           }
                         `}</style>
-                        <div className="relative mt-3 px-2">
-                          <div className="absolute left-0 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.pythonExpertise === 'no-experience' ? 'font-medium text-gray-900' : ''}>No experience</span>
+                        <div className="relative mt-6">
+                          <div className="absolute" style={{ left: '0%', transform: 'translateX(0%)', top: '0' }}>
+                            <span className={`text-xs ${formData.pythonExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>No experience</span>
                           </div>
-                          <div className="absolute left-1/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.pythonExpertise === 'beginner' ? 'font-medium text-gray-900' : ''}>Beginner</span>
+                          <div className="absolute" style={{ left: '25%', transform: 'translateX(-50%)', top: '0' }}>
+                            <span className={`text-xs ${formData.pythonExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
                           </div>
-                          <div className="absolute left-1/2 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.pythonExpertise === 'intermediate' ? 'font-medium text-gray-900' : ''}>Intermediate</span>
+                          <div className="absolute" style={{ left: '50%', transform: 'translateX(-50%)', top: '0' }}>
+                            <span className={`text-xs ${formData.pythonExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
                           </div>
-                          <div className="absolute left-3/4 text-xs text-gray-500" style={{ transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.pythonExpertise === 'advanced' ? 'font-medium text-gray-900' : ''}>Advanced</span>
+                          <div className="absolute" style={{ left: '75%', transform: 'translateX(-50%)', top: '0' }}>
+                            <span className={`text-xs ${formData.pythonExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
                           </div>
-                          <div className="absolute right-0 text-xs text-gray-500" style={{ transform: 'translateX(50%)', whiteSpace: 'nowrap' }}>
-                            <span className={formData.pythonExpertise === 'expert' ? 'font-medium text-gray-900' : ''}>Expert</span>
+                          <div className="absolute" style={{ left: '100%', transform: 'translateX(-100%)', top: '0' }}>
+                            <span className={`text-xs ${formData.pythonExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end pt-4 border-t">
                   <button
                     onClick={handleNextStep}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    className="px-6 py-2 text-white rounded-md transition-colors"
+                    style={{ backgroundColor: '#1B5E20' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2E7D32'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1B5E20'}
                   >
                     Next
                   </button>
@@ -495,7 +532,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
               </div>
             )}
 
-            {step === 2 && (
+            {step === 1 && (
               <div className="space-y-8">
                 {formData.primaryLanguage === 'java' && (
                   <div>
@@ -592,7 +629,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                 <div className="flex justify-between pt-4 border-t">
                   {!preselectedLanguage && (
                     <button
-                      onClick={() => setStep(1)}
+                      onClick={() => setStep(0)}
                       className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
                     >
                       Back
@@ -609,7 +646,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                   <button
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
+                    className="px-6 py-2 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: '#1B5E20' }}
+                    onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#2E7D32')}
+                    onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#1B5E20')}
                   >
                     {isSubmitting ? 'Submitting...' : 'Submit'}
                   </button>

@@ -80,10 +80,10 @@ export const generateProjectsForLanguage = async (userId, language) => {
       return generateFallbackProjects(userId, language);
     }
 
-    const survey = await Survey.findOne({ userId }).sort({ createdAt: -1 });
+    const survey = await Survey.findOne({ userId, primaryLanguage: language }).sort({ createdAt: -1 });
     
     if (!survey) {
-      console.log(`[ProjectGen] No survey found for user ${userId}, using fallback for ${language}`);
+      console.log(`[ProjectGen] No survey found for user ${userId} and language ${language}, using fallback`);
       return generateFallbackProjects(userId, language);
     }
 
@@ -96,17 +96,22 @@ export const generateProjectsForLanguage = async (userId, language) => {
       return generateFallbackProjects(userId, language);
     }
 
+    if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length === 0) {
+      console.log(`[ProjectGen] No roadmap found, using fallback`);
+      return generateFallbackProjects(userId, language);
+    }
+
     const skillLevel = language.toLowerCase() === 'java'
       ? determineSkillLevel(survey.javaExpertise, null, survey.javaQuestions?.score, null)
       : determineSkillLevel(null, survey.pythonExpertise, null, survey.pythonQuestions?.score);
     
-    console.log(`[ProjectGen] ========== GENERATING PROJECTS ==========`);
+    console.log(`[ProjectGen] ========== GENERATING ROADMAP-BASED PROJECTS ==========`);
     console.log(`[ProjectGen] User ID: ${userId}`);
     console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
-    console.log(`[ProjectGen] Interest: ${survey.courseInterest}`);
-    console.log(`[ProjectGen] Goals: ${survey.learningGoals}`);
     console.log(`[ProjectGen] Skill Level: ${skillLevel}`);
-    console.log(`[ProjectGen] AI Analysis: ${survey.aiAnalysis?.substring(0, 100)}...`);
+    console.log(`[ProjectGen] Roadmap Phase 1: ${survey.learningRoadmap.phase1.join(', ')}`);
+    console.log(`[ProjectGen] Roadmap Phase 2: ${survey.learningRoadmap.phase2.join(', ')}`);
+    console.log(`[ProjectGen] Roadmap Phase 3: ${survey.learningRoadmap.phase3.join(', ')}`);
     console.log(`[ProjectGen] ===========================================`);
     
     const languageSpecificSurvey = {
@@ -114,7 +119,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
       primaryLanguage: language
     };
     
-    const prompt = constructPersonalizedPrompt(languageSpecificSurvey);
+    const prompt = constructRoadmapBasedPrompt(languageSpecificSurvey);
     
     try {
       const response = await ollama.chat({
@@ -128,17 +133,24 @@ export const generateProjectsForLanguage = async (userId, language) => {
 
       const projectsText = response.message.content;
       const projects = parseProjectsFromAI(projectsText);
+      
+      // Ensure all projects have the correct language
+      const correctedProjects = projects.map(project => ({
+        ...project,
+        language: language  // Force the correct language
+      }));
 
-      if (projects.length < 6) {
-        console.error(`Only generated ${projects.length} projects, expected 6`);
-        return projects.length > 0 ? projects : generateFallbackProjects(userId);
+      if (correctedProjects.length < 6) {
+        console.error(`Only generated ${correctedProjects.length} projects, expected 6`);
+        return correctedProjects.length > 0 ? correctedProjects : generateFallbackProjects(userId, language);
       }
 
-      console.log(`[ProjectGen] Successfully generated ${projects.length} personalized projects`);
-      return projects.slice(0, 6);
+      console.log(`[ProjectGen] Successfully generated ${correctedProjects.length} roadmap-based projects`);
+      console.log(`[ProjectGen] All projects set to language: ${language}`);
+      return correctedProjects.slice(0, 6);
     } catch (apiError) {
       console.error('[ProjectGen] Ollama Error:', apiError.message);
-      return generateFallbackProjects(userId, user.primaryLanguage);
+      return generateFallbackProjects(userId, language);
     }
   } catch (error) {
     console.error('Generate projects error:', error);
@@ -146,25 +158,191 @@ export const generateProjectsForLanguage = async (userId, language) => {
   }
 };
 
-const constructPersonalizedPrompt = (survey) => {
-  const { primaryLanguage, courseInterest, learningGoals, javaExpertise, pythonExpertise, aiAnalysis } = survey;
+const constructRoadmapBasedPrompt = (survey) => {
+  const { primaryLanguage, learningRoadmap, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = survey;
   
   const language = primaryLanguage 
     ? primaryLanguage.charAt(0).toUpperCase() + primaryLanguage.slice(1)
     : 'Java';
   
-  const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, survey.javaQuestions?.score, survey.pythonQuestions?.score);
+  const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, javaQuestions?.score, pythonQuestions?.score);
+  
+  const roadmapItems = [
+    ...learningRoadmap.phase1,
+    ...learningRoadmap.phase2,
+    ...learningRoadmap.phase3
+  ];
+
+  return `You are creating 6 UNIQUE mini programming projects based on a personalized learning roadmap.
+
+CRITICAL LANGUAGE REQUIREMENT:
+ALL projects MUST be in ${language} programming language.
+EVERY project Language field MUST say: ${language}
+Do NOT mix languages - if the student selected ${language}, generate ONLY ${language} projects.
+
+STUDENT LEARNING ROADMAP:
+The student has a structured learning path with specific concepts to master:
+
+Phase 1 - Foundation:
+${learningRoadmap.phase1.map((item, i) => `${i + 1}. ${item}`).join('\n')}
+
+Phase 2 - Building Skills:
+${learningRoadmap.phase2.map((item, i) => `${i + 1}. ${item}`).join('\n')}
+
+Phase 3 - Advanced Practice:
+${learningRoadmap.phase3.map((item, i) => `${i + 1}. ${item}`).join('\n')}
+
+Primary Language: ${language}
+Skill Level: ${skillLevel}
+
+PROJECT GENERATION REQUIREMENTS:
+
+CRITICAL: Create ONE project for EACH of the 6 roadmap items above, in order.
+- Project 1: Based on Phase 1, Item 1 (${roadmapItems[0]})
+- Project 2: Based on Phase 1, Item 2 (${roadmapItems[1]})
+- Project 3: Based on Phase 2, Item 1 (${roadmapItems[2]})
+- Project 4: Based on Phase 2, Item 2 (${roadmapItems[3]})
+- Project 5: Based on Phase 3, Item 1 (${roadmapItems[4]})
+- Project 6: Based on Phase 3, Item 2 (${roadmapItems[5]})
+
+Each project MUST:
+1. Teach the SPECIFIC concept from the roadmap item
+2. Be a SINGLE FILE console program
+3. Use Scanner (Java) or input() (Python) for user interaction
+4. Include clear requirements that focus on the roadmap concept
+5. Progress in difficulty following the roadmap phases
+
+TECHNICAL CONSTRAINTS:
+- SINGLE FILE ONLY - One .java or .py file
+- CONSOLE INPUT/OUTPUT - Scanner (Java) or input() (Python)
+- NO WEB SERVERS - No servlets, JSP, Flask, Django
+- NO DATABASES - Use arrays/lists to store data
+- NO GUI - Text-based console only
+- NO EXTERNAL LIBRARIES - Use standard library only
+- NO FILE I/O - No reading/writing files (use in-memory data only)
+- NO FILE UPLOAD/DOWNLOAD - All data must be entered via console
+- NO EXTERNAL FILES - Everything must be in one code file
+
+SKILL LEVEL REQUIREMENT:
+Student Skill Level: ${skillLevel}
+${getSkillLevelGuidance(skillLevel)}
+
+ALL 6 PROJECTS MUST BE AT EXACTLY ${skillLevel} LEVEL
+
+FORMAT EACH PROJECT:
+
+IMPORTANT: Language field MUST be exactly: ${language}
+
+PROJECT 1:
+Title: [Concept from Roadmap] - [Application Name]
+Description: This project teaches [ROADMAP CONCEPT: ${roadmapItems[0]}]. [Explain why this concept is important and how it applies]. You will create a console program that [what they build]. This is the foundation for your learning journey.
+Language: ${language}
+Requirements:
+- [Requirement focused on the roadmap concept]
+- [Requirement showing practical application]
+- [Requirement for user interaction]
+- [Requirement for demonstration]
+Sample Output:
+[Show realistic console interaction demonstrating the concept]
+
+EXAMPLE PROJECT (Roadmap Item: "Practice basic syntax and variables"):
+
+PROJECT 1:
+Title: Variables and Data Types - Student Profile Manager
+Description: This project teaches variables and data types which are the building blocks of all programs. You will create a console program that stores and displays student information using different data types (String, int, double, boolean). This helps you understand how to work with different kinds of data in ${language}.
+Language: ${language}
+Requirements:
+- Declare variables for student name (String), age (int), GPA (double), and enrolled status (boolean)
+- Accept user input for all variables
+- Display the complete student profile
+- Demonstrate understanding of different data types
+Sample Output:
+=== Student Profile Manager ===
+Enter student name: Maria Santos
+Enter age: 20
+Enter GPA: 3.75
+Is enrolled? (true/false): true
+
+--- Student Profile ---
+Name: Maria Santos
+Age: 20
+GPA: 3.75
+Enrolled: Yes
+
+EXAMPLE PROJECT (Roadmap Item: "Object-oriented programming basics"):
+
+PROJECT 3:
+Title: OOP Basics - Book Management System
+Description: This project teaches object-oriented programming by creating Book objects with properties and methods. OOP helps you organize code and model real-world things as objects. You will create a Book class with properties (title, author, pages) and methods (display info, mark as read). This is essential for building larger programs.
+Language: ${language}
+Requirements:
+- Create a Book class with title, author, pages, and isRead properties
+- Add a method to display book information
+- Add a method to mark a book as read
+- Create multiple Book objects and manage them
+- Use console input to add books
+Sample Output:
+=== Book Management System ===
+1. Add book
+2. Display all books
+3. Mark book as read
+4. Exit
+Enter choice: 1
+Enter title: Clean Code
+Enter author: Robert Martin
+Enter pages: 464
+Book added successfully!
+
+IMPORTANT REMINDERS:
+- Each project MUST directly teach the specific roadmap concept
+- Projects should progress naturally through the roadmap phases
+- Phase 1 projects are simpler (foundation)
+- Phase 2 projects build on Phase 1 (intermediate skills)
+- Phase 3 projects combine multiple concepts (advanced practice)
+- All single-file console programs with clear learning objectives
+- DO NOT use asterisks ** in titles
+- NO FILE I/O OPERATIONS - Use in-memory data only
+- NO FILE READING/WRITING - All data via Scanner/input()
+- Focus on TEACHING the roadmap concept through practical application
+
+CRITICAL: ALL 6 PROJECTS MUST BE IN ${language}. DO NOT GENERATE PYTHON IF LANGUAGE IS JAVA. DO NOT GENERATE JAVA IF LANGUAGE IS PYTHON.
+
+Generate 6 projects, ONE for EACH roadmap item in order:`;
+};
+
+const constructPersonalizedPrompt = (survey) => {
+  const { primaryLanguage, courseInterest, learningGoals, javaExpertise, pythonExpertise, aiAnalysis, javaQuestions, pythonQuestions } = survey;
+  
+  const language = primaryLanguage 
+    ? primaryLanguage.charAt(0).toUpperCase() + primaryLanguage.slice(1)
+    : 'Java';
+  
+  const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, javaQuestions?.score, pythonQuestions?.score);
   
   const conceptsMapping = getConceptsForGoal(courseInterest, learningGoals, skillLevel);
-
+  
+  const studentSkills = analyzeStudentSkills(primaryLanguage, javaQuestions, pythonQuestions);
+  const { strengths, weaknesses } = studentSkills;
   return `You are creating 6 UNIQUE mini programming projects that teach FUNDAMENTAL PROGRAMMING CONCEPTS needed for the student's goal.
 
 STUDENT PROFILE:
 Student Interest: "${courseInterest || 'General Programming'}"
 Student Goals: "${learningGoals || 'Improve programming skills'}"
-AI Analysis: ${aiAnalysis || 'No analysis available'}
 Primary Language: ${language}
 Skill Level: ${skillLevel}
+
+STUDENT SKILLS ASSESSMENT:
+AI Analysis: ${aiAnalysis || 'No analysis available'}
+
+Strengths: ${strengths.join(', ')}
+Weaknesses: ${weaknesses.join(', ')}
+
+PROJECT GENERATION STRATEGY:
+Based on the student's skills, create projects that:
+1. Build on their STRENGTHS (${strengths.slice(0, 2).join(', ')})
+2. Address their WEAKNESSES (${weaknesses.slice(0, 2).join(', ')})
+3. Progress gradually from concepts they know to concepts they need to learn
+4. Each project should target ONE specific weakness while using their strengths
 
 CRITICAL UNDERSTANDING:
 The student wants to learn "${courseInterest || 'programming'}", but we have a SINGLE FILE CONSOLE COMPILER with ONE code editor and ONE output window.
@@ -307,7 +485,13 @@ IMPORTANT REMINDERS:
 - NO FILE READING/WRITING - All data via Scanner/input()
 - Users enter data through console, not files
 
-Generate 6 CONCEPT-FOCUSED projects for ${courseInterest || 'programming'}:`;
+CRITICAL: Base the difficulty and concepts on the student's actual skills:
+- Include 2 projects focused on strengthening: ${strengths.slice(0, 2).join(' and ')}
+- Include 4 projects focused on improving: ${weaknesses.join(', ')}
+- Each project should be practical and relevant to ${courseInterest || 'programming'}
+- Projects should progress in difficulty based on the concepts covered
+
+Generate 6 SKILL-BASED, CONCEPT-FOCUSED projects for ${courseInterest || 'programming'}:`;
 };
 
 const getConceptsForGoal = (interest, goals, skillLevel) => {
@@ -573,6 +757,46 @@ Examples: Inheritance hierarchy for different types, Collection management syste
 - Advanced OOP architecture
 - Performance considerations
 Examples: Factory pattern implementation, Recursive tree structures`;
+};
+
+const analyzeStudentSkills = (primaryLanguage, javaQuestions, pythonQuestions) => {
+  const strengths = [];
+  const weaknesses = [];
+  
+  const score = primaryLanguage === 'java' ? javaQuestions?.score : pythonQuestions?.score;
+  
+  if (!score) {
+    return {
+      strengths: ['basic programming concepts', 'problem solving'],
+      weaknesses: ['programming fundamentals', 'syntax', 'algorithms']
+    };
+  }
+  
+  if (score.easy >= 2) {
+    strengths.push('basic syntax and fundamentals');
+    strengths.push('simple data types and variables');
+  } else {
+    weaknesses.push('basic syntax');
+    weaknesses.push('fundamental concepts');
+  }
+  
+  if (score.medium >= 2) {
+    strengths.push('object-oriented programming');
+    strengths.push('data structures');
+  } else {
+    weaknesses.push('OOP concepts (classes, objects)');
+    weaknesses.push('working with collections');
+  }
+  
+  if (score.hard >= 2) {
+    strengths.push('advanced algorithms');
+    strengths.push('complex problem solving');
+  } else {
+    weaknesses.push('advanced programming patterns');
+    weaknesses.push('algorithm implementation');
+  }
+  
+  return { strengths, weaknesses };
 };
 
 const determineSkillLevel = (javaExpertise, pythonExpertise, javaScore, pythonScore) => {

@@ -110,6 +110,14 @@ const miniProjectSchema = new mongoose.Schema({
     type: [completedTaskSchema],
     default: []
   },
+  javaProjects: {
+    type: [availableProjectSchema],
+    default: []
+  },
+  pythonProjects: {
+    type: [availableProjectSchema],
+    default: []
+  },
   availableProjects: {
     type: [availableProjectSchema],
     default: []
@@ -178,6 +186,16 @@ miniProjectSchema.methods.addWeeklyGeneratedProjects = function(projects, weekNu
     createdAt: new Date()
   }));
   
+  // Separate projects by language
+  projectsToAdd.forEach(project => {
+    if (project.language.toLowerCase() === 'java') {
+      this.javaProjects.push(project);
+    } else if (project.language.toLowerCase() === 'python') {
+      this.pythonProjects.push(project);
+    }
+  });
+  
+  // Keep availableProjects for backward compatibility (deprecated)
   this.availableProjects.push(...projectsToAdd);
   this.lastGenerationDate = new Date();
 };
@@ -186,6 +204,23 @@ miniProjectSchema.methods.getCurrentWeekProjects = function() {
   return this.availableProjects.filter(
     project => project.weekNumber === this.currentWeekNumber
   );
+};
+
+miniProjectSchema.methods.getProjectsByLanguage = function(language) {
+  if (language.toLowerCase() === 'java') {
+    return this.javaProjects;
+  } else if (language.toLowerCase() === 'python') {
+    return this.pythonProjects;
+  }
+  return [];
+};
+
+miniProjectSchema.methods.clearProjectsByLanguage = function(language) {
+  if (language.toLowerCase() === 'java') {
+    this.javaProjects = [];
+  } else if (language.toLowerCase() === 'python') {
+    this.pythonProjects = [];
+  }
 };
 
 miniProjectSchema.methods.getProjectsByWeek = function(weekNumber) {

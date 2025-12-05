@@ -60,16 +60,11 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Mini project data not found' });
     }
 
-    const languageProjects = miniProject.availableProjects.filter(
-      project => project.language.toLowerCase() === currentLanguage.toLowerCase()
-    );
+    // Use language-specific arrays
+    const languageProjects = miniProject.getProjectsByLanguage(currentLanguage);
 
-    console.log(`[Available-Projects] Total projects in DB: ${miniProject.availableProjects.length}`);
-    if (miniProject.availableProjects.length > 0) {
-      const projectLanguages = miniProject.availableProjects.map(p => p.language);
-      console.log(`[Available-Projects] All project languages in DB:`, projectLanguages);
-      console.log(`[Available-Projects] Sample projects:`, miniProject.availableProjects.slice(0, 2).map(p => ({ title: p.title, language: p.language })));
-    }
+    console.log(`[Available-Projects] Java projects in DB: ${miniProject.javaProjects.length}`);
+    console.log(`[Available-Projects] Python projects in DB: ${miniProject.pythonProjects.length}`);
     console.log(`[Available-Projects] User's current language: ${currentLanguage}`);
     console.log(`[Available-Projects] Filtered ${currentLanguage} projects: ${languageProjects.length}`);
     if (languageProjects.length > 0) {
@@ -78,6 +73,20 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
 
     if (languageProjects.length === 0) {
       console.log(`[Available-Projects] No ${currentLanguage} projects available, checking if we should generate...`);
+      
+      const surveyCompletedLanguages = user.surveyCompletedLanguages || [];
+      console.log(`[Available-Projects] Survey completed languages:`, surveyCompletedLanguages);
+      
+      if (surveyCompletedLanguages.length === 0) {
+        console.log(`[Available-Projects] No surveys completed yet`);
+        return res.json({
+          availableProjects: [],
+          completedThisWeek: 0,
+          weekStartDate: miniProject.weekStartDate,
+          allCompleted: false,
+          message: 'Please complete the onboarding survey to generate projects'
+        });
+      }
       
       const Survey = (await import('../models/Survey.js')).default;
       const survey = await Survey.findOne({ userId: req.user.userId });
@@ -133,9 +142,7 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
       }
       
       const updatedProject = await MiniProject.findOne({ userId: req.user.userId });
-      const updatedLanguageProjects = updatedProject.availableProjects.filter(
-        project => project.language.toLowerCase() === currentLanguage.toLowerCase()
-      );
+      const updatedLanguageProjects = updatedProject.getProjectsByLanguage(currentLanguage);
       
       const completedThisWeek = updatedProject.completedTasks.filter(task => {
         const taskDate = new Date(task.completedAt);
