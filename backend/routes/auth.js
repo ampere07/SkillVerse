@@ -434,12 +434,17 @@ router.put('/update-language', authenticateToken, async (req, res) => {
       const miniProject = await MiniProject.findOne({ userId: req.user.userId });
       
       if (miniProject) {
-        miniProject.availableProjects = [];
-        miniProject.weekStartDate = null;
-        miniProject.currentWeekNumber = 0;
-        miniProject.weeklyProjectHistory = [];
+        // Clear only the projects for the NEW language (target language)
+        // This ensures fresh projects are generated for the language being switched to
+        miniProject.clearProjectsByLanguage(primaryLanguage);
+        
+        // Also clear the deprecated availableProjects array
+        miniProject.availableProjects = miniProject.availableProjects.filter(
+          p => p.language.toLowerCase() !== primaryLanguage.toLowerCase()
+        );
+        
         await miniProject.save();
-        console.log(`Cleared projects for user ${user.email} when switching from ${oldLanguage} to ${primaryLanguage}`);
+        console.log(`Cleared ${primaryLanguage} projects for user ${user.email} when switching from ${oldLanguage} to ${primaryLanguage}`);
       }
     }
 

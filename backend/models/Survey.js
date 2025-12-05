@@ -60,6 +60,11 @@ const surveySchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  learningRoadmap: {
+    phase1: [String],
+    phase2: [String],
+    phase3: [String]
+  },
   analysisGeneratedAt: {
     type: Date,
     default: null

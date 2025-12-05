@@ -110,7 +110,6 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   const [aiFeedback, setAiFeedback] = useState('');
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const [viewingSubmittedFeedback, setViewingSubmittedFeedback] = useState(false);
-  const [hasSavedCode, setHasSavedCode] = useState(false);
   const [showFullSubmission, setShowFullSubmission] = useState(false);
   const [showFullOwnSubmission, setShowFullOwnSubmission] = useState(false);
   const compilerRef = useRef<CompilerHandle>(null);
@@ -284,7 +283,6 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
         } else {
           setAiFeedback('Great work completing this activity! Your submission has been received successfully.');
         }
-        setHasSavedCode(false);
         await fetchPostDetails();
       } else {
         setShowAIFeedbackModal(false);
@@ -309,35 +307,6 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   useEffect(() => {
     fetchPostDetails();
   }, [postId, postType]);
-
-  useEffect(() => {
-    if (post?.requiresCompiler) {
-      checkSavedCode();
-    }
-  }, [post]);
-
-  const checkSavedCode = async () => {
-    if (!post?.requiresCompiler || !post?.title) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/mini-projects/project-progress/${encodeURIComponent(post.title)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      const data = await response.json();
-      setHasSavedCode(data.found && data.task.codeBase);
-    } catch (error) {
-      setHasSavedCode(false);
-    }
-  };
 
   const fetchPostDetails = async () => {
     try {
@@ -907,15 +876,6 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                     <span className="text-sm text-gray-600">Not turned in</span>
                   </div>
 
-                  {post.requiresCompiler && hasSavedCode && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-blue-800 font-medium mb-1">Code Ready</p>
-                      <p className="text-xs text-blue-600">
-                        Your code has been saved. Click Submit below to submit your work.
-                      </p>
-                    </div>
-                  )}
-
                   {submissionContent.trim() && (
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
@@ -995,16 +955,6 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
                   >
                     {hasSubmitted ? 'Already Submitted' : (isOverdue && !post.allowLateSubmission ? 'Submission Closed' : (post.requiresCompiler ? 'Open Compiler' : 'Add or create'))}
                   </button>
-
-                  {post.requiresCompiler && hasSavedCode && (
-                    <button
-                      onClick={() => setShowActivitySubmitModal(true)}
-                      disabled={submitting}
-                      className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {submitting ? 'Submitting...' : 'Submit Activity'}
-                    </button>
-                  )}
 
                   {!post.requiresCompiler && (pendingFiles.length > 0 || submissionContent.trim()) && (
                     <button

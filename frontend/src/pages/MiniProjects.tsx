@@ -1,4 +1,4 @@
-import { FolderKanban, Clock, CheckCircle, PlayCircle, MoreVertical } from 'lucide-react';
+import { FolderKanban, Clock, CheckCircle, PlayCircle, Settings } from 'lucide-react';
 import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import axios from 'axios';
 import Compiler from './Compiler';
@@ -36,9 +36,9 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   const [surveyLanguage, setSurveyLanguage] = useState<string | undefined>(undefined);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<string>('java');
-  const [showLanguageChangeModal, setShowLanguageChangeModal] = useState(false);
-  const [pendingLanguage, setPendingLanguage] = useState<string>('');
-  const [changingLanguage, setChangingLanguage] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [pendingLanguage, setPendingLanguage] = useState<string | undefined>(undefined);
+  const [surveyCompletedLanguages, setSurveyCompletedLanguages] = useState<string[]>([]);
   const compilerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -66,6 +66,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
 
   useEffect(() => {
     const checkIfTrulyNew = async () => {
+      // Only show survey for truly new students on first navigation
       if (isNewStudent) {
         try {
           const token = localStorage.getItem('token');
@@ -76,18 +77,14 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
           const surveyCompletedLanguages = response.data.user.surveyCompletedLanguages || [];
           const userPrimaryLanguage = response.data.user.primaryLanguage || 'java';
           
-          // Set the survey language FIRST, before showing the modal
-          setSurveyLanguage(userPrimaryLanguage);
+          // Do NOT set surveyLanguage here for new students
+          // Let them choose the language in step 0 of the modal
           setCurrentLanguage(userPrimaryLanguage);
           
+          // Only show if no surveys completed at all (truly new student)
           if (surveyCompletedLanguages.length === 0) {
-            // First time, no surveys completed
-            console.log('[MiniProjects] First survey - setting language to:', userPrimaryLanguage);
-            setShowSurvey(true);
-          } else if (!surveyCompletedLanguages.includes(userPrimaryLanguage)) {
-            // User has completed at least one survey, but not for current language
-            console.log('[MiniProjects] Need survey for language:', userPrimaryLanguage);
-            console.log('[MiniProjects] Already completed:', surveyCompletedLanguages);
+            console.log('[MiniProjects] First survey - student will choose language');
+            // Do not set surveyLanguage, leave it undefined for step 0
             setShowSurvey(true);
           } else {
             console.log('[MiniProjects] Survey already completed for:', userPrimaryLanguage);
@@ -97,40 +94,13 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
           console.error('Error checking survey completion:', error);
           setShowSurvey(false);
         }
-      } else {
-        checkSurveyStatus();
       }
     };
     
     checkIfTrulyNew();
   }, [isNewStudent]);
 
-  const checkSurveyStatus = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
 
-      const [statusResponse, userResponse] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/auth/check-survey-status`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
-
-      const statusData = await statusResponse.json();
-      const userData = await userResponse.json();
-      
-      if (statusResponse.ok && statusData.needsSurvey) {
-        const userPrimaryLanguage = userData.user?.primaryLanguage || 'java';
-        setSurveyLanguage(userPrimaryLanguage);
-        setShowSurvey(true);
-      }
-    } catch (error) {
-      console.error('Error checking survey status:', error);
-    }
-  };
 
   useImperativeHandle(ref, () => ({
     saveProgress: async () => {
@@ -219,80 +189,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
       if (response.data.user.primaryLanguage) {
         setCurrentLanguage(response.data.user.primaryLanguage);
       }
-    } catch (error) {
-      console.error('[MiniProjects] Error fetching user language:', error);
-    }
-  };
-
-  const handleLanguageSwitch = () => {
-    const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
-    setPendingLanguage(otherLanguage);
-    setShowLanguageChangeModal(true);
-    setShowLanguageMenu(false);
-  };
-
-  const confirmLanguageChange = async () => {
-    setChangingLanguage(true);
-    setShowSurvey(false);
-    setSurveyLanguage(undefined);
-    
-    console.log('[MiniProjects] ========== LANGUAGE SWITCH STARTED ==========');
-    console.log('[MiniProjects] Current language:', currentLanguage);
-    console.log('[MiniProjects] Switching to:', pendingLanguage);
-
-    try {
-      const token = localStorage.getItem('token');
-      console.log('[MiniProjects] Sending language change request to backend...');
       
-      const response = await axios.put(
-        `${API_URL}/auth/change-language`,
-        { language: pendingLanguage },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      console.log('[MiniProjects] Backend response:', response.data);
-
-      if (response.data.success) {
-        console.log('[MiniProjects] Language change successful');
-        setCurrentLanguage(pendingLanguage);
-        console.log('[MiniProjects] Updated currentLanguage state to:', pendingLanguage);
-        setShowLanguageChangeModal(false);
-        
-        setLoading(true);
-        console.log('[MiniProjects] Set loading to true');
-        
-        console.log('[MiniProjects] Checking survey status...');
-        const checkResponse = await axios.get(`${API_URL}/auth/check-survey-status`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        console.log('[MiniProjects] Survey status response:', checkResponse.data);
-        console.log('[MiniProjects] Needs survey?', checkResponse.data.needsSurvey);
-        
-        if (checkResponse.data.needsSurvey) {
-          console.log('[MiniProjects] Survey needed - showing survey modal');
-          setLoading(false);
-          setSurveyLanguage(pendingLanguage);
-          setShowSurvey(true);
-        } else {
-          console.log('[MiniProjects] Survey not needed - fetching projects...');
-          setShowSurvey(false);
-          setSurveyLanguage(undefined);
-          await fetchProjects();
-          console.log('[MiniProjects] Projects fetched');
-          await fetchCompletedTasks();
-          console.log('[MiniProjects] Completed tasks fetched');
-        }
-        console.log('[MiniProjects] ========== LANGUAGE SWITCH COMPLETED ==========');
+      if (response.data.user.surveyCompletedLanguages) {
+        setSurveyCompletedLanguages(response.data.user.surveyCompletedLanguages);
       }
     } catch (error) {
-      console.error('[MiniProjects] ========== LANGUAGE SWITCH ERROR ==========');
-      console.error('[MiniProjects] Error changing language:', error);
-      console.error('[MiniProjects] Error details:', error.response?.data);
-      alert('Failed to change language. Please try again.');
-      setLoading(false);
-    } finally {
-      setChangingLanguage(false);
+      console.error('[MiniProjects] Error fetching user language:', error);
     }
   };
 
@@ -408,14 +310,45 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
               className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-100"
               style={{ color: '#757575' }}
             >
-              <MoreVertical className="w-5 h-5" strokeWidth={1.5} />
+              <Settings className="w-5 h-5" strokeWidth={1.5} />
             </button>
             {showLanguageMenu && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                 <button
-                  onClick={handleLanguageSwitch}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
-                >
+                onClick={async () => {
+                setShowLanguageMenu(false);
+                const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
+                setPendingLanguage(otherLanguage);
+                
+                // Check if student has completed survey for target language
+                if (surveyCompletedLanguages.includes(otherLanguage)) {
+                // Direct switch without survey - use update-language endpoint
+                try {
+                setLoading(true);
+                const token = localStorage.getItem('token');
+                await axios.put(
+                `${API_URL}/auth/update-language`,
+                { primaryLanguage: otherLanguage },
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                
+                setCurrentLanguage(otherLanguage);
+                console.log('[MiniProjects] Direct language switch to:', otherLanguage);
+                
+                await fetchProjects();
+                  await fetchCompletedTasks();
+                setLoading(false);
+                } catch (error) {
+                    console.error('[MiniProjects] Error switching language:', error);
+                  setLoading(false);
+                }
+                } else {
+                    // Show confirmation modal for survey
+                    setShowConfirmationModal(true);
+                    }
+              }}
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
+            >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'python' ? '#DBEAFE' : '#FEF3C7' }}>
                     <span className="text-sm font-bold" style={{ color: currentLanguage === 'python' ? '#3B82F6' : '#F59E0B' }}>
                       {currentLanguage === 'python' ? 'Jv' : 'Py'}
@@ -423,9 +356,9 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
                   </div>
                   <div>
                     <p className="text-sm font-medium" style={{ color: '#212121' }}>
-                      Switch to {currentLanguage === 'python' ? 'Java' : 'Python'}
+                      Switch Language
                     </p>
-                    <p className="text-xs" style={{ color: '#757575' }}>Change programming language</p>
+                    <p className="text-xs" style={{ color: '#757575' }}>Change to {currentLanguage === 'python' ? 'Java' : 'Python'}</p>
                   </div>
                 </button>
               </div>
@@ -438,7 +371,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
         <div className="mt-3 flex items-center gap-4">
           <div className="text-sm">
             <span className="font-medium" style={{ color: '#212121' }}>This Week: </span>
-            <span style={{ color: '#757575' }}>{completedThisWeek} / 6 completed</span>
+            <span style={{ color: '#757575' }}>
+              {projects.filter(p => {
+                const status = getProjectStatus(p.title);
+                return status === 'completed' || status === 'submitted';
+              }).length} / {projects.length} completed
+            </span>
           </div>
           {allCompleted && (
             <div className="px-3 py-1 text-xs font-medium rounded-full" style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}>
@@ -487,7 +425,13 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
                 <div className="mb-4">
                   <div className="flex items-center gap-2 text-xs" style={{ color: '#757575' }}>
                     <span className="font-medium">Language:</span>
-                    <span className="px-2 py-1 rounded" style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}>
+                    <span 
+                      className="px-2 py-1 rounded font-medium" 
+                      style={{ 
+                        backgroundColor: project.language?.toLowerCase() === 'python' ? '#FEF3C7' : '#DBEAFE', 
+                        color: project.language?.toLowerCase() === 'python' ? '#F59E0B' : '#3B82F6' 
+                      }}
+                    >
                       {project.language || 'Not specified'}
                     </span>
                   </div>
@@ -549,6 +493,8 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
                     disabled={status === 'completed' || status === 'submitted'}
                     onClick={() => {
                       if (status !== 'completed' && status !== 'submitted') {
+                        console.log('[MiniProjects] Opening project:', project.title);
+                        console.log('[MiniProjects] Project language:', project.language);
                         setSelectedProject({
                           title: project.title,
                           description: project.description,
@@ -634,6 +580,79 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
         </div>
       )}
 
+      {showConfirmationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold" style={{ color: '#212121' }}>Switch Programming Language</h2>
+            </div>
+            
+            <div className="px-6 py-6 space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'java' ? '#DBEAFE' : '#FEF3C7' }}>
+                  <span className="text-lg font-bold" style={{ color: currentLanguage === 'java' ? '#3B82F6' : '#F59E0B' }}>
+                    {currentLanguage === 'java' ? 'Jv' : 'Py'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium" style={{ color: '#212121' }}>Current Language</p>
+                  <p className="text-lg font-bold" style={{ color: '#212121' }}>{currentLanguage === 'java' ? 'Java' : 'Python'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </div>
+
+              <div className="flex items-center gap-4 p-4 border-2 rounded-lg" style={{ borderColor: '#1B5E20', backgroundColor: '#E8F5E9' }}>
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: pendingLanguage === 'java' ? '#DBEAFE' : '#FEF3C7' }}>
+                  <span className="text-lg font-bold" style={{ color: pendingLanguage === 'java' ? '#3B82F6' : '#F59E0B' }}>
+                    {pendingLanguage === 'java' ? 'Jv' : 'Py'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium" style={{ color: '#212121' }}>Switch To</p>
+                  <p className="text-lg font-bold" style={{ color: '#212121' }}>{pendingLanguage === 'java' ? 'Java' : 'Python'}</p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-sm" style={{ color: '#757575' }}>
+                  You will need to complete a quick survey to assess your skills in {pendingLanguage === 'java' ? 'Java' : 'Python'}. This helps us personalize your learning experience.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowConfirmationModal(false);
+                  setPendingLanguage(undefined);
+                }}
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50"
+                style={{ color: '#757575' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmationModal(false);
+                  setSurveyLanguage(pendingLanguage);
+                  setShowSurvey(true);
+                  setPendingLanguage(undefined);
+                }}
+                className="flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium transition-all hover:shadow-md"
+                style={{ backgroundColor: '#1B5E20' }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <OnboardingSurveyModal
         isOpen={showSurvey}
         onClose={async () => {
@@ -641,51 +660,45 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
           console.log('[MiniProjects] Survey language was:', surveyLanguage);
           setShowSurvey(false);
           const languageToFetch = surveyLanguage;
+          
+          // If surveyLanguage is set, this is a language switch
+          if (languageToFetch && languageToFetch !== currentLanguage) {
+            console.log('[MiniProjects] Language switch detected');
+            console.log('[MiniProjects] Switching from', currentLanguage, 'to', languageToFetch);
+            
+            // Update backend language using update-language endpoint
+            try {
+              const token = localStorage.getItem('token');
+              await axios.put(
+                `${API_URL}/auth/update-language`,
+                { primaryLanguage: languageToFetch },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              
+              setCurrentLanguage(languageToFetch);
+              console.log('[MiniProjects] Updated currentLanguage to:', languageToFetch);
+            } catch (error) {
+              console.error('[MiniProjects] Error updating language:', error);
+            }
+          }
+          
           setSurveyLanguage(undefined);
           completeSurvey();
-          
-          // Update currentLanguage to match the survey that was just completed
-          if (languageToFetch) {
-            console.log('[MiniProjects] Updating currentLanguage to:', languageToFetch);
-            setCurrentLanguage(languageToFetch);
-          }
           
           console.log('[MiniProjects] Fetching projects after survey completion...');
           await fetchProjects();
           await fetchCompletedTasks();
+          await fetchUserLanguage(); // Refresh survey completion status
           console.log('[MiniProjects] Survey modal close handler complete');
+        }}
+        onCancel={() => {
+          console.log('[MiniProjects] Survey cancelled');
+          setShowSurvey(false);
+          setSurveyLanguage(undefined);
         }}
         preselectedLanguage={surveyLanguage}
       />
 
-      {showLanguageChangeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold mb-3" style={{ color: '#212121' }}>Switch to {pendingLanguage === 'java' ? 'Java' : 'Python'}?</h3>
-            <p className="text-sm mb-4" style={{ color: '#757575' }}>
-              You will need to complete the survey for {pendingLanguage === 'java' ? 'Java' : 'Python'} to generate personalized mini projects.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowLanguageChangeModal(false)}
-                disabled={changingLanguage}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                style={{ color: '#212121' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmLanguageChange}
-                disabled={changingLanguage}
-                className="px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: '#1B5E20' }}
-              >
-                {changingLanguage ? 'Switching...' : 'Switch Language'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 });
