@@ -42,9 +42,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   const compilerRef = useRef<any>(null);
 
   useEffect(() => {
-    fetchProjects();
-    fetchCompletedTasks();
-    fetchUserLanguage();
+    const initializePage = async () => {
+      await fetchProjects();
+      await fetchCompletedTasks();
+      await fetchUserLanguage();
+    };
+    initializePage();
   }, []);
 
   useEffect(() => {
@@ -73,15 +76,21 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
           const surveyCompletedLanguages = response.data.user.surveyCompletedLanguages || [];
           const userPrimaryLanguage = response.data.user.primaryLanguage || 'java';
           
+          // Set the survey language FIRST, before showing the modal
+          setSurveyLanguage(userPrimaryLanguage);
+          setCurrentLanguage(userPrimaryLanguage);
+          
           if (surveyCompletedLanguages.length === 0) {
             // First time, no surveys completed
+            console.log('[MiniProjects] First survey - setting language to:', userPrimaryLanguage);
             setShowSurvey(true);
-            setSurveyLanguage(userPrimaryLanguage);
           } else if (!surveyCompletedLanguages.includes(userPrimaryLanguage)) {
             // User has completed at least one survey, but not for current language
+            console.log('[MiniProjects] Need survey for language:', userPrimaryLanguage);
+            console.log('[MiniProjects] Already completed:', surveyCompletedLanguages);
             setShowSurvey(true);
-            setSurveyLanguage(userPrimaryLanguage);
           } else {
+            console.log('[MiniProjects] Survey already completed for:', userPrimaryLanguage);
             setShowSurvey(false);
           }
         } catch (error) {
