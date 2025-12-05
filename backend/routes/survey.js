@@ -85,7 +85,7 @@ router.post('/submit', async (req, res) => {
       aiAnalysis = `Welcome to SkillVerse! Based on your ${primaryLanguage === 'java' ? 'Java' : 'Python'} selection and ${primaryLanguage === 'java' ? javaExpertise : pythonExpertise} level, we'll create personalized projects to help you improve your skills. Start with the mini projects to practice and enhance your programming abilities!`;
     }
 
-    let survey = await Survey.findOne({ userId });
+    let survey = await Survey.findOne({ userId, primaryLanguage });
 
     const surveyData = {
       primaryLanguage,
@@ -114,9 +114,8 @@ router.post('/submit', async (req, res) => {
       surveyCompleted: true
     };
     
-    if (!user.primaryLanguage) {
-      user.primaryLanguage = primaryLanguage;
-    }
+    // Update primaryLanguage to match the survey language
+    user.primaryLanguage = primaryLanguage;
     
     if (!user.surveyCompletedLanguages) {
       user.surveyCompletedLanguages = [];
@@ -155,7 +154,20 @@ router.post('/submit', async (req, res) => {
     console.log(`[Survey] Generating AI projects for user ${userId}...`);
     
     try {
-      const projects = await generateWeeklyProjects(userId);
+      const completedLanguages = user.surveyCompletedLanguages || [];
+      console.log(`[Survey] Completed surveys for languages: ${completedLanguages.join(', ')}`);
+      
+      let projects = [];
+      
+      if (completedLanguages.includes('java') && completedLanguages.includes('python')) {
+        console.log(`[Survey] Both surveys completed, generating projects for both languages`);
+        const { generateProjectsForBothLanguages } = await import('../services/projectGenerationService.js');
+        projects = await generateProjectsForBothLanguages(userId);
+      } else {
+        console.log(`[Survey] Generating projects for ${primaryLanguage} only`);
+        const { generateProjectsForLanguage } = await import('../services/projectGenerationService.js');
+        projects = await generateProjectsForLanguage(userId, primaryLanguage);
+      }
       
       const weekStartDate = new Date();
       const weekEndDate = new Date(weekStartDate);

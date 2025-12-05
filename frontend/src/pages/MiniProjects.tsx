@@ -13,7 +13,7 @@ interface ProjectDetails {
   language: string;
   requirements: string;
 }
-
+  
 interface MiniProjectsProps {
   onHasUnsavedChanges?: (hasChanges: boolean) => void;
 }
@@ -33,6 +33,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState<{title: string, score: number, feedback: string} | null>(null);
   const [showSurvey, setShowSurvey] = useState(false);
+  const [surveyLanguage, setSurveyLanguage] = useState<string | undefined>(undefined);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<string>('java');
   const [showLanguageChangeModal, setShowLanguageChangeModal] = useState(false);
@@ -61,11 +62,38 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   }, [showLanguageMenu]);
 
   useEffect(() => {
-    if (isNewStudent) {
-      setShowSurvey(true);
-    } else {
-      checkSurveyStatus();
-    }
+    const checkIfTrulyNew = async () => {
+      if (isNewStudent) {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.get(`${API_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          const surveyCompletedLanguages = response.data.user.surveyCompletedLanguages || [];
+          const userPrimaryLanguage = response.data.user.primaryLanguage || 'java';
+          
+          if (surveyCompletedLanguages.length === 0) {
+            // First time, no surveys completed
+            setShowSurvey(true);
+            setSurveyLanguage(userPrimaryLanguage);
+          } else if (!surveyCompletedLanguages.includes(userPrimaryLanguage)) {
+            // User has completed at least one survey, but not for current language
+            setShowSurvey(true);
+            setSurveyLanguage(userPrimaryLanguage);
+          } else {
+            setShowSurvey(false);
+          }
+        } catch (error) {
+          console.error('Error checking survey completion:', error);
+          setShowSurvey(false);
+        }
+      } else {
+        checkSurveyStatus();
+      }
+    };
+    
+    checkIfTrulyNew();
   }, [isNewStudent]);
 
   const checkSurveyStatus = async () => {
@@ -73,12 +101,21 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/check-survey-status`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const [statusResponse, userResponse] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/auth/check-survey-status`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
 
-      const data = await response.json();
-      if (response.ok && data.needsSurvey) {
+      const statusData = await statusResponse.json();
+      const userData = await userResponse.json();
+      
+      if (statusResponse.ok && statusData.needsSurvey) {
+        const userPrimaryLanguage = userData.user?.primaryLanguage || 'java';
+        setSurveyLanguage(userPrimaryLanguage);
         setShowSurvey(true);
       }
     } catch (error) {
@@ -95,22 +132,41 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   }));
 
   const fetchProjects = async () => {
+    console.log('[MiniProjects] ========== FETCH PROJECTS STARTED ==========');
     try {
       const token = localStorage.getItem('token');
+      console.log('[MiniProjects] Fetching projects from API...');
       
       const response = await axios.get(`${API_URL}/mini-projects/available-projects`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      console.log('[MiniProjects] API Response received');
+      console.log('[MiniProjects] Response data:', response.data);
+      
       const projectsData = response.data.availableProjects || [];
+      console.log('[MiniProjects] Projects count:', projectsData.length);
+      
+      if (projectsData.length > 0) {
+        console.log('[MiniProjects] First project:', projectsData[0]);
+        console.log('[MiniProjects] Project languages:', projectsData.map(p => p.language));
+      }
       
       setProjects(projectsData);
+      console.log('[MiniProjects] Updated projects state');
+      
       setCompletedThisWeek(response.data.completedThisWeek || 0);
       setAllCompleted(response.data.allCompleted || false);
       setLoading(false);
       setError(null);
+      
+      console.log('[MiniProjects] Completed this week:', response.data.completedThisWeek);
+      console.log('[MiniProjects] All completed:', response.data.allCompleted);
+      console.log('[MiniProjects] ========== FETCH PROJECTS COMPLETED ==========');
     } catch (error) {
+      console.error('[MiniProjects] ========== FETCH PROJECTS ERROR ==========');
       console.error('[MiniProjects] Error fetching projects:', error);
+      console.error('[MiniProjects] Error response:', error.response?.data);
       setError(error.response?.data?.message || error.message);
       setLoading(false);
     }
@@ -168,33 +224,64 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
 
   const confirmLanguageChange = async () => {
     setChangingLanguage(true);
+    setShowSurvey(false);
+    setSurveyLanguage(undefined);
+    
+    console.log('[MiniProjects] ========== LANGUAGE SWITCH STARTED ==========');
+    console.log('[MiniProjects] Current language:', currentLanguage);
+    console.log('[MiniProjects] Switching to:', pendingLanguage);
 
     try {
       const token = localStorage.getItem('token');
+      console.log('[MiniProjects] Sending language change request to backend...');
+      
       const response = await axios.put(
         `${API_URL}/auth/change-language`,
         { language: pendingLanguage },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      console.log('[MiniProjects] Backend response:', response.data);
+
       if (response.data.success) {
+        console.log('[MiniProjects] Language change successful');
         setCurrentLanguage(pendingLanguage);
+        console.log('[MiniProjects] Updated currentLanguage state to:', pendingLanguage);
         setShowLanguageChangeModal(false);
         
+        setLoading(true);
+        console.log('[MiniProjects] Set loading to true');
+        
+        console.log('[MiniProjects] Checking survey status...');
         const checkResponse = await axios.get(`${API_URL}/auth/check-survey-status`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
+        console.log('[MiniProjects] Survey status response:', checkResponse.data);
+        console.log('[MiniProjects] Needs survey?', checkResponse.data.needsSurvey);
+        
         if (checkResponse.data.needsSurvey) {
+          console.log('[MiniProjects] Survey needed - showing survey modal');
+          setLoading(false);
+          setSurveyLanguage(pendingLanguage);
           setShowSurvey(true);
         } else {
+          console.log('[MiniProjects] Survey not needed - fetching projects...');
+          setShowSurvey(false);
+          setSurveyLanguage(undefined);
           await fetchProjects();
+          console.log('[MiniProjects] Projects fetched');
           await fetchCompletedTasks();
+          console.log('[MiniProjects] Completed tasks fetched');
         }
+        console.log('[MiniProjects] ========== LANGUAGE SWITCH COMPLETED ==========');
       }
     } catch (error) {
+      console.error('[MiniProjects] ========== LANGUAGE SWITCH ERROR ==========');
       console.error('[MiniProjects] Error changing language:', error);
+      console.error('[MiniProjects] Error details:', error.response?.data);
       alert('Failed to change language. Please try again.');
+      setLoading(false);
     } finally {
       setChangingLanguage(false);
     }
@@ -320,14 +407,14 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
                   onClick={handleLanguageSwitch}
                   className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
                 >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'java' ? '#FEF3C7' : '#DBEAFE' }}>
-                    <span className="text-sm font-bold" style={{ color: currentLanguage === 'java' ? '#F59E0B' : '#3B82F6' }}>
-                      {currentLanguage === 'java' ? 'Py' : 'Jv'}
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'python' ? '#DBEAFE' : '#FEF3C7' }}>
+                    <span className="text-sm font-bold" style={{ color: currentLanguage === 'python' ? '#3B82F6' : '#F59E0B' }}>
+                      {currentLanguage === 'python' ? 'Jv' : 'Py'}
                     </span>
                   </div>
                   <div>
                     <p className="text-sm font-medium" style={{ color: '#212121' }}>
-                      Switch to {currentLanguage === 'java' ? 'Python' : 'Java'}
+                      Switch to {currentLanguage === 'python' ? 'Java' : 'Python'}
                     </p>
                     <p className="text-xs" style={{ color: '#757575' }}>Change programming language</p>
                   </div>
@@ -541,11 +628,25 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
       <OnboardingSurveyModal
         isOpen={showSurvey}
         onClose={async () => {
+          console.log('[MiniProjects] ========== SURVEY MODAL CLOSED ==========');
+          console.log('[MiniProjects] Survey language was:', surveyLanguage);
           setShowSurvey(false);
+          const languageToFetch = surveyLanguage;
+          setSurveyLanguage(undefined);
           completeSurvey();
+          
+          // Update currentLanguage to match the survey that was just completed
+          if (languageToFetch) {
+            console.log('[MiniProjects] Updating currentLanguage to:', languageToFetch);
+            setCurrentLanguage(languageToFetch);
+          }
+          
+          console.log('[MiniProjects] Fetching projects after survey completion...');
           await fetchProjects();
           await fetchCompletedTasks();
+          console.log('[MiniProjects] Survey modal close handler complete');
         }}
+        preselectedLanguage={surveyLanguage}
       />
 
       {showLanguageChangeModal && (

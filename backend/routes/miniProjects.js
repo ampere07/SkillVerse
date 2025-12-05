@@ -33,6 +33,26 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
 
     console.log(`[Available-Projects] Request from user ${req.user.userId}`);
 
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(req.user.userId);
+    
+    if (!user) {
+      console.log(`[Available-Projects] User not found: ${req.user.userId}`);
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const currentLanguage = user.primaryLanguage || 'java';
+    
+    console.log(`[Available-Projects] ========== USER LANGUAGE INFO ==========`);
+    console.log(`[Available-Projects] User ID: ${req.user.userId}`);
+    console.log(`[Available-Projects] User email: ${user.email}`);
+    console.log(`[Available-Projects] User primaryLanguage from DB: ${user.primaryLanguage}`);
+    console.log(`[Available-Projects] Current language being used: ${currentLanguage}`);
+    console.log(`[Available-Projects] Survey completed languages: ${user.surveyCompletedLanguages}`);
+    console.log(`[Available-Projects] ================================================`);
+    
+    console.log(`[Available-Projects] Current language: ${currentLanguage}`);
+
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
     
     if (!miniProject) {
@@ -40,13 +60,24 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Mini project data not found' });
     }
 
-    console.log(`[Available-Projects] MiniProject found`);
-    console.log(`[Available-Projects] Available projects count: ${miniProject.availableProjects.length}`);
-    console.log(`[Available-Projects] Generation enabled: ${miniProject.generationEnabled}`);
-    console.log(`[Available-Projects] Week start date: ${miniProject.weekStartDate}`);
+    const languageProjects = miniProject.availableProjects.filter(
+      project => project.language.toLowerCase() === currentLanguage.toLowerCase()
+    );
 
-    if (miniProject.availableProjects.length === 0) {
-      console.log(`[Available-Projects] No projects available, checking if we should generate...`);
+    console.log(`[Available-Projects] Total projects in DB: ${miniProject.availableProjects.length}`);
+    if (miniProject.availableProjects.length > 0) {
+      const projectLanguages = miniProject.availableProjects.map(p => p.language);
+      console.log(`[Available-Projects] All project languages in DB:`, projectLanguages);
+      console.log(`[Available-Projects] Sample projects:`, miniProject.availableProjects.slice(0, 2).map(p => ({ title: p.title, language: p.language })));
+    }
+    console.log(`[Available-Projects] User's current language: ${currentLanguage}`);
+    console.log(`[Available-Projects] Filtered ${currentLanguage} projects: ${languageProjects.length}`);
+    if (languageProjects.length > 0) {
+      console.log(`[Available-Projects] ${currentLanguage} project titles:`, languageProjects.map(p => p.title));
+    }
+
+    if (languageProjects.length === 0) {
+      console.log(`[Available-Projects] No ${currentLanguage} projects available, checking if we should generate...`);
       
       const Survey = (await import('../models/Survey.js')).default;
       const survey = await Survey.findOne({ userId: req.user.userId });
@@ -87,16 +118,21 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
       }
       
       const updatedProject = await MiniProject.findOne({ userId: req.user.userId });
+      const updatedLanguageProjects = updatedProject.availableProjects.filter(
+        project => project.language.toLowerCase() === currentLanguage.toLowerCase()
+      );
+      
       const completedThisWeek = updatedProject.completedTasks.filter(task => {
         const taskDate = new Date(task.completedAt);
         const weekStart = updatedProject.weekStartDate ? new Date(updatedProject.weekStartDate) : new Date(0);
-        return taskDate >= weekStart && task.status === 'submitted';
+        return taskDate >= weekStart && task.status === 'submitted' && 
+               task.projectTitle && updatedLanguageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
       });
 
-      console.log(`[Available-Projects] Final projects count: ${updatedProject.availableProjects.length}`);
+      console.log(`[Available-Projects] Final ${currentLanguage} projects count: ${updatedLanguageProjects.length}`);
 
       return res.json({
-        availableProjects: updatedProject.availableProjects || [],
+        availableProjects: updatedLanguageProjects || [],
         completedThisWeek: completedThisWeek.length,
         weekStartDate: updatedProject.weekStartDate,
         allCompleted: completedThisWeek.length >= 6
@@ -106,17 +142,21 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
     const completedThisWeek = miniProject.completedTasks.filter(task => {
       const taskDate = new Date(task.completedAt);
       const weekStart = miniProject.weekStartDate ? new Date(miniProject.weekStartDate) : new Date(0);
-      return taskDate >= weekStart && task.status === 'submitted';
+      return taskDate >= weekStart && task.status === 'submitted' && 
+             task.projectTitle && languageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
     });
 
     const response = {
-      availableProjects: miniProject.availableProjects || [],
+      availableProjects: languageProjects || [],
       completedThisWeek: completedThisWeek.length,
       weekStartDate: miniProject.weekStartDate,
       allCompleted: completedThisWeek.length >= 6
     };
 
-    console.log(`[Available-Projects] Returning ${response.availableProjects.length} projects`);
+    console.log(`[Available-Projects] ===== FINAL RESPONSE =====`);
+    console.log(`[Available-Projects] Returning ${response.availableProjects.length} ${currentLanguage} projects`);
+    console.log(`[Available-Projects] Sample returned project:`, response.availableProjects[0] ? { title: response.availableProjects[0].title, language: response.availableProjects[0].language } : 'No projects');
+    console.log(`[Available-Projects] ============================`);
     res.json(response);
   } catch (error) {
     console.error('[Available-Projects] Error:', error);

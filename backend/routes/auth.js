@@ -358,6 +358,10 @@ router.put('/change-language', authenticateToken, async (req, res) => {
   try {
     const { language } = req.body;
 
+    console.log(`[Auth] ========== LANGUAGE CHANGE REQUEST ==========`);
+    console.log(`[Auth] User ID: ${req.user.userId}`);
+    console.log(`[Auth] Requested language: ${language}`);
+
     if (!language || !['java', 'python'].includes(language)) {
       return res.status(400).json({ message: 'Valid language is required (java or python)' });
     }
@@ -368,22 +372,17 @@ router.put('/change-language', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    console.log(`[Auth] User found: ${user.email}`);
+    console.log(`[Auth] Current primaryLanguage in DB: ${user.primaryLanguage}`);
+    
     const oldLanguage = user.primaryLanguage;
     user.primaryLanguage = language;
     await user.save();
-
-    if (oldLanguage !== language) {
-      const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-      
-      if (miniProject) {
-        miniProject.availableProjects = [];
-        miniProject.weekStartDate = null;
-        miniProject.currentWeekNumber = 0;
-        miniProject.weeklyProjectHistory = [];
-        await miniProject.save();
-        console.log(`Cleared projects for user ${user.email} when switching from ${oldLanguage} to ${language}`);
-      }
-    }
+    
+    console.log(`[Auth] Language updated from ${oldLanguage} to ${language}`);
+    console.log(`[Auth] Saved to database successfully`);
+    console.log(`[Auth] User primaryLanguage after save: ${user.primaryLanguage}`);
+    console.log(`[Auth] ================================================`);
 
     console.log(`Language changed to ${language} for user: ${user.email}`);
 
@@ -400,7 +399,8 @@ router.put('/change-language', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Change language error:', error);
+    console.error('[Auth] Change language error:', error);
+    console.error('[Auth] Error stack:', error.stack);
     res.status(500).json({ message: 'Server error' });
   }
 });

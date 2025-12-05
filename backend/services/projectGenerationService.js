@@ -21,33 +21,100 @@ export const generateWeeklyProjects = async (userId) => {
       return [];
     }
 
-    const survey = await Survey.findOne({ 
-      userId, 
-      primaryLanguage: user.primaryLanguage 
-    }).sort({ createdAt: -1 });
+    const projects = await generateProjectsForLanguage(userId, user.primaryLanguage);
+    return projects;
+  } catch (error) {
+    console.error('Generate projects error:', error);
+    return generateFallbackProjects(userId, 'java');
+  }
+};
+
+export const generateProjectsForBothLanguages = async (userId) => {
+  try {
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(userId);
     
-    if (!survey) {
-      console.error(`No survey found for user ${userId} with language ${user.primaryLanguage}`);
+    if (!user) {
+      console.error(`No user found for user ${userId}`);
       return [];
     }
 
-    const skillLevel = determineSkillLevel(
-      survey.javaExpertise, 
-      survey.pythonExpertise, 
-      survey.javaQuestions?.score, 
-      survey.pythonQuestions?.score
-    );
+    console.log(`[ProjectGen] ========== GENERATING PROJECTS FOR BOTH LANGUAGES ==========`);
+    console.log(`[ProjectGen] User ID: ${userId}`);
+    
+    console.log(`[ProjectGen] Calling generateProjectsForLanguage for JAVA...`);
+    const javaProjects = await generateProjectsForLanguage(userId, 'java');
+    console.log(`[ProjectGen] Java projects generated:`, javaProjects.length);
+    if (javaProjects.length > 0) {
+      console.log(`[ProjectGen] Sample Java project:`, { title: javaProjects[0].title, language: javaProjects[0].language });
+    }
+    
+    console.log(`[ProjectGen] Calling generateProjectsForLanguage for PYTHON...`);
+    const pythonProjects = await generateProjectsForLanguage(userId, 'python');
+    console.log(`[ProjectGen] Python projects generated:`, pythonProjects.length);
+    if (pythonProjects.length > 0) {
+      console.log(`[ProjectGen] Sample Python project:`, { title: pythonProjects[0].title, language: pythonProjects[0].language });
+    }
+    
+    const allProjects = [...javaProjects, ...pythonProjects];
+    console.log(`[ProjectGen] Generated ${javaProjects.length} Java + ${pythonProjects.length} Python = ${allProjects.length} total projects`);
+    console.log(`[ProjectGen] ================================================================`);
+    
+    return allProjects;
+  } catch (error) {
+    console.error('Generate projects for both languages error:', error);
+    return [
+      ...generateFallbackProjects(userId, 'java'),
+      ...generateFallbackProjects(userId, 'python')
+    ];
+  }
+};
+
+export const generateProjectsForLanguage = async (userId, language) => {
+  try {
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      console.error(`No user found for user ${userId}`);
+      return generateFallbackProjects(userId, language);
+    }
+
+    const survey = await Survey.findOne({ userId }).sort({ createdAt: -1 });
+    
+    if (!survey) {
+      console.log(`[ProjectGen] No survey found for user ${userId}, using fallback for ${language}`);
+      return generateFallbackProjects(userId, language);
+    }
+
+    const hasLanguageData = 
+      (language.toLowerCase() === 'java' && survey.javaExpertise) || 
+      (language.toLowerCase() === 'python' && survey.pythonExpertise);
+
+    if (!hasLanguageData) {
+      console.log(`[ProjectGen] Survey found but no ${language} data, using fallback`);
+      return generateFallbackProjects(userId, language);
+    }
+
+    const skillLevel = language.toLowerCase() === 'java'
+      ? determineSkillLevel(survey.javaExpertise, null, survey.javaQuestions?.score, null)
+      : determineSkillLevel(null, survey.pythonExpertise, null, survey.pythonQuestions?.score);
     
     console.log(`[ProjectGen] ========== GENERATING PROJECTS ==========`);
     console.log(`[ProjectGen] User ID: ${userId}`);
-    console.log(`[ProjectGen] Primary Language: ${user.primaryLanguage.toUpperCase()}`);
+    console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
     console.log(`[ProjectGen] Interest: ${survey.courseInterest}`);
     console.log(`[ProjectGen] Goals: ${survey.learningGoals}`);
     console.log(`[ProjectGen] Skill Level: ${skillLevel}`);
     console.log(`[ProjectGen] AI Analysis: ${survey.aiAnalysis?.substring(0, 100)}...`);
     console.log(`[ProjectGen] ===========================================`);
     
-    const prompt = constructPersonalizedPrompt(survey);
+    const languageSpecificSurvey = {
+      ...survey.toObject(),
+      primaryLanguage: language
+    };
+    
+    const prompt = constructPersonalizedPrompt(languageSpecificSurvey);
     
     try {
       const response = await ollama.chat({
@@ -588,11 +655,13 @@ const parseProjectsFromAI = (text) => {
 };
 
 const generateFallbackProjects = (userId, language = 'java') => {
-  console.log(`[ProjectGen] Using fallback projects for user ${userId} in ${language.toUpperCase()}`);
+  console.log(`[ProjectGen] ========== USING FALLBACK PROJECTS ==========`);
+  console.log(`[ProjectGen] User ID: ${userId}`);
+  console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
   
   const languageFormatted = language.charAt(0).toUpperCase() + language.slice(1);
   
-  return [
+  const projects = [
     {
       title: 'Simple Calculator',
       description: 'Create a console calculator that performs basic arithmetic operations.',
@@ -636,4 +705,14 @@ const generateFallbackProjects = (userId, language = 'java') => {
       sampleOutput: 'Primes: 2, 3, 5, 7, 11'
     }
   ];
+  
+  console.log(`[ProjectGen] Generated ${projects.length} fallback projects`);
+  console.log(`[ProjectGen] Language for all projects: ${languageFormatted}`);
+  console.log(`[ProjectGen] Sample project:`, { 
+    title: projects[0].title, 
+    language: projects[0].language 
+  });
+  console.log(`[ProjectGen] ===========================================`);
+  
+  return projects;
 };
