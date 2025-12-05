@@ -5,7 +5,6 @@ const surveySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'User ID is required'],
-    unique: true,
     index: true
   },
   primaryLanguage: {
@@ -69,6 +68,6 @@ const surveySchema = new mongoose.Schema({
   timestamps: true
 });
 
-surveySchema.index({ userId: 1 });
+surveySchema.index({ userId: 1, primaryLanguage: 1 }, { unique: true });
 
 export default mongoose.model('Survey', surveySchema);
