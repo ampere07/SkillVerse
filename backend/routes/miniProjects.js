@@ -93,7 +93,22 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
         });
       }
 
-      console.log(`[Available-Projects] Survey found, triggering project generation...`);
+      console.log(`[Available-Projects] Survey found, checking if generation is already in progress...`);
+      
+      // Check if projects were recently generated (within last 10 seconds) to prevent duplicate generation
+      const recentGenerationTime = new Date(Date.now() - 10000); // 10 seconds ago
+      if (miniProject.lastGenerationDate && new Date(miniProject.lastGenerationDate) > recentGenerationTime) {
+        console.log(`[Available-Projects] Generation already in progress or completed recently, skipping...`);
+        return res.json({
+          availableProjects: [],
+          completedThisWeek: 0,
+          weekStartDate: miniProject.weekStartDate,
+          allCompleted: false,
+          message: 'Projects are being generated, please wait...'
+        });
+      }
+      
+      console.log(`[Available-Projects] Starting project generation...`);
       
       try {
         const { generateWeeklyProjects } = await import('../services/projectGenerationService.js');
