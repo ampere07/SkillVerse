@@ -54,6 +54,7 @@ interface PostData {
   dueDate?: string;
   points?: number;
   requiresCompiler?: boolean;
+  compilerLanguage?: 'java' | 'python';
   duration?: {
     hours: number;
     minutes: number;
@@ -610,7 +611,7 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
       _id: post._id,
       title: post.title,
       description: post.description,
-      language: 'java',
+      language: post.compilerLanguage || 'python',
       requirements: post.instructions || '',
       duration: post.duration
     };
