@@ -6,11 +6,13 @@ interface CreatePostProps {
   classroomId: string;
   classroomName: string;
   onBack: () => void;
+  onNavigateToClassrooms: () => void;
+  onNavigateToClassroomDetail: () => void;
 }
 
 type PostType = 'activity' | 'module';
 
-export default function CreatePost({ classroomId, classroomName, onBack }: CreatePostProps) {
+export default function CreatePost({ classroomId, classroomName, onBack, onNavigateToClassrooms, onNavigateToClassroomDetail }: CreatePostProps) {
   const [postType, setPostType] = useState<PostType>('activity');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -167,11 +169,17 @@ export default function CreatePost({ classroomId, classroomName, onBack }: Creat
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <div className="flex items-center text-sm text-gray-600 mb-4">
-          <button onClick={onBack} className="hover:text-gray-900 transition-colors">
+          <button 
+            onClick={onNavigateToClassrooms}
+            className="hover:text-gray-900 transition-colors"
+          >
             My Classrooms
           </button>
           <ChevronRight className="w-4 h-4 mx-2" />
-          <button onClick={onBack} className="hover:text-gray-900 transition-colors">
+          <button 
+            onClick={onNavigateToClassroomDetail}
+            className="hover:text-gray-900 transition-colors"
+          >
             {classroomName}
           </button>
           <ChevronRight className="w-4 h-4 mx-2" />

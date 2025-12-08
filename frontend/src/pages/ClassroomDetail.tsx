@@ -103,6 +103,10 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
           setShowCreateModal(false);
           fetchClassroomData();
         }}
+        onNavigateToClassrooms={onBack}
+        onNavigateToClassroomDetail={() => {
+          setShowCreateModal(false);
+        }}
       />
     );
   }

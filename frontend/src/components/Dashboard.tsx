@@ -12,7 +12,8 @@ import {
   TrendingUp,
   Clock,
   Calendar,
-  Sparkles
+  Sparkles,
+  CheckCircle
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Compiler from '../pages/Compiler';
@@ -21,7 +22,10 @@ import MiniProjects from '../pages/MiniProjects';
 import Settings from '../pages/Settings';
 import Assignments from '../pages/Assignments';
 import CreateAssignment from '../pages/CreateAssignment';
+import CreatePost from '../pages/CreatePost';
+import Submissions from '../pages/Submissions';
 import UnsavedChangesModal from './UnsavedChangesModal';
+import TeacherDashboardContent from './TeacherDashboardContent';
 
 interface NavItem {
   icon: any;
@@ -48,6 +52,12 @@ const navigationItems: NavItem[] = [
     label: 'Assignments',
     href: '/assignments',
     roles: ['student']
+  },
+  {
+    icon: CheckCircle,
+    label: 'Submissions',
+    href: '/submissions',
+    roles: ['teacher']
   },
   {
     icon: Code,
@@ -82,6 +92,9 @@ export default function Dashboard() {
   const [activeAssignmentsCount, setActiveAssignmentsCount] = useState(0);
   const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [createPostClassroomId, setCreatePostClassroomId] = useState<string | null>(null);
+  const [createPostClassroomName, setCreatePostClassroomName] = useState<string | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role === 'student') {
@@ -428,7 +441,10 @@ export default function Dashboard() {
           {activeNav === '/compiler' ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
           ) : activeNav === '/classrooms' ? (
-            <Classrooms />
+            <Classrooms 
+              selectedClassroomId={selectedClassroomId}
+              onClearSelection={() => setSelectedClassroomId(null)}
+            />
           ) : activeNav === '/mini-projects' ? (
             <MiniProjects 
               ref={miniProjectsRef}
@@ -438,8 +454,33 @@ export default function Dashboard() {
             <Settings />
           ) : activeNav === '/assignments' ? (
             <Assignments />
+          ) : activeNav === '/submissions' ? (
+            <Submissions />
           ) : activeNav === '/create-assignment' ? (
             <CreateAssignment />
+          ) : activeNav === '/create-post' ? (
+            <CreatePost 
+              classroomId={createPostClassroomId || ''} 
+              classroomName={createPostClassroomName || ''}
+              onBack={() => setActiveNav('/dashboard')}
+              onNavigateToClassrooms={() => {
+                setSelectedClassroomId(null);
+                setActiveNav('/classrooms');
+              }}
+              onNavigateToClassroomDetail={() => {
+                setSelectedClassroomId(createPostClassroomId);
+                setActiveNav('/classrooms');
+              }}
+            />
+          ) : user.role === 'teacher' ? (
+            <TeacherDashboardContent 
+              user={user} 
+              onNavigateToCreatePost={(classroomId: string, classroomName: string) => {
+                setCreatePostClassroomId(classroomId);
+                setCreatePostClassroomName(classroomName);
+                setActiveNav('/create-post');
+              }}
+            />
           ) : (
             <StudentDashboardContent 
               user={user}
