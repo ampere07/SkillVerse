@@ -46,8 +46,10 @@ Validate now:`;
       model: MODEL_NAME,
       messages: [{ role: 'user', content: prompt }],
       options: {
-        temperature: 0.3,
-        num_predict: 100
+        temperature: 0.9,
+        num_predict: 2500,
+        num_ctx: 2048,
+        num_thread: 10
       }
     });
 
@@ -90,7 +92,8 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
       options: {
         temperature: 0.7,
         top_p: 0.95,
-        num_predict: 1500
+        num_predict: 1500,
+        num_thread: 10
       }
     });
 
@@ -218,30 +221,46 @@ Welcome to SkillVerse!
 Your Learning Roadmap:
 
 Phase 1 - Foundation
-- [Concept 1 to learn]
-- [Concept 2 to learn]
+- [Concept 1 - something they know]
+- [Concept 2 - basic new skill]
+- [Concept 3 - basic new skill]
+- [Concept 4 - basic new skill]
+- [Concept 5 - basic new skill]
+- [Concept 6 - basic new skill]
 
 Phase 2 - Building Skills
-- [Concept 3 to learn]
-- [Concept 4 to learn]
+- [Concept 7 - intermediate skill]
+- [Concept 8 - intermediate skill]
+- [Concept 9 - intermediate skill]
+- [Concept 10 - intermediate skill]
+- [Concept 11 - intermediate skill]
+- [Concept 12 - intermediate skill]
 
 Phase 3 - Advanced Practice
-- [Concept 5 to learn]
-- [Concept 6 to learn]
+- [Concept 13 - advanced skill]
+- [Concept 14 - advanced skill]
+- [Concept 15 - advanced skill]
+- [Concept 16 - advanced skill]
+- [Concept 17 - advanced skill]
+- [Concept 18 - advanced skill]
 
 CRITICAL REQUIREMENTS FOR ROADMAP:
 
-1. PHASE 1 must include 2 concepts:
+1. PHASE 1 must include EXACTLY 6 concepts:
    - First concept: Something they already know (from strengths) to build confidence
-   - Second concept: A new basic concept they need to learn
+   - Next 5 concepts: Foundation concepts they need to master
+   - All should be basic/fundamental concepts
+   - Examples: variables, data types, loops, conditionals, arrays, functions
 
-2. PHASE 2 must include 2 concepts:
-   - Both should be intermediate concepts addressing their weaknesses
+2. PHASE 2 must include EXACTLY 6 concepts:
+   - All should be intermediate concepts addressing their weaknesses
    - Build directly on Phase 1 concepts
+   - Examples: OOP basics, classes and objects, inheritance, collections, exception handling, file I/O
 
-3. PHASE 3 must include 2 concepts:
-   - Advanced concepts that combine previous learning
+3. PHASE 3 must include EXACTLY 6 concepts:
+   - All should be advanced concepts that combine previous learning
    - Prepare them for real-world applications
+   - Examples: design patterns, algorithms, data structures, API integration, testing, project architecture
 
 4. Each phase item should be:
    - ONE clear concept or skill (not multiple things)
@@ -269,15 +288,27 @@ Your Learning Roadmap:
 
 Phase 1 - Foundation
 - ${strengths.length > 0 ? strengths[0] : 'Basic syntax and variables'} (practice what you know)
-- ${weaknesses.length > 0 ? weaknesses[0] : 'Control structures and loops'} (new skill)
+- ${weaknesses.length > 0 ? weaknesses[0] : 'Understanding conditional statements'} (new skill)
+- Working with loops and iteration (new skill)
+- Understanding data types and type conversion (new skill)
+- Creating and using functions (new skill)
+- Working with arrays and lists (new skill)
 
 Phase 2 - Building Skills
 - ${weaknesses.length > 1 ? weaknesses[1] : 'Object-oriented programming basics'} (intermediate)
 - Working with collections and data structures (intermediate)
+- Understanding inheritance and polymorphism (intermediate)
+- Exception handling and error management (intermediate)
+- File input and output operations (intermediate)
+- Working with interfaces and abstract classes (intermediate)
 
 Phase 3 - Advanced Practice
-- ${weaknesses.length > 2 ? weaknesses[2] : 'Algorithm design and optimization'} (advanced)
+- ${weaknesses.length > 2 ? weaknesses[2] : 'Algorithm design and problem solving'} (advanced)
+- Implementing common data structures (advanced)
+- Understanding design patterns (advanced)
 - Building complete applications with multiple components (advanced)
+- Code optimization and performance tuning (advanced)
+- Testing and debugging strategies (advanced)
 
 WRITING STYLE:
 - Write like talking to a friend, not a textbook

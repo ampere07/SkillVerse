@@ -26,7 +26,8 @@ export const gradeProject = async (projectDetails, submittedCode) => {
       messages: [{ role: 'user', content: prompt }],
       options: {
         temperature: 0.3,
-        num_predict: 2000
+        num_predict: 2000,
+        num_thread: 10
       }
     });
 
