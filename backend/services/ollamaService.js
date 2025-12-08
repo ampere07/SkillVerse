@@ -82,7 +82,8 @@ Validate now:`;
 
 export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => {
   try {
-    console.log('Starting AI analysis for student skills...');
+    console.log('[Survey] Starting AI analysis for student skills...');
+    const startTime = Date.now();
     
     const prompt = constructPrompt(surveyData, fullName);
     
@@ -93,9 +94,13 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
         temperature: 0.7,
         top_p: 0.95,
         num_predict: 1500,
-        num_thread: 10
+        num_thread: 12
       }
     });
+    
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.log(`[Survey] ✓ AI analysis completed in ${duration} seconds`);
 
     const analysis = response.message.content;
     
@@ -103,7 +108,7 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
       throw new Error('Empty analysis received from Ollama');
     }
 
-    console.log('AI analysis completed successfully');
+    console.log('[Survey] AI analysis completed successfully');
     
     const roadmap = parseRoadmap(analysis);
     
