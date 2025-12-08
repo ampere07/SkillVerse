@@ -47,6 +47,17 @@ export default function Classrooms({ selectedClassroomId: propSelectedClassroomI
     success: boolean;
     message: string;
   }>({ show: false, success: false, message: '' });
+  const [dropConfirmModal, setDropConfirmModal] = useState<{
+    show: boolean;
+    classroomId: string | null;
+    classroomName: string;
+  }>({ show: false, classroomId: null, classroomName: '' });
+  const [dropLoading, setDropLoading] = useState(false);
+  const [dropResult, setDropResult] = useState<{
+    show: boolean;
+    success: boolean;
+    message: string;
+  }>({ show: false, success: false, message: '' });
 
   useEffect(() => {
     fetchClassrooms();
@@ -103,16 +114,32 @@ export default function Classrooms({ selectedClassroomId: propSelectedClassroomI
     setShowModal(false);
   };
 
-  const handleDropCourse = async (classroomId: string) => {
-    if (!confirm('Are you sure you want to drop this classroom? You will need to rejoin using the classroom code.')) {
-      return;
-    }
+  const handleDropCourse = async (classroomId: string, classroomName: string) => {
+    setDropConfirmModal({ show: true, classroomId, classroomName });
+  };
+
+  const confirmDropCourse = async () => {
+    if (!dropConfirmModal.classroomId) return;
+    
+    setDropConfirmModal({ show: false, classroomId: null, classroomName: '' });
+    setDropLoading(true);
 
     try {
-      await classroomAPI.leaveClassroom(classroomId);
+      await classroomAPI.leaveClassroom(dropConfirmModal.classroomId);
+      setDropLoading(false);
+      setDropResult({
+        show: true,
+        success: true,
+        message: 'Successfully dropped from classroom'
+      });
       await fetchClassrooms();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to drop classroom');
+      setDropLoading(false);
+      setDropResult({
+        show: true,
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to drop classroom'
+      });
     }
   };
 
@@ -253,6 +280,24 @@ export default function Classrooms({ selectedClassroomId: propSelectedClassroomI
           onClose={() => setDeleteResult({ show: false, success: false, message: '' })}
         />
       )}
+
+      {dropConfirmModal.show && (
+        <ConfirmDropModal
+          classroomName={dropConfirmModal.classroomName}
+          onConfirm={confirmDropCourse}
+          onCancel={() => setDropConfirmModal({ show: false, classroomId: null, classroomName: '' })}
+        />
+      )}
+
+      {dropLoading && <LoadingModal message="Dropping classroom..." />}
+
+      {dropResult.show && (
+        <ResultModal
+          success={dropResult.success}
+          message={dropResult.message}
+          onClose={() => setDropResult({ show: false, success: false, message: '' })}
+        />
+      )}
     </div>
   );
 }
@@ -263,7 +308,7 @@ interface ClassroomCardProps {
   assignmentCount?: number;
   onCopyCode: (code: string) => void;
   copiedCode: string | null;
-  onDropCourse: (classroomId: string) => void;
+  onDropCourse: (classroomId: string, classroomName: string) => void;
   onDeleteClassroom: (classroomId: string, classroomName: string) => void;
   onView: () => void;
 }
@@ -341,7 +386,7 @@ function ClassroomCard({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDropCourse(classroom._id);
+                        onDropCourse(classroom._id, classroom.name);
                         setShowMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -435,6 +480,45 @@ function ConfirmDeleteModal({ classroomName, onConfirm, onCancel }: ConfirmDelet
               className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
             >
               Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ConfirmDropModalProps {
+  classroomName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDropModal({ classroomName, onConfirm, onCancel }: ConfirmDropModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-3" style={{ color: '#212121' }}>
+            Drop Classroom
+          </h3>
+          <p className="text-sm mb-6" style={{ color: '#757575' }}>
+            Are you sure you want to drop <span className="font-semibold" style={{ color: '#212121' }}>{classroomName}</span>? 
+            You will need to rejoin using the classroom code.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              style={{ color: '#212121' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Drop
             </button>
           </div>
         </div>
