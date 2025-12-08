@@ -194,6 +194,10 @@ export default function Dashboard() {
           return dueDate >= now || activity.allowLateSubmission;
         }).length;
 
+        // Get recent activities - both submissions and mini projects
+        const recentActivityList: any[] = [];
+
+        // Add assignment submissions
         const recentSubmissions = allActivities
           .filter(activity => {
             const submission = activity.submissions?.find(
@@ -201,32 +205,63 @@ export default function Dashboard() {
             );
             return submission !== undefined;
           })
-          .sort((a, b) => {
-            const subA = a.submissions?.find((s: any) => s.student === user?.id || s.student?._id === user?.id);
-            const subB = b.submissions?.find((s: any) => s.student === user?.id || s.student?._id === user?.id);
-            const dateA = subA?.submittedAt ? new Date(subA.submittedAt).getTime() : 0;
-            const dateB = subB?.submittedAt ? new Date(subB.submittedAt).getTime() : 0;
-            return dateB - dateA;
-          })
-          .slice(0, 3)
           .map(activity => {
             const submission = activity.submissions?.find(
               (s: any) => s.student === user?.id || s.student?._id === user?.id
             );
             const submittedAt = submission?.submittedAt ? new Date(submission.submittedAt) : null;
-            const timeAgo = submittedAt ? getTimeAgo(submittedAt) : '';
             
             return {
-              title: `${activity.title} completed`,
-              timeAgo,
-              icon: '/assets/Untitled_icon/Icon-14.png'
+              title: `Submitted "${activity.title}"`,
+              subtitle: activity.classroom?.name || '',
+              timestamp: submittedAt,
+              type: 'submission'
             };
           });
 
+        recentActivityList.push(...recentSubmissions);
+
+        // Add mini project completions
+        try {
+          const miniProjectsActivityResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/user-projects`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (miniProjectsActivityResponse.ok) {
+            const miniProjectsActivityData = await miniProjectsActivityResponse.json();
+            if (miniProjectsActivityData.miniProject && miniProjectsActivityData.miniProject.completedTasks) {
+              const completedProjects = miniProjectsActivityData.miniProject.completedTasks
+                .filter((task: any) => task.status === 'submitted' && task.completedAt)
+                .map((task: any) => ({
+                  title: `Completed mini project "${task.title}"`,
+                  subtitle: task.language || '',
+                  timestamp: new Date(task.completedAt),
+                  type: 'mini-project'
+                }));
+              
+              recentActivityList.push(...completedProjects);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching mini projects for recent activity:', err);
+        }
+
+        // Sort all activities by timestamp (most recent first) and take top 5
+        const sortedActivities = recentActivityList
+          .filter(activity => activity.timestamp)
+          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+          .slice(0, 5)
+          .map(activity => ({
+            title: activity.title,
+            subtitle: activity.subtitle,
+            timeAgo: getTimeAgo(activity.timestamp),
+            type: activity.type
+          }));
+
         setActiveAssignmentsCount(activeCount);
         setUpcomingAssignments(upcomingActivities);
-        setRecentActivities(recentSubmissions.length > 0 ? recentSubmissions : [
-          { title: 'No pending assignments', timeAgo: 'Today', icon: '/assets/Untitled_icon/Icon-14.png' }
+        setRecentActivities(sortedActivities.length > 0 ? sortedActivities : [
+          { title: 'No recent activities', subtitle: '', timeAgo: 'Get started with your first activity!', type: 'empty' }
         ]);
       }
     } catch (error) {
@@ -518,7 +553,7 @@ function StudentDashboardContent({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left Column - Quick Actions & Learning Progress */}
+        {/* Left Column - Mini Projects */}
         <div className="xl:col-span-2 space-y-6">
           {/* Quick Actions - Only show if there are projects */}
           {projects.length > 0 && (
@@ -569,25 +604,6 @@ function StudentDashboardContent({
             </div>
           )}
 
-          {/* Learning Progress */}
-          <div>
-            <h2 className="text-[20px] font-semibold text-[#212121] mb-4">Learning Progress</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ProgressCard
-                title="Course Completion"
-                current={0}
-                total={5}
-                color="green"
-              />
-              <ProgressCard
-                title="Assignment Progress"
-                current={0}
-                total={10}
-                color="gray"
-              />
-            </div>
-          </div>
-
           {/* Recent Activity */}
           <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
@@ -607,7 +623,10 @@ function StudentDashboardContent({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-[#212121]">{activity.title}</p>
-                    <p className="text-[12px] text-[#757575]">{activity.timeAgo}</p>
+                    {activity.subtitle && (
+                      <p className="text-[12px] text-[#757575]">{activity.subtitle}</p>
+                    )}
+                    <p className="text-[12px] text-[#757575] mt-0.5">{activity.timeAgo}</p>
                   </div>
                 </div>
               ))}

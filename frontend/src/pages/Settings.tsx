@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Shield, Calendar, Save, Code2, AlertCircle } from 'lucide-react';
+import { User, Mail, Shield, Calendar, Save, Code2, AlertCircle, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
 
 export default function Settings() {
@@ -9,6 +9,22 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [operationLoading, setOperationLoading] = useState<{
+    show: boolean;
+    message: string;
+  }>({ show: false, message: '' });
+  const [operationResult, setOperationResult] = useState<{
+    show: boolean;
+    success: boolean;
+    message: string;
+  }>({ show: false, success: false, message: '' });
+  const [passwordValidation, setPasswordValidation] = useState({
+    minLength: false,
+    hasUpperCase: false,
+    hasNumber: false,
+    hasSpecialChar: false
+  });
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -113,19 +129,44 @@ export default function Settings() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+
+    if (name === 'newPassword') {
+      setPasswordValidation({
+        minLength: value.length >= 6,
+        hasUpperCase: /[A-Z]/.test(value),
+        hasNumber: /[0-9]/.test(value),
+        hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(value)
+      });
+      
+      if (formData.confirmPassword) {
+        setPasswordsMatch(value === formData.confirmPassword);
+      }
+    }
+
+    if (name === 'confirmPassword') {
+      if (value) {
+        setPasswordsMatch(formData.newPassword === value);
+      } else {
+        setPasswordsMatch(null);
+      }
+    }
   };
 
   const handleSaveProfile = async () => {
-    setSaving(true);
-    setMessage('');
+    setOperationLoading({ show: true, message: 'Updating profile...' });
 
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        setOperationLoading({ show: false, message: '' });
+        return;
+      }
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/update-profile`, {
         method: 'PUT',
@@ -140,39 +181,60 @@ export default function Settings() {
       });
 
       const data = await response.json();
+      setOperationLoading({ show: false, message: '' });
       
       if (response.ok) {
-        setMessage('Profile updated successfully!');
+        setOperationResult({
+          show: true,
+          success: true,
+          message: 'Profile updated successfully!'
+        });
         setUserData(data.user);
         setIsEditing(false);
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage(data.message || 'Failed to update profile');
+        setOperationResult({
+          show: true,
+          success: false,
+          message: data.message || 'Failed to update profile'
+        });
       }
     } catch (error) {
-      setMessage('Error updating profile');
-    } finally {
-      setSaving(false);
+      setOperationLoading({ show: false, message: '' });
+      setOperationResult({
+        show: true,
+        success: false,
+        message: 'Error updating profile'
+      });
     }
   };
 
   const handleChangePassword = async () => {
     if (formData.newPassword !== formData.confirmPassword) {
-      setMessage('New passwords do not match');
+      setOperationResult({
+        show: true,
+        success: false,
+        message: 'New passwords do not match'
+      });
       return;
     }
 
     if (formData.newPassword.length < 6) {
-      setMessage('Password must be at least 6 characters');
+      setOperationResult({
+        show: true,
+        success: false,
+        message: 'Password must be at least 6 characters'
+      });
       return;
     }
 
-    setSaving(true);
-    setMessage('');
+    setOperationLoading({ show: true, message: 'Changing password...' });
 
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        setOperationLoading({ show: false, message: '' });
+        return;
+      }
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/change-password`, {
         method: 'PUT',
@@ -187,23 +249,34 @@ export default function Settings() {
       });
 
       const data = await response.json();
+      setOperationLoading({ show: false, message: '' });
       
       if (response.ok) {
-        setMessage('Password changed successfully!');
+        setOperationResult({
+          show: true,
+          success: true,
+          message: 'Password changed successfully!'
+        });
         setFormData({
           ...formData,
           currentPassword: '',
           newPassword: '',
           confirmPassword: ''
         });
-        setTimeout(() => setMessage(''), 3000);
       } else {
-        setMessage(data.message || 'Failed to change password');
+        setOperationResult({
+          show: true,
+          success: false,
+          message: data.message || 'Failed to change password'
+        });
       }
     } catch (error) {
-      setMessage('Error changing password');
-    } finally {
-      setSaving(false);
+      setOperationLoading({ show: false, message: '' });
+      setOperationResult({
+        show: true,
+        success: false,
+        message: 'Error changing password'
+      });
     }
   };
 
@@ -239,15 +312,7 @@ export default function Settings() {
           <p className="text-sm mt-1" style={{ color: '#757575' }}>Manage your account settings and preferences</p>
         </div>
 
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            message.includes('success') 
-              ? 'bg-green-100 text-green-700' 
-              : 'bg-red-100 text-red-700'
-          }`}>
-            {message}
-          </div>
-        )}
+
 
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
@@ -346,13 +411,12 @@ export default function Settings() {
             {isEditing && (
               <div className="mt-6 flex justify-end gap-3">
                 <button
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                  className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md text-sm font-medium"
-                  style={{ backgroundColor: '#1B5E20' }}
+                onClick={handleSaveProfile}
+                className="flex items-center gap-2 px-6 py-2.5 text-white rounded-lg transition-all hover:shadow-md text-sm font-medium"
+                style={{ backgroundColor: '#1B5E20' }}
                 >
                   <Save className="w-4 h-4" strokeWidth={1.5} />
-                  {saving ? 'Saving...' : 'Save Changes'}
+                Save Changes
                 </button>
               </div>
             )}
@@ -460,6 +524,74 @@ export default function Settings() {
                   placeholder="Enter new password"
                   style={{ color: '#212121' }}
                 />
+                {formData.newPassword && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                        passwordValidation.minLength ? 'bg-green-100' : 'bg-gray-100'
+                      }`}>
+                        {passwordValidation.minLength ? (
+                          <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
+                        ) : (
+                          <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
+                        )}
+                      </div>
+                      <span className={`text-xs ${
+                        passwordValidation.minLength ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        At least 6 characters
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                        passwordValidation.hasUpperCase ? 'bg-green-100' : 'bg-gray-100'
+                      }`}>
+                        {passwordValidation.hasUpperCase ? (
+                          <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
+                        ) : (
+                          <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
+                        )}
+                      </div>
+                      <span className={`text-xs ${
+                        passwordValidation.hasUpperCase ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        At least one uppercase letter
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                        passwordValidation.hasNumber ? 'bg-green-100' : 'bg-gray-100'
+                      }`}>
+                        {passwordValidation.hasNumber ? (
+                          <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
+                        ) : (
+                          <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
+                        )}
+                      </div>
+                      <span className={`text-xs ${
+                        passwordValidation.hasNumber ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        At least one number
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                        passwordValidation.hasSpecialChar ? 'bg-green-100' : 'bg-gray-100'
+                      }`}>
+                        {passwordValidation.hasSpecialChar ? (
+                          <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
+                        ) : (
+                          <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
+                        )}
+                      </div>
+                      <span className={`text-xs ${
+                        passwordValidation.hasSpecialChar ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        At least one special character
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -475,17 +607,36 @@ export default function Settings() {
                   placeholder="Confirm new password"
                   style={{ color: '#212121' }}
                 />
+                {formData.confirmPassword && passwordsMatch !== null && (
+                  <div className="mt-2 flex items-center gap-2">
+                    {passwordsMatch ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-green-600" strokeWidth={2} />
+                        <span className="text-xs text-green-600">
+                          Passwords match
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-4 h-4 text-red-600" strokeWidth={2} />
+                        <span className="text-xs text-red-600">
+                          Passwords do not match
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="mt-6">
               <button
                 onClick={handleChangePassword}
-                disabled={saving || !formData.currentPassword || !formData.newPassword || !formData.confirmPassword}
+                disabled={!formData.currentPassword || !formData.newPassword || !formData.confirmPassword}
                 className="px-6 py-2.5 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md text-sm font-medium"
                 style={{ backgroundColor: '#1B5E20' }}
               >
-                {saving ? 'Changing Password...' : 'Change Password'}
+                Change Password
               </button>
             </div>
           </div>
@@ -514,6 +665,77 @@ export default function Settings() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {operationLoading.show && <LoadingModal message={operationLoading.message} />}
+
+      {operationResult.show && (
+        <ResultModal
+          success={operationResult.success}
+          message={operationResult.message}
+          onClose={() => setOperationResult({ show: false, success: false, message: '' })}
+        />
+      )}
+    </div>
+  );
+}
+
+interface LoadingModalProps {
+  message: string;
+}
+
+function LoadingModal({ message }: LoadingModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl p-8 max-w-sm w-full shadow-xl">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-12 h-12 animate-spin mb-4" style={{ color: '#1B5E20' }} strokeWidth={2} />
+          <p className="text-base font-medium text-center" style={{ color: '#212121' }}>
+            {message}
+          </p>
+          <p className="text-sm mt-2 text-center" style={{ color: '#757575' }}>
+            Please wait...
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ResultModalProps {
+  success: boolean;
+  message: string;
+  onClose: () => void;
+}
+
+function ResultModal({ success, message, onClose }: ResultModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl p-8 max-w-sm w-full shadow-xl">
+        <div className="flex flex-col items-center">
+          {success ? (
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <CheckCircle className="w-10 h-10 text-green-600" strokeWidth={2} />
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <XCircle className="w-10 h-10 text-red-600" strokeWidth={2} />
+            </div>
+          )}
+          <h3 className="text-lg font-semibold mb-2" style={{ color: '#212121' }}>
+            {success ? 'Success' : 'Error'}
+          </h3>
+          <p className="text-sm text-center mb-6" style={{ color: '#757575' }}>
+            {message}
+          </p>
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-lg transition-all text-sm font-medium w-full"
+            style={{ backgroundColor: success ? '#1B5E20' : '#DC2626', color: 'white' }}
+          >
+            OK
+          </button>
         </div>
       </div>
     </div>

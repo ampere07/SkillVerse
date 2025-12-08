@@ -79,6 +79,7 @@ interface PostDetailsProps {
   postId: string;
   postType: 'activity' | 'module';
   onBack: () => void;
+  selectedStudentId?: string;
 }
 
 interface CompilerHandle {
@@ -86,7 +87,7 @@ interface CompilerHandle {
   getCode: () => string;
 }
 
-export default function PostDetails({ postId, postType, onBack }: PostDetailsProps) {
+export default function PostDetails({ postId, postType, onBack, selectedStudentId }: PostDetailsProps) {
   const { user } = useAuth();
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -307,6 +308,25 @@ export default function PostDetails({ postId, postType, onBack }: PostDetailsPro
   useEffect(() => {
     fetchPostDetails();
   }, [postId, postType]);
+
+  useEffect(() => {
+    if (post && selectedStudentId && isTeacher && post.submissions) {
+      const studentSubmission = post.submissions.find(sub => {
+        const studentId = typeof sub.student === 'object' ? sub.student._id : sub.student;
+        return studentId === selectedStudentId;
+      });
+      
+      if (studentSubmission) {
+        if (post.requiresCompiler) {
+          setGradingSubmission(studentSubmission);
+          setShowCompilerGrading(true);
+        } else {
+          setSelectedSubmission(studentSubmission);
+          setShowSubmissionDetails(true);
+        }
+      }
+    }
+  }, [post, selectedStudentId, isTeacher]);
 
   const fetchPostDetails = async () => {
     try {

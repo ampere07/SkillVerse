@@ -207,8 +207,19 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
 router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res) => {
   try {
     const { name, description, yearLevelSection, settings } = req.body;
+    
+    console.log('====== UPDATE CLASSROOM ROUTE ======');
+    console.log('Route hit at:', new Date().toISOString());
+    console.log('Classroom ID:', req.params.id);
+    console.log('User ID:', req.user.userId);
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('yearLevelSection from body:', yearLevelSection);
+    console.log('yearLevelSection type:', typeof yearLevelSection);
+    console.log('====================================');
 
     const isOwner = await classroomService.checkTeacherOwnership(req.params.id, req.user.userId);
+    console.log('Is owner check:', isOwner);
+    
     if (!isOwner) {
       return res.status(403).json({ 
         success: false,

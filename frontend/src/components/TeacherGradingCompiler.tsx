@@ -54,6 +54,7 @@ export default function TeacherGradingCompiler({
   const [feedback, setFeedback] = useState(submission.feedback || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showMobilePanel, setShowMobilePanel] = useState<'code' | 'console' | 'grade'>('code');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
@@ -240,9 +241,45 @@ export default function TeacherGradingCompiler({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Mobile Tab Navigation */}
+        <div className="lg:hidden flex border-b border-gray-200 bg-white">
+          <button
+            onClick={() => setShowMobilePanel('code')}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${
+              showMobilePanel === 'code'
+                ? 'text-gray-900 border-b-2 border-gray-900'
+                : 'text-gray-500'
+            }`}
+          >
+            Code
+          </button>
+          <button
+            onClick={() => setShowMobilePanel('console')}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${
+              showMobilePanel === 'console'
+                ? 'text-gray-900 border-b-2 border-gray-900'
+                : 'text-gray-500'
+            }`}
+          >
+            Console
+          </button>
+          <button
+            onClick={() => setShowMobilePanel('grade')}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${
+              showMobilePanel === 'grade'
+                ? 'text-gray-900 border-b-2 border-gray-900'
+                : 'text-gray-500'
+            }`}
+          >
+            Grade
+          </button>
+        </div>
+
         {/* Code Editor */}
-        <div className="flex-1 flex flex-col border-r border-gray-200 bg-white overflow-hidden">
+        <div className={`flex-1 flex-col border-r border-gray-200 bg-white overflow-hidden ${
+          showMobilePanel === 'code' ? 'flex' : 'hidden lg:flex'
+        }`}>
           <div className="px-4 py-2 border-b border-gray-200 flex-shrink-0">
             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
               Student's Code (Read-Only)
@@ -297,9 +334,13 @@ export default function TeacherGradingCompiler({
         </div>
 
         {/* Console and Grading Panel */}
-        <div className="w-96 flex flex-col overflow-hidden">
+        <div className={`lg:w-96 flex flex-col overflow-hidden ${
+          showMobilePanel === 'console' || showMobilePanel === 'grade' ? 'flex' : 'hidden lg:flex'
+        }`}>
           {/* Console */}
-          <div className="flex-1 flex flex-col bg-gray-900 overflow-hidden">
+          <div className={`flex-1 flex-col bg-gray-900 overflow-hidden ${
+            showMobilePanel === 'console' ? 'flex' : showMobilePanel === 'grade' ? 'hidden lg:flex' : 'hidden lg:flex'
+          }`}>
             <div className="px-4 py-2 bg-gray-800 border-b border-gray-700 flex-shrink-0">
               <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
                 Console Output
@@ -321,9 +362,52 @@ export default function TeacherGradingCompiler({
           </div>
 
           {/* Grading Panel */}
-          <div className="border-t border-gray-200 bg-white overflow-y-auto" style={{ maxHeight: '50%' }}>
+          <div className={`border-t border-gray-200 bg-white overflow-y-auto ${
+            showMobilePanel === 'grade' ? 'flex-1' : 'lg:max-h-[50%] hidden lg:block'
+          }`}>
             <div className="p-6">
               <h3 className="text-base font-semibold text-gray-900 mb-4">Grade Submission</h3>
+
+              {/* Activity Details */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Activity Details</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">Title</p>
+                    <p className="text-sm text-gray-900 font-medium">{activity.title}</p>
+                  </div>
+                  {activity.description && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Description</p>
+                      <p className="text-sm text-gray-700">{activity.description}</p>
+                    </div>
+                  )}
+                  {activity.instructions && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Requirements</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{activity.instructions}</p>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-300">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Maximum Points</p>
+                      <p className="text-sm font-semibold text-gray-900">{activity.points}</p>
+                    </div>
+                    {activity.dueDate && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">Due Date</p>
+                        <p className="text-sm text-gray-900">
+                          {new Date(activity.dueDate).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">

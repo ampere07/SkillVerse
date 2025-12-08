@@ -63,14 +63,60 @@ export const classroomService = {
   },
 
   async updateClassroom(classroomId, data) {
+    console.log('Updating classroom:', classroomId, 'with data:', data);
     const classroom = await Classroom.findById(classroomId);
     
-    if (data.name) classroom.name = data.name;
-    if (data.description !== undefined) classroom.description = data.description;
-    if (data.settings) classroom.settings = { ...classroom.settings, ...data.settings };
+    if (!classroom) {
+      throw new Error('Classroom not found');
+    }
+    
+    console.log('Current classroom data:', {
+      name: classroom.name,
+      description: classroom.description,
+      yearLevelSection: classroom.yearLevelSection
+    });
+    
+    if (data.name !== undefined) {
+      console.log('Updating name from', classroom.name, 'to', data.name);
+      classroom.name = data.name;
+    }
+    if (data.description !== undefined) {
+      console.log('Updating description from', classroom.description, 'to', data.description);
+      classroom.description = data.description;
+    }
+    if (data.yearLevelSection !== undefined) {
+      console.log('Updating yearLevelSection from', classroom.yearLevelSection, 'to', data.yearLevelSection);
+      classroom.yearLevelSection = data.yearLevelSection;
+      classroom.markModified('yearLevelSection');
+      console.log('yearLevelSection after assignment:', classroom.yearLevelSection);
+      console.log('Is yearLevelSection modified?', classroom.isModified('yearLevelSection'));
+    }
+    if (data.settings) {
+      classroom.settings = { ...classroom.settings, ...data.settings };
+    }
+
+    console.log('Updated classroom data before save:', {
+      name: classroom.name,
+      description: classroom.description,
+      yearLevelSection: classroom.yearLevelSection
+    });
 
     await classroom.save();
+    console.log('Classroom saved successfully');
+    
+    // Re-fetch to verify
+    const savedClassroom = await Classroom.findById(classroomId);
+    console.log('Verified saved yearLevelSection:', savedClassroom.yearLevelSection);
+    
     await classroom.populate('teacher', 'name email');
+    await classroom.populate('students.studentId', 'name email');
+    
+    console.log('Returning updated classroom:', {
+      name: classroom.name,
+      description: classroom.description,
+      yearLevelSection: classroom.yearLevelSection
+    });
+    
     return classroom;
   },
 
