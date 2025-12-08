@@ -398,9 +398,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                               const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
                               handleInputChange('javaExpertise', levels[parseInt(e.target.value)]);
                             }}
-                            className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer java-slider"
+                            className="w-full h-1 rounded-full appearance-none cursor-pointer java-slider"
                             style={{
                               WebkitAppearance: 'none',
+                              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.javaExpertise) - 1) * 25}%, #e5e7eb ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.javaExpertise) - 1) * 25}%, #e5e7eb 100%)`
                             }}
                           />
                         </div>
@@ -425,6 +426,15 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             cursor: pointer;
                             border: 2px solid white;
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                          }
+                          .java-slider::-moz-range-track {
+                            height: 1px;
+                            background: transparent;
+                          }
+                          .java-slider::-moz-range-progress {
+                            background: #3b82f6;
+                            height: 1px;
+                            border-radius: 9999px;
                           }
                         `}</style>
                         <div className="relative mt-6">
@@ -467,9 +477,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                               const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
                               handleInputChange('pythonExpertise', levels[parseInt(e.target.value)]);
                             }}
-                            className="w-full h-1 bg-gray-200 rounded-full appearance-none cursor-pointer python-slider"
+                            className="w-full h-1 rounded-full appearance-none cursor-pointer python-slider"
                             style={{
                               WebkitAppearance: 'none',
+                              background: `linear-gradient(to right, #eab308 0%, #eab308 ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.pythonExpertise) - 1) * 25}%, #e5e7eb ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.pythonExpertise) - 1) * 25}%, #e5e7eb 100%)`
                             }}
                           />
                         </div>
@@ -494,6 +505,15 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             cursor: pointer;
                             border: 2px solid white;
                             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                          }
+                          .python-slider::-moz-range-track {
+                            height: 1px;
+                            background: transparent;
+                          }
+                          .python-slider::-moz-range-progress {
+                            background: #eab308;
+                            height: 1px;
+                            border-radius: 9999px;
                           }
                         `}</style>
                         <div className="relative mt-6">

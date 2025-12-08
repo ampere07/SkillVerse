@@ -1148,7 +1148,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     setShowSubmitConfirmModal(false);
     setIsSaving(true);
     setIsGrading(true);
-    setSaveMessage('Submitting and grading your project...');
+    setSaveMessage('');
 
     try {
       const token = localStorage.getItem('token');
@@ -1752,6 +1752,25 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         </div>
       )}
 
+      {/* Mini Project Grading Loading Modal */}
+      {isGrading && !showGradingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+            <div className="flex flex-col items-center justify-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-gray-900 mb-4"></div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Grading Your Project</h3>
+              <p className="text-sm text-gray-600 text-center mb-3">Please wait while AI analyzes your code...</p>
+              <div className="mt-4 space-y-2 w-full">
+                <p className="text-xs text-gray-500 text-center">Submitting your code...</p>
+                <p className="text-xs text-gray-500 text-center">AI is analyzing your solution...</p>
+                <p className="text-xs text-gray-500 text-center">Generating feedback...</p>
+                <p className="text-xs text-gray-500 text-center">Calculating your score...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Grading Results Modal */}
       {showGradingModal && gradingResult && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1853,7 +1872,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
             <div className="flex flex-col items-center justify-center">
               <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-gray-900 mb-4"></div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Submitting Activity</h3>
-              <p className="text-sm text-gray-600 text-center">Please wait while we submit your code...</p>
+              <p className="text-sm text-gray-600 text-center mb-3">Please wait while we submit your code...</p>
+              <div className="mt-4 space-y-2 w-full">
+                <p className="text-xs text-gray-500 text-center">Uploading your code...</p>
+                <p className="text-xs text-gray-500 text-center">Processing submission...</p>
+                <p className="text-xs text-gray-500 text-center">Saving to database...</p>
+              </div>
             </div>
           </div>
         </div>

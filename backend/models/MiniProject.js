@@ -57,6 +57,10 @@ const availableProjectSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  rubrics: {
+    type: String,
+    default: ''
+  },
   isAIGenerated: {
     type: Boolean,
     default: false
@@ -180,6 +184,7 @@ miniProjectSchema.methods.addWeeklyGeneratedProjects = function(projects, weekNu
     language: project.language,
     requirements: project.requirements || '',
     sampleOutput: project.sampleOutput || '',
+    rubrics: project.rubrics || '',
     isAIGenerated: true,
     generatedAt: new Date(),
     weekNumber: weekHistory.weekNumber,
