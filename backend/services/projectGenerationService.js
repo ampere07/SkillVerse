@@ -101,6 +101,18 @@ export const generateProjectsForLanguage = async (userId, language) => {
       return generateFallbackProjects(userId, language);
     }
 
+    // Validate roadmap has at least 6 items total
+    const totalRoadmapItems = (
+      (survey.learningRoadmap.phase1?.length || 0) +
+      (survey.learningRoadmap.phase2?.length || 0) +
+      (survey.learningRoadmap.phase3?.length || 0)
+    );
+    
+    if (totalRoadmapItems < 6) {
+      console.log(`[ProjectGen] Roadmap has only ${totalRoadmapItems} items, need at least 6. Using fallback.`);
+      return generateFallbackProjects(userId, language);
+    }
+
     const skillLevel = language.toLowerCase() === 'java'
       ? determineSkillLevel(survey.javaExpertise, null, survey.javaQuestions?.score, null)
       : determineSkillLevel(null, survey.pythonExpertise, null, survey.pythonQuestions?.score);
@@ -121,18 +133,32 @@ export const generateProjectsForLanguage = async (userId, language) => {
     
     const prompt = constructRoadmapBasedPrompt(languageSpecificSurvey);
     
+    console.log(`[ProjectGen] Prompt length: ${prompt.length} characters`);
+    console.log(`[ProjectGen] Has AI Analysis: ${!!languageSpecificSurvey.aiAnalysis}`);
+    if (languageSpecificSurvey.aiAnalysis) {
+      console.log(`[ProjectGen] AI Analysis preview:`, languageSpecificSurvey.aiAnalysis.substring(0, 200));
+    }
+    
     try {
       const response = await ollama.chat({
         model: MODEL_NAME,
         messages: [{ role: 'user', content: prompt }],
         options: {
           temperature: 0.9,
-          num_predict: 3000
+          num_predict: 5000
         }
       });
 
       const projectsText = response.message.content;
+      console.log(`[ProjectGen] AI Response length: ${projectsText.length} characters`);
+      console.log(`[ProjectGen] AI Response preview (first 500 chars):`, projectsText.substring(0, 500));
+      
       const projects = parseProjectsFromAI(projectsText);
+      console.log(`[ProjectGen] Parsed ${projects.length} projects from AI response`);
+      
+      if (projects.length > 0) {
+        console.log(`[ProjectGen] First parsed project:`, JSON.stringify(projects[0], null, 2));
+      }
       
       // Ensure all projects have the correct language
       const correctedProjects = projects.map(project => ({
@@ -159,7 +185,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
 };
 
 const constructRoadmapBasedPrompt = (survey) => {
-  const { primaryLanguage, learningRoadmap, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = survey;
+  const { primaryLanguage, learningRoadmap, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions, aiAnalysis } = survey;
   
   const language = primaryLanguage 
     ? primaryLanguage.charAt(0).toUpperCase() + primaryLanguage.slice(1)
@@ -172,6 +198,10 @@ const constructRoadmapBasedPrompt = (survey) => {
     ...learningRoadmap.phase2,
     ...learningRoadmap.phase3
   ];
+
+  const aiAnalysisSection = aiAnalysis 
+    ? `\n\nSTUDENT AI ANALYSIS:\nBased on comprehensive assessment, here's what we know about this student:\n${aiAnalysis}\n\nUSE THIS ANALYSIS to tailor project difficulty, explanations, and focus areas. Address their specific strengths and weaknesses identified above.`
+    : '';
 
   return `You are creating 6 UNIQUE mini programming projects based on a personalized learning roadmap.
 
@@ -193,7 +223,7 @@ Phase 3 - Advanced Practice:
 ${learningRoadmap.phase3.map((item, i) => `${i + 1}. ${item}`).join('\n')}
 
 Primary Language: ${language}
-Skill Level: ${skillLevel}
+Skill Level: ${skillLevel}${aiAnalysisSection}
 
 PROJECT GENERATION REQUIREMENTS:
 
@@ -238,12 +268,15 @@ Title: [Concept from Roadmap] - [Application Name]
 Description: This project teaches [ROADMAP CONCEPT: ${roadmapItems[0]}]. [Explain why this concept is important and how it applies]. You will create a console program that [what they build]. This is the foundation for your learning journey.
 Language: ${language}
 Requirements:
-- [Requirement focused on the roadmap concept]
-- [Requirement showing practical application]
-- [Requirement for user interaction]
-- [Requirement for demonstration]
+- [Specific requirement for core concept - must be unique to THIS project]
+- [Specific requirement for technical implementation - must be measurable]
+- [Specific requirement for user interaction - describe exact inputs needed]
+- [Specific requirement for output/demonstration - describe exact expected behavior]
+- [Optional: Additional requirement specific to this project's concept]
 Sample Output:
 [Show realistic console interaction demonstrating the concept]
+Rubrics:
+[Detailed grading criteria for this project with point distribution totaling 100 points]
 
 EXAMPLE PROJECT (Roadmap Item: "Practice basic syntax and variables"):
 
@@ -252,10 +285,11 @@ Title: Variables and Data Types - Student Profile Manager
 Description: This project teaches variables and data types which are the building blocks of all programs. You will create a console program that stores and displays student information using different data types (String, int, double, boolean). This helps you understand how to work with different kinds of data in ${language}.
 Language: ${language}
 Requirements:
-- Declare variables for student name (String), age (int), GPA (double), and enrolled status (boolean)
-- Accept user input for all variables
-- Display the complete student profile
-- Demonstrate understanding of different data types
+- Declare exactly 4 variables: studentName (String), age (int), gpa (double), isEnrolled (boolean)
+- Use Scanner (Java) or input() (Python) to accept user input for each variable with appropriate prompts
+- Validate that age is between 1-100 and GPA is between 0.0-4.0
+- Display a formatted profile showing all information with labels
+- Convert boolean isEnrolled to "Yes"/"No" for display output
 Sample Output:
 === Student Profile Manager ===
 Enter student name: Maria Santos
@@ -268,6 +302,12 @@ Name: Maria Santos
 Age: 20
 GPA: 3.75
 Enrolled: Yes
+Rubrics:
+- Variable Declaration (25 points): Correct declaration of all four data types
+- User Input Handling (25 points): Proper use of Scanner/input() for all variables
+- Data Type Understanding (25 points): Appropriate data type usage for each field
+- Output Formatting (15 points): Clean and organized display of student profile
+- Code Quality (10 points): Proper naming conventions and code structure
 
 EXAMPLE PROJECT (Roadmap Item: "Object-oriented programming basics"):
 
@@ -276,11 +316,12 @@ Title: OOP Basics - Book Management System
 Description: This project teaches object-oriented programming by creating Book objects with properties and methods. OOP helps you organize code and model real-world things as objects. You will create a Book class with properties (title, author, pages) and methods (display info, mark as read). This is essential for building larger programs.
 Language: ${language}
 Requirements:
-- Create a Book class with title, author, pages, and isRead properties
-- Add a method to display book information
-- Add a method to mark a book as read
-- Create multiple Book objects and manage them
-- Use console input to add books
+- Create a Book class with private properties: title (String), author (String), pages (int), isRead (boolean)
+- Implement a displayInfo() method that prints all book details in a formatted layout
+- Implement a markAsRead() method that changes isRead status to true
+- Create an ArrayList to store at least 3 Book objects
+- Implement a menu system with options: Add Book, Display All Books, Mark as Read, Exit
+- Use Scanner/input() to get book details from user when adding new books
 Sample Output:
 === Book Management System ===
 1. Add book
@@ -292,6 +333,13 @@ Enter title: Clean Code
 Enter author: Robert Martin
 Enter pages: 464
 Book added successfully!
+Rubrics:
+- Class Definition (20 points): Proper Book class with all required properties
+- Methods Implementation (25 points): Working display and markAsRead methods
+- Object Creation (20 points): Successfully creating and managing multiple Book objects
+- Menu System (15 points): Functional menu with all options working
+- User Input (10 points): Proper handling of console input
+- Code Organization (10 points): Clean structure and proper encapsulation
 
 IMPORTANT REMINDERS:
 - Each project MUST directly teach the specific roadmap concept
@@ -304,6 +352,26 @@ IMPORTANT REMINDERS:
 - NO FILE I/O OPERATIONS - Use in-memory data only
 - NO FILE READING/WRITING - All data via Scanner/input()
 - Focus on TEACHING the roadmap concept through practical application
+
+REQUIREMENTS GENERATION:
+- EVERY project MUST have 4-6 UNIQUE, SPECIFIC requirements
+- Requirements must be MEASURABLE and TESTABLE
+- Each requirement should specify EXACTLY what needs to be implemented
+- Requirements must be DIFFERENT for each project
+- Bad requirement: "Handle user input" - Too vague
+- Good requirement: "Use Scanner to accept 3 integers and validate they are between 1-100"
+- Requirements should directly map to the rubrics criteria
+
+RUBRICS GENERATION:
+- ALWAYS include detailed rubrics with clear grading criteria totaling 100 points
+- Rubrics should align perfectly with project requirements
+- Each rubric item must be specific and measurable
+- Rubrics should assess both technical implementation and concept understanding
+
+PERSONALIZATION:
+- USE THE AI ANALYSIS to personalize difficulty, explanations, and focus areas
+- Address the student's specific strengths and weaknesses in project design
+- Adjust requirements complexity based on skill level
 
 CRITICAL: ALL 6 PROJECTS MUST BE IN ${language}. DO NOT GENERATE PYTHON IF LANGUAGE IS JAVA. DO NOT GENERATE JAVA IF LANGUAGE IS PYTHON.
 
@@ -323,6 +391,11 @@ const constructPersonalizedPrompt = (survey) => {
   
   const studentSkills = analyzeStudentSkills(primaryLanguage, javaQuestions, pythonQuestions);
   const { strengths, weaknesses } = studentSkills;
+  
+  const aiAnalysisSection = aiAnalysis 
+    ? `\n\nSTUDENT AI ANALYSIS:\nBased on comprehensive assessment:\n${aiAnalysis}\n\nUSE THIS ANALYSIS to create projects that address the student's specific needs, learning style, and areas for improvement.`
+    : '';
+  
   return `You are creating 6 UNIQUE mini programming projects that teach FUNDAMENTAL PROGRAMMING CONCEPTS needed for the student's goal.
 
 STUDENT PROFILE:
@@ -335,7 +408,7 @@ STUDENT SKILLS ASSESSMENT:
 AI Analysis: ${aiAnalysis || 'No analysis available'}
 
 Strengths: ${strengths.join(', ')}
-Weaknesses: ${weaknesses.join(', ')}
+Weaknesses: ${weaknesses.join(', ')}${aiAnalysisSection}
 
 PROJECT GENERATION STRATEGY:
 Based on the student's skills, create projects that:
@@ -371,6 +444,7 @@ PERSONALIZATION REQUIREMENTS:
 3. Explain WHY this concept matters for their goal
 4. All projects are SINGLE FILE console programs
 5. Use Scanner (Java) or input() (Python) for user interaction
+6. Every project must have UNIQUE, DETAILED requirements (4-6 specific requirements each)
 
 6 DIFFERENT CONCEPTS TO TEACH (choose from based on interest):
 ${getConcepts(skillLevel)}
@@ -412,12 +486,15 @@ Title: [Concept Name + Application] (e.g., "Inheritance - User Account System")
 Description: This project teaches [CONCEPT] which is essential for ${courseInterest || 'programming'}. In ${courseInterest || 'this field'}, [explain how concept is used]. You will create a console program that [what they build]. This helps you understand [why it matters for their goal].
 Language: ${language}
 Requirements:
-- [Requirement focused on the programming concept]
-- [Requirement showing practical application]
-- [Requirement for user interaction]
-- [Requirement for demonstration]
+- [SPECIFIC requirement with exact technical details - must be unique to THIS project]
+- [MEASURABLE requirement that can be tested - include numbers/criteria]
+- [DETAILED requirement for user interaction - specify exact input format]
+- [CLEAR requirement for expected behavior - describe exact output]
+- [Optional: Additional unique requirement based on concept complexity]
 Sample Output:
 [Show realistic console interaction demonstrating the concept]
+Rubrics:
+[Detailed grading criteria for this project with point distribution totaling 100 points]
 
 EXAMPLE FOR WEB DEVELOPMENT STUDENT:
 
@@ -426,11 +503,12 @@ Title: Inheritance - Request Handler System
 Description: This project teaches inheritance which is essential for Web Development. In web frameworks like Spring Boot, inheritance is used to create different types of request handlers (GET, POST, PUT, DELETE) that share common behavior. You will create a console program that simulates a request handling system using inheritance. This helps you understand how web frameworks organize code and handle different HTTP methods.
 Language: Java
 Requirements:
-- Create a base RequestHandler class with common properties (timestamp, status)
-- Create child classes (GetHandler, PostHandler) that inherit from RequestHandler
-- Each handler type should have unique behavior
-- Demonstrate polymorphism by processing different request types
-- Use console input to simulate incoming requests
+- Create an abstract RequestHandler base class with protected properties: timestamp (String), statusCode (int), and method processRequest()
+- Implement GetHandler class extending RequestHandler with a retrieve() method for fetching data
+- Implement PostHandler class extending RequestHandler with a create() method for adding data
+- Create an array or ArrayList to store at least 3 different handler objects
+- Use Scanner to accept menu choice (1=GET, 2=POST, 3=Exit) and resource path input
+- Demonstrate polymorphism by calling processRequest() on handler objects stored in a collection
 Sample Output:
 === Request Handler System ===
 1. Process GET request
@@ -442,6 +520,13 @@ Enter resource path: /users
 Status: 200 OK
 Timestamp: 2025-11-15 10:30:45
 Data retrieved successfully
+Rubrics:
+- Base Class Design (20 points): Proper RequestHandler base class with required properties
+- Inheritance Implementation (25 points): Correct child classes inheriting from base
+- Polymorphism (20 points): Successful demonstration of polymorphic behavior
+- Unique Behaviors (15 points): Each handler type has distinct functionality
+- Menu and Input (10 points): Working menu system with proper input handling
+- Code Structure (10 points): Clean organization and proper OOP principles
 
 EXAMPLE FOR DATA ANALYTICS STUDENT:
 
@@ -450,11 +535,13 @@ Title: Collections - Student Records Manager
 Description: This project teaches Collections which are essential for Data Analytics. In data systems, collections like ArrayList and HashMap are used to store and manage records efficiently. You will create a console program that manages student records using collections. This helps you understand how databases and analytics tools organize data internally.
 Language: Java
 Requirements:
-- Use ArrayList to store multiple student records
-- Use HashMap to index students by ID for fast lookup
-- Implement add, search, and display operations
-- Calculate statistics (average grade, highest score)
-- All data entered through console (no file reading)
+- Create a Student class with properties: id (int), name (String), grade (double)
+- Use ArrayList<Student> to store all student records (minimum capacity: 10)
+- Use HashMap<Integer, Student> to index students by ID for O(1) lookup time
+- Implement addStudent() method that adds to both ArrayList and HashMap
+- Implement searchById() method that uses HashMap for fast retrieval
+- Implement calculateStatistics() method that computes: average grade, highest grade, lowest grade
+- Use Scanner to accept menu choice and student data (validate grade is between 0-100)
 Sample Output:
 === Student Records Manager ===
 1. Add student
@@ -471,6 +558,13 @@ Student added successfully!
 Enter choice: 4
 Average grade: 85.0
 Total students: 1
+Rubrics:
+- ArrayList Implementation (20 points): Proper use of ArrayList for storing records
+- HashMap Implementation (20 points): Correct HashMap usage for indexing by ID
+- CRUD Operations (25 points): Working add, search, and display functionality
+- Statistics Calculation (20 points): Accurate average and highest score computation
+- Menu System (10 points): Functional menu with all options
+- Code Quality (5 points): Clean code and proper naming
 
 IMPORTANT REMINDERS:
 - Connect EVERY project to "${courseInterest || 'programming'}"
@@ -484,6 +578,25 @@ IMPORTANT REMINDERS:
 - NO FILE I/O OPERATIONS - Use in-memory data only (arrays, lists, maps)
 - NO FILE READING/WRITING - All data via Scanner/input()
 - Users enter data through console, not files
+
+REQUIREMENTS GENERATION (CRITICAL):
+- EVERY project MUST have 4-7 UNIQUE, DETAILED requirements
+- Each requirement must be SPECIFIC and MEASURABLE
+- Bad: "Handle user input" - Good: "Use Scanner to accept 3 integers between 1-100"
+- Bad: "Create a class" - Good: "Create Employee class with name, id, salary properties"
+- Requirements must describe EXACT implementation details
+- Each project's requirements must be COMPLETELY DIFFERENT from others
+
+RUBRICS GENERATION:
+- ALWAYS include detailed rubrics with clear grading criteria totaling 100 points
+- Rubrics should align perfectly with the requirements listed above
+- Each rubric criterion should directly correspond to a requirement
+- Rubrics should assess both technical implementation and concept understanding
+
+PERSONALIZATION:
+- USE THE AI ANALYSIS to personalize projects for the student's learning style
+- Address specific strengths and weaknesses identified in the AI analysis
+- Adjust requirements complexity based on demonstrated skill level
 
 CRITICAL: Base the difficulty and concepts on the student's actual skills:
 - Include 2 projects focused on strengthening: ${strengths.slice(0, 2).join(' and ')}
@@ -840,13 +953,16 @@ const parseProjectsFromAI = (text) => {
   const projects = [];
   const projectMatches = text.split(/PROJECT \d+:/i).filter(p => p.trim());
   
+  console.log(`[ProjectGen-Parse] Found ${projectMatches.length} potential project blocks`);
+  
   for (const projectText of projectMatches) {
     try {
-      const titleMatch = projectText.match(/Title:\s*(.+?)(?:\n|$)/i);
-      const descMatch = projectText.match(/Description:\s*(.+?)(?:\n(?:Language|Requirements|Sample Output|PROJECT))/is);
-      const langMatch = projectText.match(/Language:\s*(.+?)(?:\n|$)/i);
-      const reqMatch = projectText.match(/Requirements:\s*([\s\S]+?)(?:\n(?:Sample Output|PROJECT)|$)/i);
-      const sampleMatch = projectText.match(/Sample Output:\s*([\s\S]+?)(?:\n\n|PROJECT|$)/i);
+      const titleMatch = projectText.match(/\*\*Title:\*\*\s*(.+?)(?=\n)/i);
+      const descMatch = projectText.match(/\*\*Description:\*\*\s*(.+?)(?=\n\*\*Language:)/is);
+      const langMatch = projectText.match(/\*\*Language:\*\*\s*(.+?)(?=\n)/i);
+      const reqMatch = projectText.match(/\*\*Requirements:\*\*\s*([\s\S]+?)(?=\n\*\*(?:Sample Output|Rubrics):)/i);
+      const sampleMatch = projectText.match(/\*\*Sample Output:\*\*\s*([\s\S]+?)(?=\n\*\*Rubrics:)/i);
+      const rubricsMatch = projectText.match(/\*\*Rubrics:\*\*\s*([\s\S]+?)(?=\n\n|PROJECT|$)/i);
       
       if (titleMatch && descMatch && langMatch) {
         let title = titleMatch[1].trim();
@@ -862,16 +978,30 @@ const parseProjectsFromAI = (text) => {
           ? sampleMatch[1].trim()
           : '';
         
+        const rubrics = rubricsMatch
+          ? rubricsMatch[1].split('\n').filter(r => r.trim().startsWith('-')).join('\n').trim()
+          : '';
+        
+        console.log(`[ProjectGen-Parse] Project "${title}" fields: Req=${!!reqMatch}, Sample=${!!sampleMatch}, Rubrics=${!!rubricsMatch}`);
+        
         projects.push({
           title: title,
           description: descMatch[1].trim().replace(/\n/g, ' '),
           language: langMatch[1].trim(),
           requirements: requirements.trim(),
-          sampleOutput: sampleOutput
+          sampleOutput: sampleOutput,
+          rubrics: rubrics
         });
+        console.log(`[ProjectGen-Parse] Successfully parsed project: ${title}`);
+      } else {
+        console.log(`[ProjectGen-Parse] Failed to parse project - missing fields. Title: ${!!titleMatch}, Desc: ${!!descMatch}, Lang: ${!!langMatch}`);
+        if (!descMatch) {
+          console.log(`[ProjectGen-Parse] Description section:`, projectText.substring(projectText.indexOf('Description'), projectText.indexOf('Description') + 300));
+        }
+        if (!titleMatch) console.log(`[ProjectGen-Parse] Title match failed for text:`, projectText.substring(0, 200));
       }
     } catch (error) {
-      console.error('Error parsing project:', error);
+      console.error('[ProjectGen-Parse] Error parsing project:', error.message);
     }
   }
   
@@ -891,42 +1021,48 @@ const generateFallbackProjects = (userId, language = 'java') => {
       description: 'Create a console calculator that performs basic arithmetic operations.',
       language: languageFormatted,
       requirements: '- Support addition, subtraction, multiplication, division\n- Handle user input\n- Display results',
-      sampleOutput: 'Enter operation: 5 + 3\nResult: 8'
+      sampleOutput: 'Enter operation: 5 + 3\nResult: 8',
+      rubrics: '- Arithmetic Operations (30 points): All four operations work correctly\n- Input Handling (25 points): Proper parsing of user input\n- Error Handling (20 points): Handle division by zero and invalid input\n- Output Display (15 points): Clear result formatting\n- Code Quality (10 points): Clean code structure'
     },
     {
       title: 'Student Grade Manager',
       description: 'Build a program to manage student grades and calculate averages.',
       language: languageFormatted,
       requirements: '- Store student names and grades\n- Calculate average grade\n- Display all students',
-      sampleOutput: 'Add student: John 85\nAverage: 85.0'
+      sampleOutput: 'Add student: John 85\nAverage: 85.0',
+      rubrics: '- Data Storage (25 points): Proper use of collections for students\n- Grade Calculation (30 points): Accurate average computation\n- Display Function (20 points): Clear presentation of all students\n- Input Management (15 points): Handle student entry\n- Code Organization (10 points): Well-structured code'
     },
     {
       title: 'Number Guessing Game',
       description: 'Create a game where the user guesses a random number.',
       language: languageFormatted,
       requirements: '- Generate random number\n- Accept user guesses\n- Provide hints',
-      sampleOutput: 'Guess: 50\nHigher!'
+      sampleOutput: 'Guess: 50\nHigher!',
+      rubrics: '- Random Generation (20 points): Proper random number creation\n- Game Logic (30 points): Correct comparison and feedback\n- Hint System (25 points): Accurate higher/lower hints\n- User Experience (15 points): Clear instructions and feedback\n- Code Quality (10 points): Clean implementation'
     },
     {
       title: 'Temperature Converter',
       description: 'Convert temperatures between Celsius and Fahrenheit.',
       language: languageFormatted,
       requirements: '- Convert C to F and F to C\n- Handle user input\n- Display results',
-      sampleOutput: 'Enter temp: 32F\nResult: 0C'
+      sampleOutput: 'Enter temp: 32F\nResult: 0C',
+      rubrics: '- Conversion Formula (30 points): Accurate C to F conversion\n- Reverse Conversion (30 points): Accurate F to C conversion\n- Input Parsing (20 points): Correctly parse temperature format\n- Output Formatting (10 points): Clear result display\n- Code Structure (10 points): Organized implementation'
     },
     {
       title: 'Task List Manager',
       description: 'Manage a simple to-do list with console commands.',
       language: languageFormatted,
       requirements: '- Add tasks\n- Mark as complete\n- Display list',
-      sampleOutput: 'Task added: Buy groceries'
+      sampleOutput: 'Task added: Buy groceries',
+      rubrics: '- Task Addition (25 points): Successfully add new tasks\n- Task Completion (25 points): Mark tasks as complete\n- List Display (25 points): Show all tasks with status\n- Menu System (15 points): Working command interface\n- Code Quality (10 points): Clean code structure'
     },
     {
       title: 'Prime Number Finder',
       description: 'Find all prime numbers in a given range.',
       language: languageFormatted,
       requirements: '- Check if number is prime\n- Find primes in range\n- Display results',
-      sampleOutput: 'Primes: 2, 3, 5, 7, 11'
+      sampleOutput: 'Primes: 2, 3, 5, 7, 11',
+      rubrics: '- Prime Algorithm (35 points): Correct prime checking logic\n- Range Processing (25 points): Find all primes in given range\n- Efficiency (15 points): Reasonable performance\n- Output Format (15 points): Clear display of results\n- Code Quality (10 points): Well-organized code'
     }
   ];
   
