@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   ChevronRight,
   Plus, 
@@ -7,14 +7,14 @@ import {
   FileText,
   MoreVertical,
   Trash2,
-  Eye,
   CheckCircle,
   AlertCircle,
-  X,
-  Upload
+  Settings
 } from 'lucide-react';
 import { classroomAPI, activityAPI, moduleAPI, uploadAPI } from '../utils/api';
 import PostDetails from './PostDetails';
+import ClassroomDetailsSettings from './ClassroomDetailsSettings';
+import CreatePost from './CreatePost';
 
 interface Post {
   _id: string;
@@ -43,37 +43,12 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
   const [error, setError] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<{ id: string; type: 'activity' | 'module' } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<{ id: string; type: 'activity' | 'module'; title: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const [postType, setPostType] = useState<PostType>('activity');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [instructions, setInstructions] = useState('');
-  const [durationHours, setDurationHours] = useState('0');
-  const [durationMinutes, setDurationMinutes] = useState('0');
-  const [dueDate, setDueDate] = useState('');
-  const [points, setPoints] = useState('100');
-  const [requiresCompiler, setRequiresCompiler] = useState(false);
-  const [compilerLanguage, setCompilerLanguage] = useState<'java' | 'python'>('python');
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const [uploadProgress, setUploadProgress] = useState(false);
-  const [createLoading, setCreateLoading] = useState(false);
-  const [createError, setCreateError] = useState('');
-
-  useEffect(() => {
-    fetchClassroomData();
-  }, [classroomId]);
-
-  if (selectedPost) {
-    return (
-      <PostDetails
-        postId={selectedPost.id}
-        postType={selectedPost.type}
-        onBack={() => setSelectedPost(null)}
-      />
-    );
-  }
-
-  const fetchClassroomData = async () => {
+  const fetchClassroomData = useCallback(async () => {
     try {
       setLoading(true);
       const [classroomRes, activitiesRes, modulesRes] = await Promise.all([
@@ -104,157 +79,72 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
     } finally {
       setLoading(false);
     }
+  }, [classroomId]);
+
+  useEffect(() => {
+    fetchClassroomData();
+  }, [fetchClassroomData]);
+
+  if (showSettings) {
+    return (
+      <ClassroomDetailsSettings
+        classroomId={classroomId}
+        onBack={() => setShowSettings(false)}
+      />
+    );
+  }
+
+  if (showCreateModal) {
+    return (
+      <CreatePost
+        classroomId={classroomId}
+        classroomName={classroom?.name || ''}
+        onBack={() => {
+          setShowCreateModal(false);
+          fetchClassroomData();
+        }}
+        onNavigateToClassrooms={onBack}
+        onNavigateToClassroomDetail={() => {
+          setShowCreateModal(false);
+        }}
+      />
+    );
+  }
+
+  if (selectedPost) {
+    return (
+      <PostDetails
+        postId={selectedPost.id}
+        postType={selectedPost.type}
+        onBack={() => setSelectedPost(null)}
+      />
+    );
+  }
+
+  const handleDeletePost = async (postId: string, postType: 'activity' | 'module', title: string) => {
+    setPostToDelete({ id: postId, type: postType, title });
+    setShowDeleteModal(true);
   };
 
-  const handleDeletePost = async (postId: string, postType: 'activity' | 'module') => {
-    if (!confirm(`Are you sure you want to delete this ${postType}?`)) return;
+  const confirmDelete = async () => {
+    if (!postToDelete) return;
     
     try {
-      if (postType === 'activity') {
-        await activityAPI.deleteActivity(postId);
+      setDeleting(true);
+      if (postToDelete.type === 'activity') {
+        await activityAPI.deleteActivity(postToDelete.id);
       } else {
-        await moduleAPI.deleteModule(postId);
+        await moduleAPI.deleteModule(postToDelete.id);
       }
+      setShowDeleteModal(false);
+      setPostToDelete(null);
       await fetchClassroomData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : `Failed to delete ${postType}`);
-    }
-  };
-
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setInstructions('');
-    setDurationHours('0');
-    setDurationMinutes('0');
-    setDueDate('');
-    setPoints('100');
-    setRequiresCompiler(false);
-    setCompilerLanguage('python');
-    setAttachments([]);
-    setPostType('activity');
-    setCreateError('');
-  };
-
-  const handleCloseModal = () => {
-    setShowCreateModal(false);
-    resetForm();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateError('');
-
-    if (!title.trim() || !description.trim()) {
-      setCreateError('Title and description are required');
-      return;
-    }
-
-    if (postType === 'activity') {
-      if (!instructions.trim()) {
-        setCreateError('Requirements are required for activities');
-        return;
-      }
-
-      if (requiresCompiler) {
-        const hours = parseInt(durationHours) || 0;
-        const minutes = parseInt(durationMinutes) || 0;
-        if (hours === 0 && minutes === 0) {
-          setCreateError('Duration is required for compiler activities');
-          return;
-        }
-      }
-    }
-
-    setCreateLoading(true);
-    try {
-      let uploadedFiles = [];
-
-      if (attachments.length > 0) {
-        setUploadProgress(true);
-        try {
-          const uploadResponse = await uploadAPI.uploadMultiple(attachments, {
-            classroomName: classroom.name,
-            postTitle: title.trim(),
-            postType
-          });
-          uploadedFiles = uploadResponse.files;
-        } catch (uploadError) {
-          setCreateError('Failed to upload files. Please try again.');
-          setCreateLoading(false);
-          setUploadProgress(false);
-          return;
-        }
-        setUploadProgress(false);
-      }
-
-      if (postType === 'activity') {
-        const hours = parseInt(durationHours) || 0;
-        const minutes = parseInt(durationMinutes) || 0;
-        
-        const activityData = {
-          classroomId,
-          title: title.trim(),
-          description: description.trim(),
-          dueDate: dueDate || undefined,
-          points: parseInt(points) || 100,
-          instructions: instructions.trim(),
-          duration: {
-            hours,
-            minutes
-          },
-          requiresCompiler,
-          compilerLanguage: requiresCompiler ? compilerLanguage : undefined,
-          isPublished: true,
-          allowLateSubmission: false,
-          attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined
-        };
-        
-        await activityAPI.createActivity(activityData);
-      } else {
-        await moduleAPI.createModule({
-          classroomId,
-          title: title.trim(),
-          description: description.trim(),
-          isPublished: true,
-          attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined
-        });
-      }
-      
-      await fetchClassroomData();
-      handleCloseModal();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : `Failed to create ${postType}`);
+      alert(err instanceof Error ? err.message : `Failed to delete ${postToDelete.type}`);
     } finally {
-      setCreateLoading(false);
-      setUploadProgress(false);
+      setDeleting(false);
     }
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      setAttachments(prev => [...prev, ...filesArray]);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleTypeChange = (type: PostType) => {
-    setPostType(type);
-    setInstructions('');
-    setDurationHours('0');
-    setDurationMinutes('0');
-    setDueDate('');
-    setPoints('100');
-    setRequiresCompiler(false);
-    setCompilerLanguage('python');
-  };
-
-  const now = new Date();
-  const minDateTime = now.toISOString().slice(0, 16);
 
   if (loading) {
     return (
@@ -304,13 +194,22 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
             </div>
           </div>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="text-sm font-medium">New Post</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Classroom Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">New Post</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -369,264 +268,44 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
         )}
       </div>
 
-      {showCreateModal && (
+      {showDeleteModal && postToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Create Post</h2>
-                <p className="text-sm text-gray-500 mt-1">for {classroom.name}</p>
-              </div>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              {createError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700">{createError}</p>
+          <div className="bg-white rounded-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
                 </div>
-              )}
-
-              <div>
-                <label htmlFor="postType" className="block text-sm font-medium text-gray-700 mb-2">
-                  Type
-                </label>
-                <select
-                  id="postType"
-                  value={postType}
-                  onChange={(e) => handleTypeChange(e.target.value as PostType)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                >
-                  <option value="activity">Activity</option>
-                  <option value="module">Module</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                  {postType === 'activity' ? 'Activity Title' : 'Module Title'} *
-                </label>
-                <input
-                  id="title"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={postType === 'activity' ? 'e.g., Java Loops Exercise' : 'e.g., Introduction to Python'}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                  Description *
-                </label>
-                <textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder={postType === 'activity' ? 'Brief description of the activity' : 'Brief description of the module'}
-                  rows={3}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-                />
-              </div>
-
-              {postType === 'activity' && (
-                <>
-                  <div>
-                    <label htmlFor="instructions" className="block text-sm font-medium text-gray-700 mb-2">
-                      Requirements *
-                    </label>
-                    <textarea
-                      id="instructions"
-                      value={instructions}
-                      onChange={(e) => setInstructions(e.target.value)}
-                      placeholder="Detailed requirements for students"
-                      rows={4}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-                    />
-                  </div>
-
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div className="flex items-start space-x-3">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="requiresCompiler"
-                          type="checkbox"
-                          checked={requiresCompiler}
-                          onChange={(e) => setRequiresCompiler(e.target.checked)}
-                          className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label htmlFor="requiresCompiler" className="text-sm font-medium text-gray-700 cursor-pointer">
-                          Requires Compiler
-                        </label>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Enable if students need to write and submit code
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {requiresCompiler && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Programming Language *
-                        </label>
-                        <select
-                          value={compilerLanguage}
-                          onChange={(e) => setCompilerLanguage(e.target.value as 'java' | 'python')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          required
-                        >
-                          <option value="python">Python</option>
-                          <option value="java">Java</option>
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">Students will use this language for code submission</p>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Duration *
-                        </label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <input
-                            type="number"
-                            value={durationHours}
-                            onChange={(e) => setDurationHours(e.target.value)}
-                            min="0"
-                            placeholder="Hours"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">Hours</p>
-                        </div>
-                        <div>
-                          <input
-                            type="number"
-                            value={durationMinutes}
-                            onChange={(e) => setDurationMinutes(e.target.value)}
-                            min="0"
-                            max="59"
-                            placeholder="Minutes"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">Minutes</p>
-                        </div>
-                      </div>
-                        <p className="text-xs text-gray-500 mt-2">Time limit for completing the activity</p>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700 mb-2">
-                        Due Date (Optional)
-                      </label>
-                      <input
-                        id="dueDate"
-                        type="datetime-local"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
-                        min={minDateTime}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Past dates are disabled</p>
-                    </div>
-
-                    <div>
-                      <label htmlFor="points" className="block text-sm font-medium text-gray-700 mb-2">
-                        Points
-                      </label>
-                      <input
-                        id="points"
-                        type="number"
-                        value={points}
-                        onChange={(e) => setPoints(e.target.value)}
-                        min="0"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Attachments (Optional)
-                </label>
-                <div className="space-y-3">
-                  <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors">
-                    <div className="flex items-center space-x-2 text-gray-600">
-                      <Upload className="w-5 h-5" />
-                      <span className="text-sm font-medium">Click to upload files</span>
-                    </div>
-                    <input
-                      type="file"
-                      multiple
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {attachments.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-gray-500">{attachments.length} file(s) selected</p>
-                      {attachments.map((file, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200"
-                        >
-                          <div className="flex items-center space-x-2 flex-1 min-w-0">
-                            <span className="text-gray-500">📎</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                              <p className="text-xs text-gray-500">
-                                {(file.size / 1024).toFixed(1)} KB
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeFile(index)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Delete {postToDelete.type === 'activity' ? 'Activity' : 'Module'}</h3>
+                  <p className="text-sm text-gray-500 mt-1">This action cannot be undone</p>
                 </div>
               </div>
+              
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to delete <span className="font-semibold">{postToDelete.title}</span>? This will permanently remove the {postToDelete.type} and all associated data.
+              </p>
 
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-end space-x-3">
                 <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setPostToDelete(null);
+                  }}
+                  disabled={deleting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  disabled={createLoading || uploadProgress}
-                  className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {uploadProgress ? 'Uploading files...' : createLoading ? 'Creating...' : `Create ${postType === 'activity' ? 'Activity' : 'Module'}`}
+                  {deleting ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -636,7 +315,7 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
 
 interface PostCardProps {
   post: Post;
-  onDelete: (id: string, postType: 'activity' | 'module') => void;
+  onDelete: (id: string, postType: 'activity' | 'module', title: string) => void;
   onView: () => void;
 }
 
@@ -755,7 +434,7 @@ function PostCard({ post, onDelete, onView }: PostCardProps) {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(post._id, post.postType);
+                    onDelete(post._id, post.postType, post.title);
                     setShowMenu(false);
                   }}
                   className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"

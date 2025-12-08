@@ -42,9 +42,11 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       setValidationError('');
       setUnansweredQuestions({java: [], python: []});
       
-      // Reset form based on preselected language
+      // Always start at Step 0 to show language selection
+      setStep(0);
+      
+      // If preselected language is provided, pre-fill it but still show Step 0
       if (preselectedLanguage) {
-        setStep(1);
         setFormData({
           primaryLanguage: preselectedLanguage,
           javaExpertise: preselectedLanguage === 'java' ? 'beginner' : '',
@@ -54,7 +56,6 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
         setJavaAnswers(Array(10).fill(-1));
         setPythonAnswers(Array(10).fill(-1));
       } else {
-        setStep(0);
         setFormData({
           primaryLanguage: '',
           javaExpertise: '',

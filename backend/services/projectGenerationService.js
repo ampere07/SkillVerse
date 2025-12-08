@@ -1,6 +1,7 @@
 import { Ollama } from 'ollama';
 import Survey from '../models/Survey.js';
 import OLLAMA_CONFIG from '../config/ollamaConfig.js';
+import { fallbackProjects } from '../data/fallbackProjects.js';
 
 const MODEL_NAME = OLLAMA_CONFIG.model;
 const OLLAMA_URL = OLLAMA_CONFIG.url;
@@ -77,14 +78,14 @@ export const generateProjectsForLanguage = async (userId, language) => {
     
     if (!user) {
       console.error(`No user found for user ${userId}`);
-      return generateFallbackProjects(userId, language);
+      return generateFallbackProjects(userId, language, 'Beginner');
     }
 
     const survey = await Survey.findOne({ userId, primaryLanguage: language }).sort({ createdAt: -1 });
     
     if (!survey) {
       console.log(`[ProjectGen] No survey found for user ${userId} and language ${language}, using fallback`);
-      return generateFallbackProjects(userId, language);
+      return generateFallbackProjects(userId, language, 'Beginner');
     }
 
     const hasLanguageData = 
@@ -93,12 +94,17 @@ export const generateProjectsForLanguage = async (userId, language) => {
 
     if (!hasLanguageData) {
       console.log(`[ProjectGen] Survey found but no ${language} data, using fallback`);
-      return generateFallbackProjects(userId, language);
+      return generateFallbackProjects(userId, language, 'Beginner');
     }
 
+    // Determine skill level for fallback
+    const skillLevel = language.toLowerCase() === 'java'
+      ? determineSkillLevel(survey.javaExpertise, null, survey.javaQuestions?.score, null)
+      : determineSkillLevel(null, survey.pythonExpertise, null, survey.pythonQuestions?.score);
+
     if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length === 0) {
-      console.log(`[ProjectGen] No roadmap found, using fallback`);
-      return generateFallbackProjects(userId, language);
+      console.log(`[ProjectGen] No roadmap found, using fallback for ${skillLevel}`);
+      return generateFallbackProjects(userId, language, skillLevel);
     }
 
     // Validate roadmap has at least 6 items total
@@ -109,8 +115,8 @@ export const generateProjectsForLanguage = async (userId, language) => {
     );
     
     if (totalRoadmapItems < 6) {
-      console.log(`[ProjectGen] Roadmap has only ${totalRoadmapItems} items, need at least 6. Using fallback.`);
-      return generateFallbackProjects(userId, language);
+      console.log(`[ProjectGen] Roadmap has only ${totalRoadmapItems} items, need at least 6. Using fallback for ${skillLevel}.`);
+      return generateFallbackProjects(userId, language, skillLevel);
     }
 
     const skillLevel = language.toLowerCase() === 'java'
@@ -168,7 +174,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
 
       if (correctedProjects.length < 6) {
         console.error(`Only generated ${correctedProjects.length} projects, expected 6`);
-        return correctedProjects.length > 0 ? correctedProjects : generateFallbackProjects(userId, language);
+        return correctedProjects.length > 0 ? correctedProjects : generateFallbackProjects(userId, language, skillLevel);
       }
 
       console.log(`[ProjectGen] Successfully generated ${correctedProjects.length} roadmap-based projects`);
@@ -176,11 +182,11 @@ export const generateProjectsForLanguage = async (userId, language) => {
       return correctedProjects.slice(0, 6);
     } catch (apiError) {
       console.error('[ProjectGen] Ollama Error:', apiError.message);
-      return generateFallbackProjects(userId, language);
+      return generateFallbackProjects(userId, language, skillLevel);
     }
   } catch (error) {
     console.error('Generate projects error:', error);
-    return generateFallbackProjects(userId, 'java');
+    return generateFallbackProjects(userId, 'java', 'Beginner');
   }
 };
 
@@ -1008,69 +1014,30 @@ const parseProjectsFromAI = (text) => {
   return projects;
 };
 
-const generateFallbackProjects = (userId, language = 'java') => {
+const generateFallbackProjects = (userId, language = 'java', skillLevel = 'Beginner') => {
   console.log(`[ProjectGen] ========== USING FALLBACK PROJECTS ==========`);
   console.log(`[ProjectGen] User ID: ${userId}`);
   console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
+  console.log(`[ProjectGen] Skill Level: ${skillLevel}`);
   
   const languageFormatted = language.charAt(0).toUpperCase() + language.slice(1);
+  const skillLevelKey = skillLevel.toLowerCase();
   
-  const projects = [
-    {
-      title: 'Simple Calculator',
-      description: 'Create a console calculator that performs basic arithmetic operations.',
-      language: languageFormatted,
-      requirements: '- Support addition, subtraction, multiplication, division\n- Handle user input\n- Display results',
-      sampleOutput: 'Enter operation: 5 + 3\nResult: 8',
-      rubrics: '- Arithmetic Operations (30 points): All four operations work correctly\n- Input Handling (25 points): Proper parsing of user input\n- Error Handling (20 points): Handle division by zero and invalid input\n- Output Display (15 points): Clear result formatting\n- Code Quality (10 points): Clean code structure'
-    },
-    {
-      title: 'Student Grade Manager',
-      description: 'Build a program to manage student grades and calculate averages.',
-      language: languageFormatted,
-      requirements: '- Store student names and grades\n- Calculate average grade\n- Display all students',
-      sampleOutput: 'Add student: John 85\nAverage: 85.0',
-      rubrics: '- Data Storage (25 points): Proper use of collections for students\n- Grade Calculation (30 points): Accurate average computation\n- Display Function (20 points): Clear presentation of all students\n- Input Management (15 points): Handle student entry\n- Code Organization (10 points): Well-structured code'
-    },
-    {
-      title: 'Number Guessing Game',
-      description: 'Create a game where the user guesses a random number.',
-      language: languageFormatted,
-      requirements: '- Generate random number\n- Accept user guesses\n- Provide hints',
-      sampleOutput: 'Guess: 50\nHigher!',
-      rubrics: '- Random Generation (20 points): Proper random number creation\n- Game Logic (30 points): Correct comparison and feedback\n- Hint System (25 points): Accurate higher/lower hints\n- User Experience (15 points): Clear instructions and feedback\n- Code Quality (10 points): Clean implementation'
-    },
-    {
-      title: 'Temperature Converter',
-      description: 'Convert temperatures between Celsius and Fahrenheit.',
-      language: languageFormatted,
-      requirements: '- Convert C to F and F to C\n- Handle user input\n- Display results',
-      sampleOutput: 'Enter temp: 32F\nResult: 0C',
-      rubrics: '- Conversion Formula (30 points): Accurate C to F conversion\n- Reverse Conversion (30 points): Accurate F to C conversion\n- Input Parsing (20 points): Correctly parse temperature format\n- Output Formatting (10 points): Clear result display\n- Code Structure (10 points): Organized implementation'
-    },
-    {
-      title: 'Task List Manager',
-      description: 'Manage a simple to-do list with console commands.',
-      language: languageFormatted,
-      requirements: '- Add tasks\n- Mark as complete\n- Display list',
-      sampleOutput: 'Task added: Buy groceries',
-      rubrics: '- Task Addition (25 points): Successfully add new tasks\n- Task Completion (25 points): Mark tasks as complete\n- List Display (25 points): Show all tasks with status\n- Menu System (15 points): Working command interface\n- Code Quality (10 points): Clean code structure'
-    },
-    {
-      title: 'Prime Number Finder',
-      description: 'Find all prime numbers in a given range.',
-      language: languageFormatted,
-      requirements: '- Check if number is prime\n- Find primes in range\n- Display results',
-      sampleOutput: 'Primes: 2, 3, 5, 7, 11',
-      rubrics: '- Prime Algorithm (35 points): Correct prime checking logic\n- Range Processing (25 points): Find all primes in given range\n- Efficiency (15 points): Reasonable performance\n- Output Format (15 points): Clear display of results\n- Code Quality (10 points): Well-organized code'
-    }
-  ];
+  // Get skill-level-specific projects from fallback data
+  const projects = fallbackProjects[skillLevelKey]?.[language.toLowerCase()];
   
-  console.log(`[ProjectGen] Generated ${projects.length} fallback projects`);
+  if (!projects || projects.length === 0) {
+    console.log(`[ProjectGen] No fallback projects found for ${skillLevel} ${language}, using default`);
+    // If no skill-specific projects, use beginner level as default
+    return fallbackProjects.beginner[language.toLowerCase()] || [];
+  }
+  
+  console.log(`[ProjectGen] Generated ${projects.length} ${skillLevel.toLowerCase()} fallback projects`);
   console.log(`[ProjectGen] Language for all projects: ${languageFormatted}`);
   console.log(`[ProjectGen] Sample project:`, { 
     title: projects[0].title, 
-    language: projects[0].language 
+    language: projects[0].language,
+    skillLevel: skillLevel
   });
   console.log(`[ProjectGen] ===========================================`);
   

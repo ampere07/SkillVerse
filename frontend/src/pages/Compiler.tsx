@@ -35,19 +35,8 @@ print(greet('World'))`,
   java: `import java.util.Scanner;
 
 public class Main {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        
-        System.out.print("Enter your name: ");
-        String name = scanner.nextLine();
-        
-        System.out.print("Enter your age: ");
-        int age = scanner.nextInt();
-        
-        System.out.println("Hello, " + name + "!");
-        System.out.println("You are " + age + " years old.");
-        
-        scanner.close();
+    public static void main(String[] args) { 
+        System.out.println("Hello, World!");
     }
 }`
 };
@@ -148,7 +137,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useImperativeHandle(ref, () => ({
-    saveProgress: handleSaveProgress,
+    saveProgress: () => handleSaveProgress(),
     getCode: () => code
   }));
   
@@ -169,7 +158,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       console.log('[Compiler] Project language from details:', projectDetails.language);
       console.log('[Compiler] Setting compiler language to:', projectLang);
       setLanguage(projectLang);
-      loadSavedProgress();
+      loadSavedProgress(projectLang);
       hasLoadedRef.current = true;
       console.log('[Compiler] ========================================');
     }
@@ -219,19 +208,25 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     };
   }, []);
 
-  const loadSavedProgress = async () => {
+  const loadSavedProgress = async (projectLang?: string) => {
     if (!projectDetails) return;
+
+    const lang = projectLang || projectDetails.language.toLowerCase();
 
     // Don't load saved progress for activities - activities should start fresh
     if (isActivityMode) {
-      const projectLang = projectDetails.language.toLowerCase();
-      setCode(DEFAULT_CODE[projectLang] || DEFAULT_CODE.java);
+      console.log('[Compiler] Activity mode - setting default code for language:', lang);
+      setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
       return;
     }
 
     try {
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        console.log('[Compiler] No token - setting default code for language:', lang);
+        setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
+        return;
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/mini-projects/project-progress/${encodeURIComponent(projectDetails.title)}`,
@@ -244,14 +239,15 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
       const data = await response.json();
       if (data.found && data.task.codeBase) {
+        console.log('[Compiler] Found saved progress - loading saved code');
         setCode(data.task.codeBase);
       } else {
-        const projectLang = projectDetails.language.toLowerCase();
-        setCode(DEFAULT_CODE[projectLang] || DEFAULT_CODE.java);
+        console.log('[Compiler] No saved progress - setting default code for language:', lang);
+        setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
       }
     } catch (error) {
-      const projectLang = projectDetails.language.toLowerCase();
-      setCode(DEFAULT_CODE[projectLang] || DEFAULT_CODE.java);
+      console.log('[Compiler] Error loading progress - setting default code for language:', lang);
+      setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
     }
   };
 
@@ -1874,9 +1870,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Submitting Activity</h3>
               <p className="text-sm text-gray-600 text-center mb-3">Please wait while we submit your code...</p>
               <div className="mt-4 space-y-2 w-full">
-                <p className="text-xs text-gray-500 text-center">Uploading your code...</p>
-                <p className="text-xs text-gray-500 text-center">Processing submission...</p>
-                <p className="text-xs text-gray-500 text-center">Saving to database...</p>
+                <p className="text-xs text-gray-500 text-center">Uploading your assignment...</p>
               </div>
             </div>
           </div>

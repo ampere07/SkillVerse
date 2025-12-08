@@ -110,13 +110,15 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
     }
   }));
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (fromSurvey = false) => {
     console.log('[MiniProjects] ========== FETCH PROJECTS STARTED ==========');
+    console.log('[MiniProjects] From survey:', fromSurvey);
     try {
       const token = localStorage.getItem('token');
       console.log('[MiniProjects] Fetching projects from API...');
       
       const response = await axios.get(`${API_URL}/mini-projects/available-projects`, {
+        params: { fromSurvey: fromSurvey.toString() },
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -315,40 +317,45 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
             {showLanguageMenu && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                 <button
-                onClick={async () => {
-                setShowLanguageMenu(false);
-                const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
-                setPendingLanguage(otherLanguage);
-                
-                // Check if student has completed survey for target language
-                if (surveyCompletedLanguages.includes(otherLanguage)) {
-                // Direct switch without survey - use update-language endpoint
-                try {
-                setLoading(true);
-                const token = localStorage.getItem('token');
-                await axios.put(
-                `${API_URL}/auth/update-language`,
-                { primaryLanguage: otherLanguage },
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
-                
-                setCurrentLanguage(otherLanguage);
-                console.log('[MiniProjects] Direct language switch to:', otherLanguage);
-                
-                await fetchProjects();
-                  await fetchCompletedTasks();
-                setLoading(false);
-                } catch (error) {
-                    console.error('[MiniProjects] Error switching language:', error);
-                  setLoading(false);
-                }
-                } else {
-                    // Show confirmation modal for survey
-                    setShowConfirmationModal(true);
+                  onClick={async () => {
+                    setShowLanguageMenu(false);
+                    const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
+                    console.log('[MiniProjects] Switch language clicked:', otherLanguage);
+                    
+                    // Check if projects exist or survey is done for target language
+                    try {
+                      const token = localStorage.getItem('token');
+                      const response = await axios.get(`${API_URL}/mini-projects/check-language-projects`, {
+                        params: { language: otherLanguage },
+                        headers: { Authorization: `Bearer ${token}` }
+                      });
+                      
+                      const { hasProjects, surveyCompleted } = response.data;
+                      console.log('[MiniProjects] Check result:', { hasProjects, surveyCompleted });
+                      
+                      if (hasProjects || surveyCompleted) {
+                        // Show confirmation modal if projects exist or survey is done
+                        console.log('[MiniProjects] Showing confirmation modal');
+                        setPendingLanguage(otherLanguage);
+                        setShowConfirmationModal(true);
+                      } else {
+                        // No projects and no survey - go directly to survey modal
+                        console.log('[MiniProjects] No projects and no survey for', otherLanguage);
+                        console.log('[MiniProjects] Showing survey modal directly');
+                        setPendingLanguage(otherLanguage);
+                        setSurveyLanguage(otherLanguage);
+                        setShowSurvey(true);
+                      }
+                    } catch (error) {
+                      console.error('[MiniProjects] Error checking language projects:', error);
+                      // On error, show confirmation modal as fallback
+                      console.log('[MiniProjects] Error - showing confirmation modal as fallback');
+                      setPendingLanguage(otherLanguage);
+                      setShowConfirmationModal(true);
                     }
-              }}
-              className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
-            >
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
+                >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'python' ? '#DBEAFE' : '#FEF3C7' }}>
                     <span className="text-sm font-bold" style={{ color: currentLanguage === 'python' ? '#3B82F6' : '#F59E0B' }}>
                       {currentLanguage === 'python' ? 'Jv' : 'Py'}
@@ -580,7 +587,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
         </div>
       )}
 
-      {showConfirmationModal && (
+      {showConfirmationModal && pendingLanguage && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -637,11 +644,45 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
                 Cancel
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowConfirmationModal(false);
-                  setSurveyLanguage(pendingLanguage);
-                  setShowSurvey(true);
-                  setPendingLanguage(undefined);
+                  
+                  // Check if student has completed survey for target language
+                  if (surveyCompletedLanguages.includes(pendingLanguage)) {
+                    console.log('[MiniProjects] Survey already completed for:', pendingLanguage);
+                    console.log('[MiniProjects] Switching language directly without survey');
+                    
+                    // Direct switch without survey - use update-language endpoint
+                    try {
+                      setLoading(true);
+                      const token = localStorage.getItem('token');
+                      await axios.put(
+                        `${API_URL}/auth/update-language`,
+                        { primaryLanguage: pendingLanguage },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                      );
+                      
+                      setCurrentLanguage(pendingLanguage);
+                      console.log('[MiniProjects] Updated current language to:', pendingLanguage);
+                      
+                      await fetchProjects();
+                      await fetchCompletedTasks();
+                      setLoading(false);
+                      setPendingLanguage(undefined);
+                    } catch (error) {
+                      console.error('[MiniProjects] Error switching language:', error);
+                      setLoading(false);
+                      setPendingLanguage(undefined);
+                    }
+                  } else {
+                    console.log('[MiniProjects] Survey not completed for:', pendingLanguage);
+                    console.log('[MiniProjects] Opening survey modal');
+                    
+                    // Show survey modal if not completed
+                    setSurveyLanguage(pendingLanguage);
+                    setShowSurvey(true);
+                    setPendingLanguage(undefined);
+                  }
                 }}
                 className="flex-1 px-4 py-2.5 text-white rounded-lg text-sm font-medium transition-all hover:shadow-md"
                 style={{ backgroundColor: '#1B5E20' }}
@@ -686,7 +727,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
           completeSurvey();
           
           console.log('[MiniProjects] Fetching projects after survey completion...');
-          await fetchProjects();
+          await fetchProjects(true); // Pass true to indicate request is from survey
           await fetchCompletedTasks();
           await fetchUserLanguage(); // Refresh survey completion status
           console.log('[MiniProjects] Survey modal close handler complete');

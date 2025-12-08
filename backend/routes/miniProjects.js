@@ -6,6 +6,49 @@ import { gradeProject } from '../services/projectGradingService.js';
 
 const router = express.Router();
 
+router.get('/check-language-projects', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'Access denied. Students only.' });
+    }
+
+    const { language } = req.query;
+    
+    if (!language) {
+      return res.status(400).json({ message: 'Language parameter is required' });
+    }
+
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const miniProject = await MiniProject.findOne({ userId: req.user.userId });
+    
+    if (!miniProject) {
+      return res.status(404).json({ message: 'Mini project data not found' });
+    }
+
+    const languageProjects = miniProject.getProjectsByLanguage(language);
+    const surveyCompletedLanguages = user.surveyCompletedLanguages || [];
+    
+    console.log(`[Check-Language] Language: ${language}`);
+    console.log(`[Check-Language] Has projects: ${languageProjects.length > 0}`);
+    console.log(`[Check-Language] Survey completed: ${surveyCompletedLanguages.includes(language)}`);
+
+    res.json({
+      hasProjects: languageProjects.length > 0,
+      surveyCompleted: surveyCompletedLanguages.includes(language),
+      projectCount: languageProjects.length
+    });
+  } catch (error) {
+    console.error('[Check-Language] Error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.get('/student', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'student') {
@@ -31,7 +74,11 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Access denied. Students only.' });
     }
 
+    const { fromSurvey } = req.query; // Check if request is from survey completion
+    const isFromSurvey = fromSurvey === 'true';
+
     console.log(`[Available-Projects] Request from user ${req.user.userId}`);
+    console.log(`[Available-Projects] From survey: ${isFromSurvey}`);
 
     const User = (await import('../models/User.js')).default;
     const user = await User.findById(req.user.userId);
@@ -60,126 +107,158 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Mini project data not found' });
     }
 
-    // Use language-specific arrays
+    // Use language-specific arrays from current week
     const languageProjects = miniProject.getProjectsByLanguage(currentLanguage);
+    const currentWeek = miniProject.weeklyProjectHistory.find(
+      week => week.weekNumber === miniProject.currentWeekNumber
+    );
 
-    console.log(`[Available-Projects] Java projects in DB: ${miniProject.javaProjects.length}`);
-    console.log(`[Available-Projects] Python projects in DB: ${miniProject.pythonProjects.length}`);
+    console.log(`[Available-Projects] Current week number: ${miniProject.currentWeekNumber}`);
+    console.log(`[Available-Projects] Java projects in current week: ${currentWeek?.javaProjects?.length || 0}`);
+    console.log(`[Available-Projects] Python projects in current week: ${currentWeek?.pythonProjects?.length || 0}`);
     console.log(`[Available-Projects] User's current language: ${currentLanguage}`);
     console.log(`[Available-Projects] Filtered ${currentLanguage} projects: ${languageProjects.length}`);
+    
     if (languageProjects.length > 0) {
       console.log(`[Available-Projects] ${currentLanguage} project titles:`, languageProjects.map(p => p.title));
-    }
-
-    if (languageProjects.length === 0) {
-      console.log(`[Available-Projects] No ${currentLanguage} projects available, checking if we should generate...`);
+      console.log(`[Available-Projects] PROJECTS EXIST - RETURNING FROM DATABASE`);
       
-      const surveyCompletedLanguages = user.surveyCompletedLanguages || [];
-      console.log(`[Available-Projects] Survey completed languages:`, surveyCompletedLanguages);
-      
-      if (surveyCompletedLanguages.length === 0) {
-        console.log(`[Available-Projects] No surveys completed yet`);
-        return res.json({
-          availableProjects: [],
-          completedThisWeek: 0,
-          weekStartDate: miniProject.weekStartDate,
-          allCompleted: false,
-          message: 'Please complete the onboarding survey to generate projects'
-        });
-      }
-      
-      const Survey = (await import('../models/Survey.js')).default;
-      const survey = await Survey.findOne({ userId: req.user.userId });
-      
-      if (!survey) {
-        console.log(`[Available-Projects] No survey found for user`);
-        return res.json({
-          availableProjects: [],
-          completedThisWeek: 0,
-          weekStartDate: miniProject.weekStartDate,
-          allCompleted: false,
-          message: 'Please complete the onboarding survey to generate projects'
-        });
-      }
-
-      console.log(`[Available-Projects] Survey found, checking if generation is already in progress...`);
-      
-      // Check if projects were recently generated (within last 10 seconds) to prevent duplicate generation
-      const recentGenerationTime = new Date(Date.now() - 10000); // 10 seconds ago
-      if (miniProject.lastGenerationDate && new Date(miniProject.lastGenerationDate) > recentGenerationTime) {
-        console.log(`[Available-Projects] Generation already in progress or completed recently, skipping...`);
-        return res.json({
-          availableProjects: [],
-          completedThisWeek: 0,
-          weekStartDate: miniProject.weekStartDate,
-          allCompleted: false,
-          message: 'Projects are being generated, please wait...'
-        });
-      }
-      
-      console.log(`[Available-Projects] Starting project generation...`);
-      
-      try {
-        const { generateWeeklyProjects } = await import('../services/projectGenerationService.js');
-        const projects = await generateWeeklyProjects(req.user.userId);
-        
-        if (projects && projects.length > 0) {
-          const weekStartDate = new Date();
-          const weekEndDate = new Date(weekStartDate);
-          weekEndDate.setDate(weekEndDate.getDate() + 7);
-          
-          const weekNumber = miniProject.currentWeekNumber + 1;
-          miniProject.addWeeklyGeneratedProjects(projects, weekNumber, weekStartDate, weekEndDate);
-          miniProject.weekStartDate = weekStartDate;
-          
-          await miniProject.save();
-          console.log(`[Available-Projects] Successfully generated ${projects.length} projects`);
-        } else {
-          console.log(`[Available-Projects] Project generation returned empty array`);
-        }
-      } catch (genError) {
-        console.error(`[Available-Projects] Error generating projects:`, genError);
-      }
-      
-      const updatedProject = await MiniProject.findOne({ userId: req.user.userId });
-      const updatedLanguageProjects = updatedProject.getProjectsByLanguage(currentLanguage);
-      
-      const completedThisWeek = updatedProject.completedTasks.filter(task => {
+      // Projects exist, return them immediately without any generation
+      const completedThisWeek = miniProject.completedTasks.filter(task => {
         const taskDate = new Date(task.completedAt);
-        const weekStart = updatedProject.weekStartDate ? new Date(updatedProject.weekStartDate) : new Date(0);
+        const weekStart = miniProject.weekStartDate ? new Date(miniProject.weekStartDate) : new Date(0);
         return taskDate >= weekStart && task.status === 'submitted' && 
-               task.projectTitle && updatedLanguageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
+               task.projectTitle && languageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
       });
 
-      console.log(`[Available-Projects] Final ${currentLanguage} projects count: ${updatedLanguageProjects.length}`);
-
-      return res.json({
-        availableProjects: updatedLanguageProjects || [],
+      const response = {
+        availableProjects: languageProjects || [],
         completedThisWeek: completedThisWeek.length,
-        weekStartDate: updatedProject.weekStartDate,
+        weekStartDate: miniProject.weekStartDate,
         allCompleted: completedThisWeek.length >= 6
+      };
+
+      console.log(`[Available-Projects] ===== FINAL RESPONSE (FROM DB) =====`);
+      console.log(`[Available-Projects] Returning ${response.availableProjects.length} ${currentLanguage} projects`);
+      console.log(`[Available-Projects] Sample returned project:`, response.availableProjects[0] ? { title: response.availableProjects[0].title, language: response.availableProjects[0].language } : 'No projects');
+      console.log(`[Available-Projects] ============================`);
+      return res.json(response);
+    }
+
+    // No projects exist for this language
+    console.log(`[Available-Projects] No ${currentLanguage} projects available`);
+      
+    const surveyCompletedLanguages = user.surveyCompletedLanguages || [];
+    console.log(`[Available-Projects] Survey completed languages:`, surveyCompletedLanguages);
+    
+    // Check if survey is completed for current language
+    if (!surveyCompletedLanguages.includes(currentLanguage)) {
+      console.log(`[Available-Projects] Survey not completed for ${currentLanguage}`);
+      return res.json({
+        availableProjects: [],
+        completedThisWeek: 0,
+        weekStartDate: miniProject.weekStartDate,
+        allCompleted: false,
+        message: 'Please complete the onboarding survey to generate projects'
+      });
+    }
+    
+    // Survey is completed but no projects exist
+    console.log(`[Available-Projects] Survey completed for ${currentLanguage} but no projects exist`);
+    
+    // ONLY generate if request is from survey completion
+    if (!isFromSurvey) {
+      console.log(`[Available-Projects] NOT from survey - returning empty projects`);
+      return res.json({
+        availableProjects: [],
+        completedThisWeek: 0,
+        weekStartDate: miniProject.weekStartDate,
+        allCompleted: false,
+        message: `No projects available for ${currentLanguage}. Complete the onboarding survey to generate projects.`
+      });
+    }
+    
+    // Request is from survey - proceed with generation
+    console.log(`[Available-Projects] From survey - proceeding with generation...`);
+    
+    const Survey = (await import('../models/Survey.js')).default;
+    const survey = await Survey.findOne({ userId: req.user.userId });
+    
+    if (!survey) {
+      console.log(`[Available-Projects] No survey found for user`);
+      return res.json({
+        availableProjects: [],
+        completedThisWeek: 0,
+        weekStartDate: miniProject.weekStartDate,
+        allCompleted: false,
+        message: 'Please complete the onboarding survey to generate projects'
       });
     }
 
-    const completedThisWeek = miniProject.completedTasks.filter(task => {
+    console.log(`[Available-Projects] Survey found, checking if generation is already in progress...`);
+    
+    // Check if projects were recently generated (within last 10 seconds) to prevent duplicate generation
+    const recentGenerationTime = new Date(Date.now() - 10000); // 10 seconds ago
+    if (miniProject.lastGenerationDate && new Date(miniProject.lastGenerationDate) > recentGenerationTime) {
+      console.log(`[Available-Projects] Generation already in progress or completed recently, skipping...`);
+      return res.json({
+        availableProjects: [],
+        completedThisWeek: 0,
+        weekStartDate: miniProject.weekStartDate,
+        allCompleted: false,
+        message: 'Projects are being generated, please wait...'
+      });
+    }
+    
+    console.log(`[Available-Projects] Starting project generation for ${currentLanguage}...`);
+    
+    try {
+      const { generateWeeklyProjects } = await import('../services/projectGenerationService.js');
+      const projects = await generateWeeklyProjects(req.user.userId);
+      
+      if (projects && projects.length > 0) {
+        const weekStartDate = miniProject.weekStartDate || new Date();
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekEndDate.getDate() + 7);
+        
+        // Use current week number if it exists, otherwise create week 1
+        const weekNumber = miniProject.currentWeekNumber || 1;
+        console.log(`[Available-Projects] Using week number: ${weekNumber}`);
+        
+        miniProject.addWeeklyGeneratedProjects(projects, weekNumber, weekStartDate, weekEndDate);
+        
+        // Only set weekStartDate if it doesn't exist
+        if (!miniProject.weekStartDate) {
+          miniProject.weekStartDate = weekStartDate;
+        }
+        
+        await miniProject.save();
+        console.log(`[Available-Projects] Successfully generated ${projects.length} ${currentLanguage} projects for week ${weekNumber}`);
+      } else {
+        console.log(`[Available-Projects] Project generation returned empty array`);
+      }
+    } catch (genError) {
+      console.error(`[Available-Projects] Error generating projects:`, genError);
+    }
+    
+    const updatedProject = await MiniProject.findOne({ userId: req.user.userId });
+    const updatedLanguageProjects = updatedProject.getProjectsByLanguage(currentLanguage);
+    
+    const completedThisWeek = updatedProject.completedTasks.filter(task => {
       const taskDate = new Date(task.completedAt);
-      const weekStart = miniProject.weekStartDate ? new Date(miniProject.weekStartDate) : new Date(0);
+      const weekStart = updatedProject.weekStartDate ? new Date(updatedProject.weekStartDate) : new Date(0);
       return taskDate >= weekStart && task.status === 'submitted' && 
-             task.projectTitle && languageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
+             task.projectTitle && updatedLanguageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
     });
 
-    const response = {
-      availableProjects: languageProjects || [],
-      completedThisWeek: completedThisWeek.length,
-      weekStartDate: miniProject.weekStartDate,
-      allCompleted: completedThisWeek.length >= 6
-    };
+    console.log(`[Available-Projects] Final ${currentLanguage} projects count: ${updatedLanguageProjects.length}`);
 
-    console.log(`[Available-Projects] ===== FINAL RESPONSE =====`);
-    console.log(`[Available-Projects] Returning ${response.availableProjects.length} ${currentLanguage} projects`);
-    console.log(`[Available-Projects] Sample returned project:`, response.availableProjects[0] ? { title: response.availableProjects[0].title, language: response.availableProjects[0].language } : 'No projects');
-    console.log(`[Available-Projects] ============================`);
-    res.json(response);
+    return res.json({
+      availableProjects: updatedLanguageProjects || [],
+      completedThisWeek: completedThisWeek.length,
+      weekStartDate: updatedProject.weekStartDate,
+      allCompleted: completedThisWeek.length >= 6
+    });
   } catch (error) {
     console.error('[Available-Projects] Error:', error);
     console.error('[Available-Projects] Error stack:', error.stack);
@@ -217,7 +296,23 @@ router.post('/complete-task', authenticateToken, async (req, res) => {
       });
     }
 
-    const projectExists = miniProject.availableProjects.some(
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(req.user.userId);
+    const currentLanguage = user?.primaryLanguage || 'java';
+    
+    // Get all projects from current week
+    const currentWeek = miniProject.weeklyProjectHistory.find(
+      week => week.weekNumber === miniProject.currentWeekNumber
+    );
+    
+    if (!currentWeek) {
+      return res.status(400).json({ 
+        message: 'No projects found for current week' 
+      });
+    }
+    
+    const allProjects = [...(currentWeek.javaProjects || []), ...(currentWeek.pythonProjects || [])];
+    const projectExists = allProjects.some(
       p => p.title.toLowerCase() === projectTitle.toLowerCase()
     );
 
@@ -527,7 +622,23 @@ router.post('/save-progress', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Mini project data not found' });
     }
 
-    const projectExists = miniProject.availableProjects.some(
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(req.user.userId);
+    const currentLanguage = user?.primaryLanguage || 'java';
+    
+    // Get all projects from current week
+    const currentWeek = miniProject.weeklyProjectHistory.find(
+      week => week.weekNumber === miniProject.currentWeekNumber
+    );
+    
+    if (!currentWeek) {
+      return res.status(400).json({ 
+        message: 'No projects found for current week' 
+      });
+    }
+    
+    const allProjects = [...(currentWeek.javaProjects || []), ...(currentWeek.pythonProjects || [])];
+    const projectExists = allProjects.some(
       p => p.title.toLowerCase() === projectTitle.toLowerCase()
     );
 
@@ -588,7 +699,23 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Mini project data not found' });
     }
 
-    const projectDetails = miniProject.availableProjects.find(
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(req.user.userId);
+    const currentLanguage = user?.primaryLanguage || 'java';
+    
+    // Get all projects from current week
+    const currentWeek = miniProject.weeklyProjectHistory.find(
+      week => week.weekNumber === miniProject.currentWeekNumber
+    );
+    
+    if (!currentWeek) {
+      return res.status(400).json({ 
+        message: 'No projects found for current week' 
+      });
+    }
+    
+    const allProjects = [...(currentWeek.javaProjects || []), ...(currentWeek.pythonProjects || [])];
+    const projectDetails = allProjects.find(
       p => p.title.toLowerCase() === projectTitle.toLowerCase()
     );
 

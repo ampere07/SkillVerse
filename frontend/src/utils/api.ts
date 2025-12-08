@@ -75,6 +75,7 @@ export const classroomAPI = {
   updateClassroom: async (id: string, data: {
     name?: string;
     description?: string;
+    yearLevelSection?: string;
     settings?: any;
   }) => {
     const response = await fetch(`${API_URL}/classrooms/${id}`, {

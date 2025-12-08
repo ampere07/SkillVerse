@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, X, Plus, Users, Copy, Check, MoreVertical, Eye, Trash2 } from 'lucide-react';
+import { BookOpen, X, Plus, Users, Copy, Check, MoreVertical, Eye, Trash2, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { classroomAPI, assignmentAPI } from '../utils/api';
 import StudentClassroomDetail from './StudentClassroomDetail';
 import ClassroomDetail from './ClassroomDetail';
@@ -20,7 +20,12 @@ interface Classroom {
   createdAt: string;
 }
 
-export default function Classrooms() {
+interface ClassroomsProps {
+  selectedClassroomId?: string | null;
+  onClearSelection?: () => void;
+}
+
+export default function Classrooms({ selectedClassroomId: propSelectedClassroomId, onClearSelection }: ClassroomsProps = {}) {
   const { user } = useAuth();
   const isTeacher = user?.role === 'teacher';
   
@@ -31,10 +36,41 @@ export default function Classrooms() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [assignmentCounts, setAssignmentCounts] = useState<Record<string, number>>({});
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    show: boolean;
+    classroomId: string | null;
+    classroomName: string;
+  }>({ show: false, classroomId: null, classroomName: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<{
+    show: boolean;
+    success: boolean;
+    message: string;
+  }>({ show: false, success: false, message: '' });
+  const [dropConfirmModal, setDropConfirmModal] = useState<{
+    show: boolean;
+    classroomId: string | null;
+    classroomName: string;
+  }>({ show: false, classroomId: null, classroomName: '' });
+  const [dropLoading, setDropLoading] = useState(false);
+  const [dropResult, setDropResult] = useState<{
+    show: boolean;
+    success: boolean;
+    message: string;
+  }>({ show: false, success: false, message: '' });
 
   useEffect(() => {
     fetchClassrooms();
   }, [isTeacher]);
+
+  useEffect(() => {
+    if (propSelectedClassroomId && classrooms.length > 0) {
+      setSelectedClassroomId(propSelectedClassroomId);
+      if (onClearSelection) {
+        onClearSelection();
+      }
+    }
+  }, [propSelectedClassroomId, classrooms]);
 
   const fetchClassrooms = async () => {
     try {
@@ -78,27 +114,61 @@ export default function Classrooms() {
     setShowModal(false);
   };
 
-  const handleDropCourse = async (classroomId: string) => {
-    if (!confirm('Are you sure you want to drop this classroom? You will need to rejoin using the classroom code.')) {
-      return;
-    }
+  const handleDropCourse = async (classroomId: string, classroomName: string) => {
+    setDropConfirmModal({ show: true, classroomId, classroomName });
+  };
+
+  const confirmDropCourse = async () => {
+    if (!dropConfirmModal.classroomId) return;
+    
+    setDropConfirmModal({ show: false, classroomId: null, classroomName: '' });
+    setDropLoading(true);
 
     try {
-      await classroomAPI.leaveClassroom(classroomId);
+      await classroomAPI.leaveClassroom(dropConfirmModal.classroomId);
+      setDropLoading(false);
+      setDropResult({
+        show: true,
+        success: true,
+        message: 'Successfully dropped from classroom'
+      });
       await fetchClassrooms();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to drop classroom');
+      setDropLoading(false);
+      setDropResult({
+        show: true,
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to drop classroom'
+      });
     }
   };
 
-  const handleDeleteClassroom = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this classroom?')) return;
+  const handleDeleteClassroom = (id: string, name: string) => {
+    setDeleteConfirmModal({ show: true, classroomId: id, classroomName: name });
+  };
+
+  const confirmDeleteClassroom = async () => {
+    if (!deleteConfirmModal.classroomId) return;
+    
+    setDeleteConfirmModal({ show: false, classroomId: null, classroomName: '' });
+    setDeleteLoading(true);
     
     try {
-      await classroomAPI.deleteClassroom(id);
+      await classroomAPI.deleteClassroom(deleteConfirmModal.classroomId);
+      setDeleteLoading(false);
+      setDeleteResult({
+        show: true,
+        success: true,
+        message: 'Classroom deleted successfully'
+      });
       await fetchClassrooms();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete classroom');
+      setDeleteLoading(false);
+      setDeleteResult({
+        show: true,
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to delete classroom'
+      });
     }
   };
 
@@ -192,6 +262,42 @@ export default function Classrooms() {
           />
         )
       )}
+
+      {deleteConfirmModal.show && (
+        <ConfirmDeleteModal
+          classroomName={deleteConfirmModal.classroomName}
+          onConfirm={confirmDeleteClassroom}
+          onCancel={() => setDeleteConfirmModal({ show: false, classroomId: null, classroomName: '' })}
+        />
+      )}
+
+      {deleteLoading && <LoadingModal message="Deleting classroom..." />}
+
+      {deleteResult.show && (
+        <ResultModal
+          success={deleteResult.success}
+          message={deleteResult.message}
+          onClose={() => setDeleteResult({ show: false, success: false, message: '' })}
+        />
+      )}
+
+      {dropConfirmModal.show && (
+        <ConfirmDropModal
+          classroomName={dropConfirmModal.classroomName}
+          onConfirm={confirmDropCourse}
+          onCancel={() => setDropConfirmModal({ show: false, classroomId: null, classroomName: '' })}
+        />
+      )}
+
+      {dropLoading && <LoadingModal message="Dropping classroom..." />}
+
+      {dropResult.show && (
+        <ResultModal
+          success={dropResult.success}
+          message={dropResult.message}
+          onClose={() => setDropResult({ show: false, success: false, message: '' })}
+        />
+      )}
     </div>
   );
 }
@@ -202,8 +308,8 @@ interface ClassroomCardProps {
   assignmentCount?: number;
   onCopyCode: (code: string) => void;
   copiedCode: string | null;
-  onDropCourse: (classroomId: string) => void;
-  onDeleteClassroom: (classroomId: string) => void;
+  onDropCourse: (classroomId: string, classroomName: string) => void;
+  onDeleteClassroom: (classroomId: string, classroomName: string) => void;
   onView: () => void;
 }
 
@@ -267,7 +373,7 @@ function ClassroomCard({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDeleteClassroom(classroom._id);
+                          onDeleteClassroom(classroom._id, classroom.name);
                           setShowMenu(false);
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
@@ -280,7 +386,7 @@ function ClassroomCard({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDropCourse(classroom._id);
+                        onDropCourse(classroom._id, classroom.name);
                         setShowMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -337,6 +443,84 @@ function ClassroomCard({
               <span>{assignmentCount} assignment{assignmentCount !== 1 ? 's' : ''}</span>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ConfirmDeleteModalProps {
+  classroomName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDeleteModal({ classroomName, onConfirm, onCancel }: ConfirmDeleteModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-3" style={{ color: '#212121' }}>
+            Delete Classroom
+          </h3>
+          <p className="text-sm mb-6" style={{ color: '#757575' }}>
+            Are you sure you want to delete <span className="font-semibold" style={{ color: '#212121' }}>{classroomName}</span>? 
+            This action cannot be undone and all associated data will be permanently removed.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              style={{ color: '#212121' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ConfirmDropModalProps {
+  classroomName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDropModal({ classroomName, onConfirm, onCancel }: ConfirmDropModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-3" style={{ color: '#212121' }}>
+            Drop Classroom
+          </h3>
+          <p className="text-sm mb-6" style={{ color: '#757575' }}>
+            Are you sure you want to drop <span className="font-semibold" style={{ color: '#212121' }}>{classroomName}</span>? 
+            You will need to rejoin using the classroom code.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              style={{ color: '#212121' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Drop
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -476,6 +660,67 @@ function CreateClassroomModal({ onSuccess, onClose }: CreateClassroomModalProps)
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+interface LoadingModalProps {
+  message: string;
+}
+
+function LoadingModal({ message }: LoadingModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl p-8 max-w-sm w-full shadow-xl">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-12 h-12 animate-spin mb-4" style={{ color: '#1B5E20' }} strokeWidth={2} />
+          <p className="text-base font-medium text-center" style={{ color: '#212121' }}>
+            {message}
+          </p>
+          <p className="text-sm mt-2 text-center" style={{ color: '#757575' }}>
+            Please wait...
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ResultModalProps {
+  success: boolean;
+  message: string;
+  onClose: () => void;
+}
+
+function ResultModal({ success, message, onClose }: ResultModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl p-8 max-w-sm w-full shadow-xl">
+        <div className="flex flex-col items-center">
+          {success ? (
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <CheckCircle className="w-10 h-10 text-green-600" strokeWidth={2} />
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <XCircle className="w-10 h-10 text-red-600" strokeWidth={2} />
+            </div>
+          )}
+          <h3 className="text-lg font-semibold mb-2" style={{ color: '#212121' }}>
+            {success ? 'Success' : 'Error'}
+          </h3>
+          <p className="text-sm text-center mb-6" style={{ color: '#757575' }}>
+            {message}
+          </p>
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-lg transition-all text-sm font-medium w-full"
+            style={{ backgroundColor: success ? '#1B5E20' : '#DC2626', color: 'white' }}
+          >
+            OK
+          </button>
+        </div>
       </div>
     </div>
   );

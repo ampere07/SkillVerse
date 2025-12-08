@@ -92,7 +92,11 @@ const weeklyProjectHistorySchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  generatedProjects: {
+  javaProjects: {
+    type: [availableProjectSchema],
+    default: []
+  },
+  pythonProjects: {
     type: [availableProjectSchema],
     default: []
   },
@@ -112,18 +116,6 @@ const miniProjectSchema = new mongoose.Schema({
   },
   completedTasks: {
     type: [completedTaskSchema],
-    default: []
-  },
-  javaProjects: {
-    type: [availableProjectSchema],
-    default: []
-  },
-  pythonProjects: {
-    type: [availableProjectSchema],
-    default: []
-  },
-  availableProjects: {
-    type: [availableProjectSchema],
     default: []
   },
   weekStartDate: {
@@ -162,77 +154,129 @@ miniProjectSchema.methods.enableGeneration = function() {
 };
 
 miniProjectSchema.methods.addWeeklyGeneratedProjects = function(projects, weekNumber, weekStartDate, weekEndDate) {
-  const weekHistory = {
-    weekNumber: weekNumber || this.currentWeekNumber + 1,
-    weekStartDate: weekStartDate || new Date(),
-    weekEndDate: weekEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    generatedProjects: projects.map(project => ({
-      ...project,
-      isAIGenerated: true,
-      generatedAt: new Date(),
-      weekNumber: weekNumber || this.currentWeekNumber + 1
-    })),
-    generatedAt: new Date()
-  };
-  
-  this.weeklyProjectHistory.push(weekHistory);
-  this.currentWeekNumber = weekHistory.weekNumber;
-  
-  const projectsToAdd = weekHistory.generatedProjects.map(project => ({
-    title: project.title,
-    description: project.description,
-    language: project.language,
-    requirements: project.requirements || '',
-    sampleOutput: project.sampleOutput || '',
-    rubrics: project.rubrics || '',
-    isAIGenerated: true,
-    generatedAt: new Date(),
-    weekNumber: weekHistory.weekNumber,
-    createdAt: new Date()
-  }));
+  const javaProjects = [];
+  const pythonProjects = [];
   
   // Separate projects by language
-  projectsToAdd.forEach(project => {
+  projects.forEach(project => {
+    const projectData = {
+      title: project.title,
+      description: project.description,
+      language: project.language,
+      requirements: project.requirements || '',
+      sampleOutput: project.sampleOutput || '',
+      rubrics: project.rubrics || '',
+      isAIGenerated: true,
+      generatedAt: new Date(),
+      weekNumber: weekNumber || this.currentWeekNumber + 1,
+      createdAt: new Date()
+    };
+    
     if (project.language.toLowerCase() === 'java') {
-      this.javaProjects.push(project);
+      javaProjects.push(projectData);
     } else if (project.language.toLowerCase() === 'python') {
-      this.pythonProjects.push(project);
+      pythonProjects.push(projectData);
     }
   });
   
-  // Keep availableProjects for backward compatibility (deprecated)
-  this.availableProjects.push(...projectsToAdd);
+  const targetWeekNumber = weekNumber || this.currentWeekNumber || 1;
+  
+  // Check if week already exists
+  const existingWeek = this.weeklyProjectHistory.find(
+    week => week.weekNumber === targetWeekNumber
+  );
+  
+  if (existingWeek) {
+    // Add to existing week
+    console.log(`[Model] Adding projects to existing week ${targetWeekNumber}`);
+    if (javaProjects.length > 0) {
+      existingWeek.javaProjects.push(...javaProjects);
+    }
+    if (pythonProjects.length > 0) {
+      existingWeek.pythonProjects.push(...pythonProjects);
+    }
+  } else {
+    // Create new week
+    console.log(`[Model] Creating new week ${targetWeekNumber}`);
+    const weekHistory = {
+      weekNumber: targetWeekNumber,
+      weekStartDate: weekStartDate || new Date(),
+      weekEndDate: weekEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      javaProjects: javaProjects,
+      pythonProjects: pythonProjects,
+      generatedAt: new Date()
+    };
+    
+    this.weeklyProjectHistory.push(weekHistory);
+    this.currentWeekNumber = targetWeekNumber;
+  }
+  
   this.lastGenerationDate = new Date();
 };
 
-miniProjectSchema.methods.getCurrentWeekProjects = function() {
-  return this.availableProjects.filter(
-    project => project.weekNumber === this.currentWeekNumber
+miniProjectSchema.methods.getCurrentWeekProjects = function(language) {
+  const currentWeek = this.weeklyProjectHistory.find(
+    week => week.weekNumber === this.currentWeekNumber
   );
+  
+  if (!currentWeek) return [];
+  
+  if (language.toLowerCase() === 'java') {
+    return currentWeek.javaProjects || [];
+  } else if (language.toLowerCase() === 'python') {
+    return currentWeek.pythonProjects || [];
+  }
+  
+  return [];
 };
 
 miniProjectSchema.methods.getProjectsByLanguage = function(language) {
+  // Get projects from current week only
+  const currentWeek = this.weeklyProjectHistory.find(
+    week => week.weekNumber === this.currentWeekNumber
+  );
+  
+  if (!currentWeek) return [];
+  
   if (language.toLowerCase() === 'java') {
-    return this.javaProjects;
+    return currentWeek.javaProjects || [];
   } else if (language.toLowerCase() === 'python') {
-    return this.pythonProjects;
+    return currentWeek.pythonProjects || [];
   }
   return [];
 };
 
 miniProjectSchema.methods.clearProjectsByLanguage = function(language) {
+  const currentWeek = this.weeklyProjectHistory.find(
+    week => week.weekNumber === this.currentWeekNumber
+  );
+  
+  if (!currentWeek) return;
+  
   if (language.toLowerCase() === 'java') {
-    this.javaProjects = [];
+    currentWeek.javaProjects = [];
   } else if (language.toLowerCase() === 'python') {
-    this.pythonProjects = [];
+    currentWeek.pythonProjects = [];
   }
 };
 
-miniProjectSchema.methods.getProjectsByWeek = function(weekNumber) {
+miniProjectSchema.methods.getProjectsByWeek = function(weekNumber, language) {
   const history = this.weeklyProjectHistory.find(
     week => week.weekNumber === weekNumber
   );
-  return history ? history.generatedProjects : [];
+  
+  if (!history) return [];
+  
+  if (language) {
+    if (language.toLowerCase() === 'java') {
+      return history.javaProjects || [];
+    } else if (language.toLowerCase() === 'python') {
+      return history.pythonProjects || [];
+    }
+  }
+  
+  // Return all projects if no language specified
+  return [...(history.javaProjects || []), ...(history.pythonProjects || [])];
 };
 
 export default mongoose.model('MiniProject', miniProjectSchema);

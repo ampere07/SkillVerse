@@ -409,6 +409,8 @@ router.put('/update-language', authenticateToken, async (req, res) => {
   try {
     const { primaryLanguage } = req.body;
 
+    console.log('[Update Language] Request received:', { primaryLanguage, userId: req.user.userId });
+
     if (!primaryLanguage || !['java', 'python'].includes(primaryLanguage)) {
       return res.status(400).json({ message: 'Valid language is required (java or python)' });
     }
@@ -419,8 +421,15 @@ router.put('/update-language', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    console.log('[Update Language] User found:', { 
+      email: user.email, 
+      currentLanguage: user.primaryLanguage,
+      surveyCompletedLanguages: user.surveyCompletedLanguages 
+    });
+
     const completedLanguages = user.surveyCompletedLanguages || [];
     if (!completedLanguages.includes(primaryLanguage)) {
+      console.log('[Update Language] Survey not completed for language:', primaryLanguage);
       return res.status(400).json({ 
         message: `You must complete the ${primaryLanguage.toUpperCase()} survey before switching to this language` 
       });
@@ -430,27 +439,19 @@ router.put('/update-language', authenticateToken, async (req, res) => {
     user.primaryLanguage = primaryLanguage;
     await user.save();
 
-    if (oldLanguage !== primaryLanguage) {
-      const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-      
-      if (miniProject) {
-        // Clear only the projects for the NEW language (target language)
-        // This ensures fresh projects are generated for the language being switched to
-        miniProject.clearProjectsByLanguage(primaryLanguage);
-        
-        // Also clear the deprecated availableProjects array
-        miniProject.availableProjects = miniProject.availableProjects.filter(
-          p => p.language.toLowerCase() !== primaryLanguage.toLowerCase()
-        );
-        
-        await miniProject.save();
-        console.log(`Cleared ${primaryLanguage} projects for user ${user.email} when switching from ${oldLanguage} to ${primaryLanguage}`);
-      }
-    }
+    console.log('[Update Language] User language updated:', { 
+      oldLanguage, 
+      newLanguage: primaryLanguage 
+    });
 
-    console.log(`Language changed to ${primaryLanguage} for user: ${user.email}`);
+    // DO NOT clear projects when switching languages
+    // Projects are stored separately for each language and should persist
+    console.log('[Update Language] Language switch complete - projects preserved');
 
-    res.json({ 
+    console.log(`[Update Language] Language changed to ${primaryLanguage} for user: ${user.email}`);
+    console.log('[Update Language] Sending success response');
+
+    return res.json({ 
       success: true,
       message: 'Language updated successfully',
       user: {
@@ -464,8 +465,12 @@ router.put('/update-language', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Update language error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[Update Language] Error:', error);
+    console.error('[Update Language] Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 

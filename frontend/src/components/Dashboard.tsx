@@ -12,7 +12,8 @@ import {
   TrendingUp,
   Clock,
   Calendar,
-  Sparkles
+  Sparkles,
+  CheckCircle
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Compiler from '../pages/Compiler';
@@ -21,7 +22,10 @@ import MiniProjects from '../pages/MiniProjects';
 import Settings from '../pages/Settings';
 import Assignments from '../pages/Assignments';
 import CreateAssignment from '../pages/CreateAssignment';
+import CreatePost from '../pages/CreatePost';
+import Submissions from '../pages/Submissions';
 import UnsavedChangesModal from './UnsavedChangesModal';
+import TeacherDashboardContent from './TeacherDashboardContent';
 
 interface NavItem {
   icon: any;
@@ -48,6 +52,12 @@ const navigationItems: NavItem[] = [
     label: 'Assignments',
     href: '/assignments',
     roles: ['student']
+  },
+  {
+    icon: CheckCircle,
+    label: 'Submissions',
+    href: '/submissions',
+    roles: ['teacher']
   },
   {
     icon: Code,
@@ -82,6 +92,9 @@ export default function Dashboard() {
   const [activeAssignmentsCount, setActiveAssignmentsCount] = useState(0);
   const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [createPostClassroomId, setCreatePostClassroomId] = useState<string | null>(null);
+  const [createPostClassroomName, setCreatePostClassroomName] = useState<string | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role === 'student') {
@@ -194,6 +207,10 @@ export default function Dashboard() {
           return dueDate >= now || activity.allowLateSubmission;
         }).length;
 
+        // Get recent activities - both submissions and mini projects
+        const recentActivityList: any[] = [];
+
+        // Add assignment submissions
         const recentSubmissions = allActivities
           .filter(activity => {
             const submission = activity.submissions?.find(
@@ -201,32 +218,38 @@ export default function Dashboard() {
             );
             return submission !== undefined;
           })
-          .sort((a, b) => {
-            const subA = a.submissions?.find((s: any) => s.student === user?.id || s.student?._id === user?.id);
-            const subB = b.submissions?.find((s: any) => s.student === user?.id || s.student?._id === user?.id);
-            const dateA = subA?.submittedAt ? new Date(subA.submittedAt).getTime() : 0;
-            const dateB = subB?.submittedAt ? new Date(subB.submittedAt).getTime() : 0;
-            return dateB - dateA;
-          })
-          .slice(0, 3)
           .map(activity => {
             const submission = activity.submissions?.find(
               (s: any) => s.student === user?.id || s.student?._id === user?.id
             );
             const submittedAt = submission?.submittedAt ? new Date(submission.submittedAt) : null;
-            const timeAgo = submittedAt ? getTimeAgo(submittedAt) : '';
             
             return {
-              title: `${activity.title} completed`,
-              timeAgo,
-              icon: '/assets/Untitled_icon/Icon-14.png'
+              title: `Submitted "${activity.title}"`,
+              subtitle: activity.classroom?.name || '',
+              timestamp: submittedAt,
+              type: 'submission'
             };
           });
 
+        recentActivityList.push(...recentSubmissions);
+
+        // Sort all activities by timestamp (most recent first) and take top 5
+        const sortedActivities = recentActivityList
+          .filter(activity => activity.timestamp)
+          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+          .slice(0, 5)
+          .map(activity => ({
+            title: activity.title,
+            subtitle: activity.subtitle,
+            timeAgo: getTimeAgo(activity.timestamp),
+            type: activity.type
+          }));
+
         setActiveAssignmentsCount(activeCount);
         setUpcomingAssignments(upcomingActivities);
-        setRecentActivities(recentSubmissions.length > 0 ? recentSubmissions : [
-          { title: 'No pending assignments', timeAgo: 'Today', icon: '/assets/Untitled_icon/Icon-14.png' }
+        setRecentActivities(sortedActivities.length > 0 ? sortedActivities : [
+          { title: 'No recent activities', subtitle: '', timeAgo: 'Get started with your first activity!', type: 'empty' }
         ]);
       }
     } catch (error) {
@@ -393,7 +416,10 @@ export default function Dashboard() {
           {activeNav === '/compiler' ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
           ) : activeNav === '/classrooms' ? (
-            <Classrooms />
+            <Classrooms 
+              selectedClassroomId={selectedClassroomId}
+              onClearSelection={() => setSelectedClassroomId(null)}
+            />
           ) : activeNav === '/mini-projects' ? (
             <MiniProjects 
               ref={miniProjectsRef}
@@ -403,8 +429,33 @@ export default function Dashboard() {
             <Settings />
           ) : activeNav === '/assignments' ? (
             <Assignments />
+          ) : activeNav === '/submissions' ? (
+            <Submissions />
           ) : activeNav === '/create-assignment' ? (
             <CreateAssignment />
+          ) : activeNav === '/create-post' ? (
+            <CreatePost 
+              classroomId={createPostClassroomId || ''} 
+              classroomName={createPostClassroomName || ''}
+              onBack={() => setActiveNav('/dashboard')}
+              onNavigateToClassrooms={() => {
+                setSelectedClassroomId(null);
+                setActiveNav('/classrooms');
+              }}
+              onNavigateToClassroomDetail={() => {
+                setSelectedClassroomId(createPostClassroomId);
+                setActiveNav('/classrooms');
+              }}
+            />
+          ) : user.role === 'teacher' ? (
+            <TeacherDashboardContent 
+              user={user} 
+              onNavigateToCreatePost={(classroomId: string, classroomName: string) => {
+                setCreatePostClassroomId(classroomId);
+                setCreatePostClassroomName(classroomName);
+                setActiveNav('/create-post');
+              }}
+            />
           ) : (
             <StudentDashboardContent 
               user={user}
@@ -461,13 +512,41 @@ function StudentDashboardContent({
       const token = localStorage.getItem('token');
       if (!token) return;
 
+      // Fetch available projects
       const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/available-projects`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       const data = await response.json();
       if (response.ok && data.availableProjects) {
-        setProjects(data.availableProjects.slice(0, 4));
+        // Try to fetch user's completed projects to filter them out
+        try {
+          const userProjectsResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (userProjectsResponse.ok) {
+            const userProjectsData = await userProjectsResponse.json();
+            const completedProjectTitles = new Set(
+              userProjectsData.completedTasks
+                ?.filter((task: any) => task.status === 'submitted')
+                ?.map((task: any) => task.projectTitle?.toLowerCase()) || []
+            );
+
+            // Filter out completed projects by matching titles
+            const incompleteProjects = data.availableProjects
+              .filter((project: any) => !completedProjectTitles.has(project.title?.toLowerCase()))
+              .slice(0, 4);
+            setProjects(incompleteProjects);
+          } else {
+            // If endpoint doesn't exist, just show all available projects
+            setProjects(data.availableProjects.slice(0, 4));
+          }
+        } catch (err) {
+          // If there's an error fetching completed tasks, just show all available projects
+          console.log('Could not fetch completed tasks, showing all projects');
+          setProjects(data.availableProjects.slice(0, 4));
+        }
       }
     } catch (error) {
       console.error('Error fetching mini projects:', error);
@@ -518,20 +597,12 @@ function StudentDashboardContent({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left Column - Quick Actions & Learning Progress */}
+        {/* Left Column - Mini Projects */}
         <div className="xl:col-span-2 space-y-6">
           {/* Quick Actions - Only show if there are projects */}
           {projects.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[20px] font-semibold text-[#212121]">Quick Actions</h2>
-                <button 
-                  onClick={onMiniProjectsClick}
-                  className="text-[13px] font-semibold text-[#1B5E20] hover:underline"
-                >
-                  View All →
-                </button>
-              </div>
+              <h2 className="text-[20px] font-semibold text-[#212121] mb-4">Mini Projects</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {projects.map((project, index) => (
                   <button
@@ -569,37 +640,13 @@ function StudentDashboardContent({
             </div>
           )}
 
-          {/* Learning Progress */}
-          <div>
-            <h2 className="text-[20px] font-semibold text-[#212121] mb-4">Learning Progress</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ProgressCard
-                title="Course Completion"
-                current={0}
-                total={5}
-                color="green"
-              />
-              <ProgressCard
-                title="Assignment Progress"
-                current={0}
-                total={10}
-                color="gray"
-              />
-            </div>
-          </div>
-
           {/* Recent Activity */}
           <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-[#1B5E20]" />
-                <h3 className="text-[15px] font-semibold text-[#212121]">Recent Activity</h3>
-              </div>
-              <button className="text-[12px] font-semibold text-[#1B5E20] hover:underline">
-                View All
-              </button>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-[#1B5E20]" />
+              <h3 className="text-[15px] font-semibold text-[#212121]">Recent Activity</h3>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
               {recentActivities.map((activity, index) => (
                 <div key={index} className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-[#F5F5F5] rounded-lg flex items-center justify-center flex-shrink-0">
@@ -607,7 +654,10 @@ function StudentDashboardContent({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-[#212121]">{activity.title}</p>
-                    <p className="text-[12px] text-[#757575]">{activity.timeAgo}</p>
+                    {activity.subtitle && (
+                      <p className="text-[12px] text-[#757575]">{activity.subtitle}</p>
+                    )}
+                    <p className="text-[12px] text-[#757575] mt-0.5">{activity.timeAgo}</p>
                   </div>
                 </div>
               ))}
