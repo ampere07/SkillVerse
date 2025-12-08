@@ -1,7 +1,6 @@
 import { Ollama } from 'ollama';
 import Survey from '../models/Survey.js';
 import OLLAMA_CONFIG from '../config/ollamaConfig.js';
-import { fallbackProjects } from '../data/fallbackProjects.js';
 
 const MODEL_NAME = OLLAMA_CONFIG.model;
 const OLLAMA_URL = OLLAMA_CONFIG.url;
@@ -18,15 +17,19 @@ export const generateWeeklyProjects = async (userId) => {
     const user = await User.findById(userId);
     
     if (!user || !user.primaryLanguage) {
-      console.error(`No user or primaryLanguage found for user ${userId}`);
-      return [];
+      throw new Error(`No user or primaryLanguage found for user ${userId}`);
     }
 
     const projects = await generateProjectsForLanguage(userId, user.primaryLanguage);
+    
+    if (!projects || projects.length === 0) {
+      throw new Error('AI failed to generate projects');
+    }
+    
     return projects;
   } catch (error) {
-    console.error('Generate projects error:', error);
-    return generateFallbackProjects(userId, 'java');
+    console.error('[GenerateWeeklyProjects] Error:', error);
+    throw error;
   }
 };
 
@@ -36,8 +39,7 @@ export const generateProjectsForBothLanguages = async (userId) => {
     const user = await User.findById(userId);
     
     if (!user) {
-      console.error(`No user found for user ${userId}`);
-      return [];
+      throw new Error(`No user found for user ${userId}`);
     }
 
     console.log(`[ProjectGen] ========== GENERATING PROJECTS FOR BOTH LANGUAGES ==========`);
@@ -63,11 +65,8 @@ export const generateProjectsForBothLanguages = async (userId) => {
     
     return allProjects;
   } catch (error) {
-    console.error('Generate projects for both languages error:', error);
-    return [
-      ...generateFallbackProjects(userId, 'java'),
-      ...generateFallbackProjects(userId, 'python')
-    ];
+    console.error('[GenerateProjectsForBothLanguages] Error:', error);
+    throw error;
   }
 };
 
@@ -77,15 +76,13 @@ export const generateProjectsForLanguage = async (userId, language) => {
     const user = await User.findById(userId);
     
     if (!user) {
-      console.error(`No user found for user ${userId}`);
-      return generateFallbackProjects(userId, language, 'Beginner');
+      throw new Error(`No user found for user ${userId}`);
     }
 
     const survey = await Survey.findOne({ userId, primaryLanguage: language }).sort({ createdAt: -1 });
     
     if (!survey) {
-      console.log(`[ProjectGen] No survey found for user ${userId} and language ${language}, using fallback`);
-      return generateFallbackProjects(userId, language, 'Beginner');
+      throw new Error(`No survey found for user ${userId} and language ${language}`);
     }
 
     const hasLanguageData = 
@@ -93,30 +90,11 @@ export const generateProjectsForLanguage = async (userId, language) => {
       (language.toLowerCase() === 'python' && survey.pythonExpertise);
 
     if (!hasLanguageData) {
-      console.log(`[ProjectGen] Survey found but no ${language} data, using fallback`);
-      return generateFallbackProjects(userId, language, 'Beginner');
+      throw new Error(`Survey found but no ${language} data available`);
     }
 
-    // Determine skill level for fallback
-    const skillLevel = language.toLowerCase() === 'java'
-      ? determineSkillLevel(survey.javaExpertise, null, survey.javaQuestions?.score, null)
-      : determineSkillLevel(null, survey.pythonExpertise, null, survey.pythonQuestions?.score);
-
-    if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length === 0) {
-      console.log(`[ProjectGen] No roadmap found, using fallback for ${skillLevel}`);
-      return generateFallbackProjects(userId, language, skillLevel);
-    }
-
-    // Validate roadmap has at least 6 items total
-    const totalRoadmapItems = (
-      (survey.learningRoadmap.phase1?.length || 0) +
-      (survey.learningRoadmap.phase2?.length || 0) +
-      (survey.learningRoadmap.phase3?.length || 0)
-    );
-    
-    if (totalRoadmapItems < 6) {
-      console.log(`[ProjectGen] Roadmap has only ${totalRoadmapItems} items, need at least 6. Using fallback for ${skillLevel}.`);
-      return generateFallbackProjects(userId, language, skillLevel);
+    if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length < 6) {
+      throw new Error(`Phase 1 must have at least 6 items for ${language}`);
     }
 
     const skillLevel = language.toLowerCase() === 'java'
@@ -173,8 +151,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
       }));
 
       if (correctedProjects.length < 6) {
-        console.error(`Only generated ${correctedProjects.length} projects, expected 6`);
-        return correctedProjects.length > 0 ? correctedProjects : generateFallbackProjects(userId, language, skillLevel);
+        throw new Error(`Only generated ${correctedProjects.length} projects, expected 6`);
       }
 
       console.log(`[ProjectGen] Successfully generated ${correctedProjects.length} roadmap-based projects`);
@@ -182,11 +159,11 @@ export const generateProjectsForLanguage = async (userId, language) => {
       return correctedProjects.slice(0, 6);
     } catch (apiError) {
       console.error('[ProjectGen] Ollama Error:', apiError.message);
-      return generateFallbackProjects(userId, language, skillLevel);
+      throw new Error(`AI generation failed: ${apiError.message}`);
     }
   } catch (error) {
-    console.error('Generate projects error:', error);
-    return generateFallbackProjects(userId, 'java', 'Beginner');
+    console.error('[GenerateProjectsForLanguage] Error:', error);
+    throw error;
   }
 };
 
@@ -199,11 +176,12 @@ const constructRoadmapBasedPrompt = (survey) => {
   
   const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, javaQuestions?.score, pythonQuestions?.score);
   
-  const roadmapItems = [
-    ...learningRoadmap.phase1,
-    ...learningRoadmap.phase2,
-    ...learningRoadmap.phase3
-  ];
+  const phase1Items = learningRoadmap.phase1 || [];
+  
+  // Ensure Phase 1 has at least 6 items
+  if (phase1Items.length < 6) {
+    throw new Error(`Phase 1 must have at least 6 items, found ${phase1Items.length}`);
+  }
 
   const aiAnalysisSection = aiAnalysis 
     ? `\n\nSTUDENT AI ANALYSIS:\nBased on comprehensive assessment, here's what we know about this student:\n${aiAnalysis}\n\nUSE THIS ANALYSIS to tailor project difficulty, explanations, and focus areas. Address their specific strengths and weaknesses identified above.`
@@ -233,13 +211,14 @@ Skill Level: ${skillLevel}${aiAnalysisSection}
 
 PROJECT GENERATION REQUIREMENTS:
 
-CRITICAL: Create ONE project for EACH of the 6 roadmap items above, in order.
-- Project 1: Based on Phase 1, Item 1 (${roadmapItems[0]})
-- Project 2: Based on Phase 1, Item 2 (${roadmapItems[1]})
-- Project 3: Based on Phase 2, Item 1 (${roadmapItems[2]})
-- Project 4: Based on Phase 2, Item 2 (${roadmapItems[3]})
-- Project 5: Based on Phase 3, Item 1 (${roadmapItems[4]})
-- Project 6: Based on Phase 3, Item 2 (${roadmapItems[5]})
+CRITICAL: ALL 6 PROJECTS MUST BE FROM PHASE 1 CONCEPTS ONLY.
+Create ONE project for EACH of the 6 Phase 1 roadmap items:
+- Project 1: Based on Phase 1, Item 1 (${phase1Items[0]})
+- Project 2: Based on Phase 1, Item 2 (${phase1Items[1]})
+- Project 3: Based on Phase 1, Item 3 (${phase1Items[2]})
+- Project 4: Based on Phase 1, Item 4 (${phase1Items[3]})
+- Project 5: Based on Phase 1, Item 5 (${phase1Items[4]})
+- Project 6: Based on Phase 1, Item 6 (${phase1Items[5]})
 
 Each project MUST:
 1. Teach the SPECIFIC concept from the roadmap item
@@ -271,7 +250,7 @@ IMPORTANT: Language field MUST be exactly: ${language}
 
 PROJECT 1:
 Title: [Concept from Roadmap] - [Application Name]
-Description: This project teaches [ROADMAP CONCEPT: ${roadmapItems[0]}]. [Explain why this concept is important and how it applies]. You will create a console program that [what they build]. This is the foundation for your learning journey.
+Description: This project teaches [ROADMAP CONCEPT: ${phase1Items[0]}]. [Explain why this concept is important and how it applies]. You will create a console program that [what they build]. This is from Phase 1 - Foundation of your learning journey.
 Language: ${language}
 Requirements:
 - [Specific requirement for core concept - must be unique to THIS project]
@@ -348,16 +327,15 @@ Rubrics:
 - Code Organization (10 points): Clean structure and proper encapsulation
 
 IMPORTANT REMINDERS:
-- Each project MUST directly teach the specific roadmap concept
-- Projects should progress naturally through the roadmap phases
-- Phase 1 projects are simpler (foundation)
-- Phase 2 projects build on Phase 1 (intermediate skills)
-- Phase 3 projects combine multiple concepts (advanced practice)
+- Each project MUST directly teach a specific Phase 1 concept
+- All 6 projects focus on Phase 1 - Foundation concepts only
+- Projects should be at similar difficulty level (all foundation)
+- Phase 2 and Phase 3 will be covered in future weeks
 - All single-file console programs with clear learning objectives
 - DO NOT use asterisks ** in titles
 - NO FILE I/O OPERATIONS - Use in-memory data only
 - NO FILE READING/WRITING - All data via Scanner/input()
-- Focus on TEACHING the roadmap concept through practical application
+- Focus on TEACHING the Phase 1 roadmap concept through practical application
 
 REQUIREMENTS GENERATION:
 - EVERY project MUST have 4-6 UNIQUE, SPECIFIC requirements
@@ -381,7 +359,7 @@ PERSONALIZATION:
 
 CRITICAL: ALL 6 PROJECTS MUST BE IN ${language}. DO NOT GENERATE PYTHON IF LANGUAGE IS JAVA. DO NOT GENERATE JAVA IF LANGUAGE IS PYTHON.
 
-Generate 6 projects, ONE for EACH roadmap item in order:`;
+Generate 6 projects, ONE for EACH Phase 1 roadmap item in order:`;
 };
 
 const constructPersonalizedPrompt = (survey) => {
@@ -1010,36 +988,6 @@ const parseProjectsFromAI = (text) => {
       console.error('[ProjectGen-Parse] Error parsing project:', error.message);
     }
   }
-  
-  return projects;
-};
-
-const generateFallbackProjects = (userId, language = 'java', skillLevel = 'Beginner') => {
-  console.log(`[ProjectGen] ========== USING FALLBACK PROJECTS ==========`);
-  console.log(`[ProjectGen] User ID: ${userId}`);
-  console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
-  console.log(`[ProjectGen] Skill Level: ${skillLevel}`);
-  
-  const languageFormatted = language.charAt(0).toUpperCase() + language.slice(1);
-  const skillLevelKey = skillLevel.toLowerCase();
-  
-  // Get skill-level-specific projects from fallback data
-  const projects = fallbackProjects[skillLevelKey]?.[language.toLowerCase()];
-  
-  if (!projects || projects.length === 0) {
-    console.log(`[ProjectGen] No fallback projects found for ${skillLevel} ${language}, using default`);
-    // If no skill-specific projects, use beginner level as default
-    return fallbackProjects.beginner[language.toLowerCase()] || [];
-  }
-  
-  console.log(`[ProjectGen] Generated ${projects.length} ${skillLevel.toLowerCase()} fallback projects`);
-  console.log(`[ProjectGen] Language for all projects: ${languageFormatted}`);
-  console.log(`[ProjectGen] Sample project:`, { 
-    title: projects[0].title, 
-    language: projects[0].language,
-    skillLevel: skillLevel
-  });
-  console.log(`[ProjectGen] ===========================================`);
   
   return projects;
 };
