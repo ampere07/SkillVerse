@@ -1,7 +1,6 @@
 import { Ollama } from 'ollama';
 import Survey from '../models/Survey.js';
 import OLLAMA_CONFIG from '../config/ollamaConfig.js';
-import { fallbackProjects } from '../data/fallbackProjects.js';
 
 const MODEL_NAME = OLLAMA_CONFIG.model;
 const OLLAMA_URL = OLLAMA_CONFIG.url;
@@ -18,15 +17,19 @@ export const generateWeeklyProjects = async (userId) => {
     const user = await User.findById(userId);
     
     if (!user || !user.primaryLanguage) {
-      console.error(`No user or primaryLanguage found for user ${userId}`);
-      return [];
+      throw new Error(`No user or primaryLanguage found for user ${userId}`);
     }
 
     const projects = await generateProjectsForLanguage(userId, user.primaryLanguage);
+    
+    if (!projects || projects.length === 0) {
+      throw new Error('AI failed to generate projects');
+    }
+    
     return projects;
   } catch (error) {
-    console.error('Generate projects error:', error);
-    return generateFallbackProjects(userId, 'java');
+    console.error('[GenerateWeeklyProjects] Error:', error);
+    throw error;
   }
 };
 
@@ -36,8 +39,7 @@ export const generateProjectsForBothLanguages = async (userId) => {
     const user = await User.findById(userId);
     
     if (!user) {
-      console.error(`No user found for user ${userId}`);
-      return [];
+      throw new Error(`No user found for user ${userId}`);
     }
 
     console.log(`[ProjectGen] ========== GENERATING PROJECTS FOR BOTH LANGUAGES ==========`);
@@ -63,11 +65,8 @@ export const generateProjectsForBothLanguages = async (userId) => {
     
     return allProjects;
   } catch (error) {
-    console.error('Generate projects for both languages error:', error);
-    return [
-      ...generateFallbackProjects(userId, 'java'),
-      ...generateFallbackProjects(userId, 'python')
-    ];
+    console.error('[GenerateProjectsForBothLanguages] Error:', error);
+    throw error;
   }
 };
 
@@ -77,15 +76,13 @@ export const generateProjectsForLanguage = async (userId, language) => {
     const user = await User.findById(userId);
     
     if (!user) {
-      console.error(`No user found for user ${userId}`);
-      return generateFallbackProjects(userId, language, 'Beginner');
+      throw new Error(`No user found for user ${userId}`);
     }
 
     const survey = await Survey.findOne({ userId, primaryLanguage: language }).sort({ createdAt: -1 });
     
     if (!survey) {
-      console.log(`[ProjectGen] No survey found for user ${userId} and language ${language}, using fallback`);
-      return generateFallbackProjects(userId, language, 'Beginner');
+      throw new Error(`No survey found for user ${userId} and language ${language}`);
     }
 
     const hasLanguageData = 
@@ -93,30 +90,11 @@ export const generateProjectsForLanguage = async (userId, language) => {
       (language.toLowerCase() === 'python' && survey.pythonExpertise);
 
     if (!hasLanguageData) {
-      console.log(`[ProjectGen] Survey found but no ${language} data, using fallback`);
-      return generateFallbackProjects(userId, language, 'Beginner');
+      throw new Error(`Survey found but no ${language} data available`);
     }
 
-    // Determine skill level for fallback
-    const skillLevel = language.toLowerCase() === 'java'
-      ? determineSkillLevel(survey.javaExpertise, null, survey.javaQuestions?.score, null)
-      : determineSkillLevel(null, survey.pythonExpertise, null, survey.pythonQuestions?.score);
-
-    if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length === 0) {
-      console.log(`[ProjectGen] No roadmap found, using fallback for ${skillLevel}`);
-      return generateFallbackProjects(userId, language, skillLevel);
-    }
-
-    // Validate roadmap has at least 6 items total
-    const totalRoadmapItems = (
-      (survey.learningRoadmap.phase1?.length || 0) +
-      (survey.learningRoadmap.phase2?.length || 0) +
-      (survey.learningRoadmap.phase3?.length || 0)
-    );
-    
-    if (totalRoadmapItems < 6) {
-      console.log(`[ProjectGen] Roadmap has only ${totalRoadmapItems} items, need at least 6. Using fallback for ${skillLevel}.`);
-      return generateFallbackProjects(userId, language, skillLevel);
+    if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length < 6) {
+      throw new Error(`Phase 1 must have at least 6 items for ${language}`);
     }
 
     const skillLevel = language.toLowerCase() === 'java'
@@ -151,7 +129,9 @@ export const generateProjectsForLanguage = async (userId, language) => {
         messages: [{ role: 'user', content: prompt }],
         options: {
           temperature: 0.9,
-          num_predict: 5000
+          num_predict: 2500,
+          num_ctx: 2048,
+          num_thread: 10
         }
       });
 
@@ -173,8 +153,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
       }));
 
       if (correctedProjects.length < 6) {
-        console.error(`Only generated ${correctedProjects.length} projects, expected 6`);
-        return correctedProjects.length > 0 ? correctedProjects : generateFallbackProjects(userId, language, skillLevel);
+        throw new Error(`Only generated ${correctedProjects.length} projects, expected 6`);
       }
 
       console.log(`[ProjectGen] Successfully generated ${correctedProjects.length} roadmap-based projects`);
@@ -182,11 +161,11 @@ export const generateProjectsForLanguage = async (userId, language) => {
       return correctedProjects.slice(0, 6);
     } catch (apiError) {
       console.error('[ProjectGen] Ollama Error:', apiError.message);
-      return generateFallbackProjects(userId, language, skillLevel);
+      throw new Error(`AI generation failed: ${apiError.message}`);
     }
   } catch (error) {
-    console.error('Generate projects error:', error);
-    return generateFallbackProjects(userId, 'java', 'Beginner');
+    console.error('[GenerateProjectsForLanguage] Error:', error);
+    throw error;
   }
 };
 
@@ -199,11 +178,12 @@ const constructRoadmapBasedPrompt = (survey) => {
   
   const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, javaQuestions?.score, pythonQuestions?.score);
   
-  const roadmapItems = [
-    ...learningRoadmap.phase1,
-    ...learningRoadmap.phase2,
-    ...learningRoadmap.phase3
-  ];
+  const phase1Items = learningRoadmap.phase1 || [];
+  
+  // Ensure Phase 1 has at least 6 items
+  if (phase1Items.length < 6) {
+    throw new Error(`Phase 1 must have at least 6 items, found ${phase1Items.length}`);
+  }
 
   const aiAnalysisSection = aiAnalysis 
     ? `\n\nSTUDENT AI ANALYSIS:\nBased on comprehensive assessment, here's what we know about this student:\n${aiAnalysis}\n\nUSE THIS ANALYSIS to tailor project difficulty, explanations, and focus areas. Address their specific strengths and weaknesses identified above.`
@@ -233,19 +213,20 @@ Skill Level: ${skillLevel}${aiAnalysisSection}
 
 PROJECT GENERATION REQUIREMENTS:
 
-CRITICAL: Create ONE project for EACH of the 6 roadmap items above, in order.
-- Project 1: Based on Phase 1, Item 1 (${roadmapItems[0]})
-- Project 2: Based on Phase 1, Item 2 (${roadmapItems[1]})
-- Project 3: Based on Phase 2, Item 1 (${roadmapItems[2]})
-- Project 4: Based on Phase 2, Item 2 (${roadmapItems[3]})
-- Project 5: Based on Phase 3, Item 1 (${roadmapItems[4]})
-- Project 6: Based on Phase 3, Item 2 (${roadmapItems[5]})
+CRITICAL: ALL 6 PROJECTS MUST BE FROM PHASE 1 CONCEPTS ONLY.
+Create ONE project for EACH of the 6 Phase 1 roadmap items:
+- Project 1: Based on Phase 1, Item 1 (${phase1Items[0]})
+- Project 2: Based on Phase 1, Item 2 (${phase1Items[1]})
+- Project 3: Based on Phase 1, Item 3 (${phase1Items[2]})
+- Project 4: Based on Phase 1, Item 4 (${phase1Items[3]})
+- Project 5: Based on Phase 1, Item 5 (${phase1Items[4]})
+- Project 6: Based on Phase 1, Item 6 (${phase1Items[5]})
 
 Each project MUST:
 1. Teach the SPECIFIC concept from the roadmap item
 2. Be a SINGLE FILE console program
 3. Use Scanner (Java) or input() (Python) for user interaction
-4. Include clear requirements that focus on the roadmap concept
+4. Include 3-4 clear requirements (concise and specific)
 5. Progress in difficulty following the roadmap phases
 
 TECHNICAL CONSTRAINTS:
@@ -270,109 +251,75 @@ FORMAT EACH PROJECT:
 IMPORTANT: Language field MUST be exactly: ${language}
 
 PROJECT 1:
-Title: [Concept from Roadmap] - [Application Name]
-Description: This project teaches [ROADMAP CONCEPT: ${roadmapItems[0]}]. [Explain why this concept is important and how it applies]. You will create a console program that [what they build]. This is the foundation for your learning journey.
+Title: [Concept] - [App Name]
+Description: Teaches [CONCEPT]. [1 sentence why important]. [1 sentence what to build]. (Max 3 sentences total)
 Language: ${language}
 Requirements:
-- [Specific requirement for core concept - must be unique to THIS project]
-- [Specific requirement for technical implementation - must be measurable]
-- [Specific requirement for user interaction - describe exact inputs needed]
-- [Specific requirement for output/demonstration - describe exact expected behavior]
-- [Optional: Additional requirement specific to this project's concept]
-Sample Output:
-[Show realistic console interaction demonstrating the concept]
+- [Requirement 1 - specific and measurable]
+- [Requirement 2 - specific and measurable]
+- [Requirement 3 - specific and measurable]
+- [Requirement 4 - specific and measurable]
 Rubrics:
-[Detailed grading criteria for this project with point distribution totaling 100 points]
+[4-5 grading criteria totaling 100 points]
 
 EXAMPLE PROJECT (Roadmap Item: "Practice basic syntax and variables"):
 
 PROJECT 1:
-Title: Variables and Data Types - Student Profile Manager
-Description: This project teaches variables and data types which are the building blocks of all programs. You will create a console program that stores and displays student information using different data types (String, int, double, boolean). This helps you understand how to work with different kinds of data in ${language}.
+Title: Variables and Data Types - Student Profile
+Description: Teaches variables and data types. Understanding different data types is essential for storing information. You will create a program that stores and displays student information.
 Language: ${language}
 Requirements:
-- Declare exactly 4 variables: studentName (String), age (int), gpa (double), isEnrolled (boolean)
-- Use Scanner (Java) or input() (Python) to accept user input for each variable with appropriate prompts
-- Validate that age is between 1-100 and GPA is between 0.0-4.0
-- Display a formatted profile showing all information with labels
-- Convert boolean isEnrolled to "Yes"/"No" for display output
-Sample Output:
-=== Student Profile Manager ===
-Enter student name: Maria Santos
-Enter age: 20
-Enter GPA: 3.75
-Is enrolled? (true/false): true
-
---- Student Profile ---
-Name: Maria Santos
-Age: 20
-GPA: 3.75
-Enrolled: Yes
+- Declare 4 variables: studentName (String), age (int), gpa (double), isEnrolled (boolean)
+- Use Scanner/input() to accept user input for each variable
+- Validate age (1-100) and GPA (0.0-4.0)
+- Display formatted profile with all information
 Rubrics:
-- Variable Declaration (25 points): Correct declaration of all four data types
-- User Input Handling (25 points): Proper use of Scanner/input() for all variables
-- Data Type Understanding (25 points): Appropriate data type usage for each field
-- Output Formatting (15 points): Clean and organized display of student profile
-- Code Quality (10 points): Proper naming conventions and code structure
+- Variable Declaration (25 pts): All 4 data types declared correctly
+- User Input (25 pts): Proper Scanner/input() usage
+- Validation (25 pts): Age and GPA validated correctly
+- Output Format (15 pts): Clean display
+- Code Quality (10 pts): Proper naming
 
 EXAMPLE PROJECT (Roadmap Item: "Object-oriented programming basics"):
 
 PROJECT 3:
-Title: OOP Basics - Book Management System
-Description: This project teaches object-oriented programming by creating Book objects with properties and methods. OOP helps you organize code and model real-world things as objects. You will create a Book class with properties (title, author, pages) and methods (display info, mark as read). This is essential for building larger programs.
+Title: OOP Basics - Book Manager
+Description: Teaches object-oriented programming with classes and objects. OOP helps organize code for larger programs. You will create a Book class with properties and methods.
 Language: ${language}
 Requirements:
-- Create a Book class with private properties: title (String), author (String), pages (int), isRead (boolean)
-- Implement a displayInfo() method that prints all book details in a formatted layout
-- Implement a markAsRead() method that changes isRead status to true
-- Create an ArrayList to store at least 3 Book objects
-- Implement a menu system with options: Add Book, Display All Books, Mark as Read, Exit
-- Use Scanner/input() to get book details from user when adding new books
-Sample Output:
-=== Book Management System ===
-1. Add book
-2. Display all books
-3. Mark book as read
-4. Exit
-Enter choice: 1
-Enter title: Clean Code
-Enter author: Robert Martin
-Enter pages: 464
-Book added successfully!
+- Create Book class with properties: title, author, pages, isRead
+- Implement displayInfo() and markAsRead() methods
+- Create ArrayList to store 3+ Book objects
+- Implement menu: Add Book, Display All, Mark as Read, Exit
 Rubrics:
-- Class Definition (20 points): Proper Book class with all required properties
-- Methods Implementation (25 points): Working display and markAsRead methods
-- Object Creation (20 points): Successfully creating and managing multiple Book objects
-- Menu System (15 points): Functional menu with all options working
-- User Input (10 points): Proper handling of console input
-- Code Organization (10 points): Clean structure and proper encapsulation
+- Class Definition (25 pts): Proper Book class with all properties
+- Methods (25 pts): Working display and markAsRead methods
+- Object Management (20 pts): ArrayList with multiple objects
+- Menu System (20 pts): All menu options functional
+- Code Quality (10 pts): Clean structure
 
 IMPORTANT REMINDERS:
-- Each project MUST directly teach the specific roadmap concept
-- Projects should progress naturally through the roadmap phases
-- Phase 1 projects are simpler (foundation)
-- Phase 2 projects build on Phase 1 (intermediate skills)
-- Phase 3 projects combine multiple concepts (advanced practice)
+- Each project MUST directly teach a specific Phase 1 concept
+- All 6 projects focus on Phase 1 - Foundation concepts only
+- Projects should be at similar difficulty level (all foundation)
+- Phase 2 and Phase 3 will be covered in future weeks
 - All single-file console programs with clear learning objectives
 - DO NOT use asterisks ** in titles
 - NO FILE I/O OPERATIONS - Use in-memory data only
 - NO FILE READING/WRITING - All data via Scanner/input()
-- Focus on TEACHING the roadmap concept through practical application
+- Focus on TEACHING the Phase 1 roadmap concept through practical application
 
 REQUIREMENTS GENERATION:
-- EVERY project MUST have 4-6 UNIQUE, SPECIFIC requirements
+- EVERY project MUST have exactly 4 UNIQUE, SPECIFIC requirements
 - Requirements must be MEASURABLE and TESTABLE
 - Each requirement should specify EXACTLY what needs to be implemented
 - Requirements must be DIFFERENT for each project
-- Bad requirement: "Handle user input" - Too vague
-- Good requirement: "Use Scanner to accept 3 integers and validate they are between 1-100"
-- Requirements should directly map to the rubrics criteria
+- Keep requirements concise (one clear sentence each)
 
 RUBRICS GENERATION:
-- ALWAYS include detailed rubrics with clear grading criteria totaling 100 points
-- Rubrics should align perfectly with project requirements
-- Each rubric item must be specific and measurable
-- Rubrics should assess both technical implementation and concept understanding
+- Include 4-5 grading criteria totaling 100 points
+- Rubrics must align with project requirements
+- Each criterion should be specific and measurable
 
 PERSONALIZATION:
 - USE THE AI ANALYSIS to personalize difficulty, explanations, and focus areas
@@ -381,7 +328,7 @@ PERSONALIZATION:
 
 CRITICAL: ALL 6 PROJECTS MUST BE IN ${language}. DO NOT GENERATE PYTHON IF LANGUAGE IS JAVA. DO NOT GENERATE JAVA IF LANGUAGE IS PYTHON.
 
-Generate 6 projects, ONE for EACH roadmap item in order:`;
+Generate 6 projects, ONE for EACH Phase 1 roadmap item in order:`;
 };
 
 const constructPersonalizedPrompt = (survey) => {
@@ -966,8 +913,7 @@ const parseProjectsFromAI = (text) => {
       const titleMatch = projectText.match(/\*\*Title:\*\*\s*(.+?)(?=\n)/i);
       const descMatch = projectText.match(/\*\*Description:\*\*\s*(.+?)(?=\n\*\*Language:)/is);
       const langMatch = projectText.match(/\*\*Language:\*\*\s*(.+?)(?=\n)/i);
-      const reqMatch = projectText.match(/\*\*Requirements:\*\*\s*([\s\S]+?)(?=\n\*\*(?:Sample Output|Rubrics):)/i);
-      const sampleMatch = projectText.match(/\*\*Sample Output:\*\*\s*([\s\S]+?)(?=\n\*\*Rubrics:)/i);
+      const reqMatch = projectText.match(/\*\*Requirements:\*\*\s*([\s\S]+?)(?=\n\*\*Rubrics:)/i);
       const rubricsMatch = projectText.match(/\*\*Rubrics:\*\*\s*([\s\S]+?)(?=\n\n|PROJECT|$)/i);
       
       if (titleMatch && descMatch && langMatch) {
@@ -980,22 +926,17 @@ const parseProjectsFromAI = (text) => {
           ? reqMatch[1].split('\n').filter(r => r.trim().startsWith('-')).join('\n')
           : '';
         
-        const sampleOutput = sampleMatch 
-          ? sampleMatch[1].trim()
-          : '';
-        
         const rubrics = rubricsMatch
           ? rubricsMatch[1].split('\n').filter(r => r.trim().startsWith('-')).join('\n').trim()
           : '';
         
-        console.log(`[ProjectGen-Parse] Project "${title}" fields: Req=${!!reqMatch}, Sample=${!!sampleMatch}, Rubrics=${!!rubricsMatch}`);
+        console.log(`[ProjectGen-Parse] Project "${title}" fields: Req=${!!reqMatch}, Rubrics=${!!rubricsMatch}`);
         
         projects.push({
           title: title,
           description: descMatch[1].trim().replace(/\n/g, ' '),
           language: langMatch[1].trim(),
           requirements: requirements.trim(),
-          sampleOutput: sampleOutput,
           rubrics: rubrics
         });
         console.log(`[ProjectGen-Parse] Successfully parsed project: ${title}`);
@@ -1010,36 +951,6 @@ const parseProjectsFromAI = (text) => {
       console.error('[ProjectGen-Parse] Error parsing project:', error.message);
     }
   }
-  
-  return projects;
-};
-
-const generateFallbackProjects = (userId, language = 'java', skillLevel = 'Beginner') => {
-  console.log(`[ProjectGen] ========== USING FALLBACK PROJECTS ==========`);
-  console.log(`[ProjectGen] User ID: ${userId}`);
-  console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
-  console.log(`[ProjectGen] Skill Level: ${skillLevel}`);
-  
-  const languageFormatted = language.charAt(0).toUpperCase() + language.slice(1);
-  const skillLevelKey = skillLevel.toLowerCase();
-  
-  // Get skill-level-specific projects from fallback data
-  const projects = fallbackProjects[skillLevelKey]?.[language.toLowerCase()];
-  
-  if (!projects || projects.length === 0) {
-    console.log(`[ProjectGen] No fallback projects found for ${skillLevel} ${language}, using default`);
-    // If no skill-specific projects, use beginner level as default
-    return fallbackProjects.beginner[language.toLowerCase()] || [];
-  }
-  
-  console.log(`[ProjectGen] Generated ${projects.length} ${skillLevel.toLowerCase()} fallback projects`);
-  console.log(`[ProjectGen] Language for all projects: ${languageFormatted}`);
-  console.log(`[ProjectGen] Sample project:`, { 
-    title: projects[0].title, 
-    language: projects[0].language,
-    skillLevel: skillLevel
-  });
-  console.log(`[ProjectGen] ===========================================`);
   
   return projects;
 };
