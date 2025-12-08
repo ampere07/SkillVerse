@@ -234,31 +234,6 @@ export default function Dashboard() {
 
         recentActivityList.push(...recentSubmissions);
 
-        // Add mini project completions
-        try {
-          const miniProjectsActivityResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/user-projects`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          
-          if (miniProjectsActivityResponse.ok) {
-            const miniProjectsActivityData = await miniProjectsActivityResponse.json();
-            if (miniProjectsActivityData.miniProject && miniProjectsActivityData.miniProject.completedTasks) {
-              const completedProjects = miniProjectsActivityData.miniProject.completedTasks
-                .filter((task: any) => task.status === 'submitted' && task.completedAt)
-                .map((task: any) => ({
-                  title: `Completed mini project "${task.title}"`,
-                  subtitle: task.language || '',
-                  timestamp: new Date(task.completedAt),
-                  type: 'mini-project'
-                }));
-              
-              recentActivityList.push(...completedProjects);
-            }
-          }
-        } catch (err) {
-          console.error('Error fetching mini projects for recent activity:', err);
-        }
-
         // Sort all activities by timestamp (most recent first) and take top 5
         const sortedActivities = recentActivityList
           .filter(activity => activity.timestamp)
@@ -537,13 +512,41 @@ function StudentDashboardContent({
       const token = localStorage.getItem('token');
       if (!token) return;
 
+      // Fetch available projects
       const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/available-projects`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       const data = await response.json();
       if (response.ok && data.availableProjects) {
-        setProjects(data.availableProjects.slice(0, 4));
+        // Try to fetch user's completed projects to filter them out
+        try {
+          const userProjectsResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (userProjectsResponse.ok) {
+            const userProjectsData = await userProjectsResponse.json();
+            const completedProjectTitles = new Set(
+              userProjectsData.completedTasks
+                ?.filter((task: any) => task.status === 'submitted')
+                ?.map((task: any) => task.projectTitle?.toLowerCase()) || []
+            );
+
+            // Filter out completed projects by matching titles
+            const incompleteProjects = data.availableProjects
+              .filter((project: any) => !completedProjectTitles.has(project.title?.toLowerCase()))
+              .slice(0, 4);
+            setProjects(incompleteProjects);
+          } else {
+            // If endpoint doesn't exist, just show all available projects
+            setProjects(data.availableProjects.slice(0, 4));
+          }
+        } catch (err) {
+          // If there's an error fetching completed tasks, just show all available projects
+          console.log('Could not fetch completed tasks, showing all projects');
+          setProjects(data.availableProjects.slice(0, 4));
+        }
       }
     } catch (error) {
       console.error('Error fetching mini projects:', error);
@@ -599,15 +602,7 @@ function StudentDashboardContent({
           {/* Quick Actions - Only show if there are projects */}
           {projects.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[20px] font-semibold text-[#212121]">Quick Actions</h2>
-                <button 
-                  onClick={onMiniProjectsClick}
-                  className="text-[13px] font-semibold text-[#1B5E20] hover:underline"
-                >
-                  View All →
-                </button>
-              </div>
+              <h2 className="text-[20px] font-semibold text-[#212121] mb-4">Mini Projects</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {projects.map((project, index) => (
                   <button
@@ -647,16 +642,11 @@ function StudentDashboardContent({
 
           {/* Recent Activity */}
           <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-[#1B5E20]" />
-                <h3 className="text-[15px] font-semibold text-[#212121]">Recent Activity</h3>
-              </div>
-              <button className="text-[12px] font-semibold text-[#1B5E20] hover:underline">
-                View All
-              </button>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-[#1B5E20]" />
+              <h3 className="text-[15px] font-semibold text-[#212121]">Recent Activity</h3>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
               {recentActivities.map((activity, index) => (
                 <div key={index} className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-[#F5F5F5] rounded-lg flex items-center justify-center flex-shrink-0">
