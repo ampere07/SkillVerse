@@ -30,7 +30,7 @@ router.get('/student/my-assignments', authenticateToken, authorizeRole('student'
       classroom: { $in: classroomIds },
       isPublished: true
     })
-      .populate('teacher', 'name email')
+      .populate('teacher', 'firstName middleInitial lastName email')
       .populate('classroom', 'name code')
       .sort({ dueDate: 1, createdAt: -1 });
 
@@ -117,9 +117,9 @@ router.get('/classroom/:classroomId', authenticateToken, async (req, res) => {
     }
 
     const assignments = await Assignment.find(query)
-      .populate('teacher', 'name email')
-      .populate('students.studentId', 'name email')
-      .populate('submissions.student', 'name email')
+      .populate('teacher', 'firstName middleInitial lastName email')
+      .populate('students.studentId', 'firstName middleInitial lastName email')
+      .populate('submissions.student', 'firstName middleInitial lastName email')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -141,10 +141,10 @@ router.get('/classroom/:classroomId', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const assignment = await Assignment.findById(req.params.id)
-      .populate('teacher', 'name email')
+      .populate('teacher', 'firstName middleInitial lastName email')
       .populate('classroom')
-      .populate('students.studentId', 'name email')
-      .populate('submissions.student', 'name email');
+      .populate('students.studentId', 'firstName middleInitial lastName email')
+      .populate('submissions.student', 'firstName middleInitial lastName email');
 
     if (!assignment) {
       return res.status(404).json({ 
@@ -248,7 +248,7 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
     });
 
     await assignment.save();
-    await assignment.populate('teacher', 'name email');
+    await assignment.populate('teacher', 'firstName middleInitial lastName email');
     await assignment.populate('classroom', 'name code');
 
     console.log(`New assignment created: ${assignment.title} in ${classroom.name} by ${req.user.email}`);
@@ -309,7 +309,7 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
     if (allowLateSubmission !== undefined) assignment.allowLateSubmission = allowLateSubmission;
 
     await assignment.save();
-    await assignment.populate('teacher', 'name email');
+    await assignment.populate('teacher', 'firstName middleInitial lastName email');
     await assignment.populate('classroom', 'name code');
 
     console.log(`Assignment updated: ${assignment.title} by ${req.user.email}`);

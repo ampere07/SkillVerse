@@ -7,6 +7,156 @@ import { generateWeeklyProjects } from '../services/projectGenerationService.js'
 
 const router = express.Router();
 
+const createFallbackRoadmap = (language, expertise) => {
+  const isJava = language.toLowerCase() === 'java';
+  
+  if (expertise === 'beginner' || expertise === 'basic') {
+    return {
+      phase1: isJava ? [
+        'Variables and Data Types',
+        'Operators and Expressions',
+        'Conditional Statements (if-else)',
+        'Loops (for and while)',
+        'Arrays and Basic Collections',
+        'Methods and Functions'
+      ] : [
+        'Variables and Data Types',
+        'Operators and Expressions',
+        'Conditional Statements (if-elif-else)',
+        'Loops (for and while)',
+        'Lists and Basic Collections',
+        'Functions and Parameters'
+      ],
+      phase2: isJava ? [
+        'Object-Oriented Programming Basics',
+        'Classes and Objects',
+        'Inheritance and Polymorphism',
+        'ArrayLists and HashMaps',
+        'Exception Handling',
+        'File Input/Output'
+      ] : [
+        'Object-Oriented Programming Basics',
+        'Classes and Objects',
+        'Dictionaries and Sets',
+        'Exception Handling',
+        'File Input/Output',
+        'List Comprehensions'
+      ],
+      phase3: isJava ? [
+        'Advanced OOP Concepts',
+        'Data Structures Implementation',
+        'Algorithm Design',
+        'Design Patterns',
+        'Multithreading Basics',
+        'Building Complete Applications'
+      ] : [
+        'Advanced Functions and Decorators',
+        'Generators and Iterators',
+        'Algorithm Implementation',
+        'Working with Modules',
+        'Regular Expressions',
+        'Building Complete Applications'
+      ]
+    };
+  } else if (expertise === 'intermediate') {
+    return {
+      phase1: isJava ? [
+        'Interfaces and Abstract Classes',
+        'Collections Framework',
+        'Exception Handling Patterns',
+        'Generics and Type Safety',
+        'Lambda Expressions',
+        'Stream API Basics'
+      ] : [
+        'Advanced Data Structures',
+        'Functional Programming',
+        'Decorators and Context Managers',
+        'Working with APIs',
+        'Data Processing with Pandas',
+        'Regular Expressions'
+      ],
+      phase2: isJava ? [
+        'Design Patterns (Factory, Singleton)',
+        'Data Structures (Trees, Graphs)',
+        'Algorithm Optimization',
+        'Multithreading and Concurrency',
+        'Database Connectivity (JDBC)',
+        'Testing with JUnit'
+      ] : [
+        'Object-Oriented Design Patterns',
+        'Advanced Algorithm Implementation',
+        'Asynchronous Programming',
+        'Working with Databases',
+        'Web Scraping',
+        'Testing with unittest/pytest'
+      ],
+      phase3: isJava ? [
+        'Spring Framework Basics',
+        'RESTful API Development',
+        'Advanced Design Patterns',
+        'Performance Optimization',
+        'Microservices Architecture',
+        'Full Application Development'
+      ] : [
+        'Web Development with Flask/Django',
+        'RESTful API Development',
+        'Data Science Libraries',
+        'Machine Learning Basics',
+        'Performance Optimization',
+        'Full Application Development'
+      ]
+    };
+  } else {
+    return {
+      phase1: isJava ? [
+        'Advanced Design Patterns',
+        'Concurrent Programming',
+        'JVM Internals',
+        'Performance Tuning',
+        'Security Best Practices',
+        'Architectural Patterns'
+      ] : [
+        'Advanced Design Patterns',
+        'Metaclasses and Descriptors',
+        'Advanced Async Programming',
+        'Performance Optimization',
+        'Security Best Practices',
+        'Architectural Patterns'
+      ],
+      phase2: isJava ? [
+        'Microservices Architecture',
+        'Distributed Systems',
+        'Message Queues and Kafka',
+        'Cloud-Native Development',
+        'Docker and Kubernetes',
+        'System Design'
+      ] : [
+        'Distributed Systems with Python',
+        'Advanced Machine Learning',
+        'Big Data Processing',
+        'Cloud Computing',
+        'Docker and Deployment',
+        'System Architecture'
+      ],
+      phase3: isJava ? [
+        'Enterprise Application Patterns',
+        'Scalability and High Availability',
+        'Advanced Testing Strategies',
+        'CI/CD Pipelines',
+        'Production Monitoring',
+        'Complete System Development'
+      ] : [
+        'Production-Grade Applications',
+        'Scalability and Performance',
+        'Advanced Testing and CI/CD',
+        'Monitoring and Logging',
+        'Data Engineering',
+        'Complete System Development'
+      ]
+    };
+  }
+};
+
 router.post('/submit', async (req, res) => {
   try {
     const {
@@ -51,10 +201,18 @@ router.post('/submit', async (req, res) => {
       } else {
         console.warn('AI Analysis failed, continuing without it:', aiAnalysisResult.error);
         aiAnalysis = `Welcome to SkillVerse! Based on your ${primaryLanguage === 'java' ? 'Java' : 'Python'} selection and ${primaryLanguage === 'java' ? javaExpertise : pythonExpertise} level, we'll create personalized projects to help you improve your skills. Start with the mini projects to practice and enhance your programming abilities!`;
+        
+        // Create fallback learning roadmap when AI fails
+        learningRoadmap = createFallbackRoadmap(primaryLanguage, primaryLanguage === 'java' ? javaExpertise : pythonExpertise);
+        console.log('[Survey] Using fallback learning roadmap:', learningRoadmap);
       }
     } catch (aiError) {
       console.error('AI Analysis error:', aiError);
       aiAnalysis = `Welcome to SkillVerse! Based on your ${primaryLanguage === 'java' ? 'Java' : 'Python'} selection and ${primaryLanguage === 'java' ? javaExpertise : pythonExpertise} level, we'll create personalized projects to help you improve your skills. Start with the mini projects to practice and enhance your programming abilities!`;
+      
+      // Create fallback learning roadmap when AI fails
+      learningRoadmap = createFallbackRoadmap(primaryLanguage, primaryLanguage === 'java' ? javaExpertise : pythonExpertise);
+      console.log('[Survey] Using fallback learning roadmap:', learningRoadmap);
     }
 
     let survey = await Survey.findOne({ userId, primaryLanguage });

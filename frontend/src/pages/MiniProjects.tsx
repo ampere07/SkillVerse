@@ -39,6 +39,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingLanguage, setPendingLanguage] = useState<string | undefined>(undefined);
   const [surveyCompletedLanguages, setSurveyCompletedLanguages] = useState<string[]>([]);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const compilerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -48,6 +49,41 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
       await fetchUserLanguage();
     };
     initializePage();
+  }, []);
+
+  useEffect(() => {
+    const calculateCountdown = () => {
+      const now = new Date();
+      const nextReset = new Date();
+      
+      // Set to next Monday at 1 AM
+      const daysUntilMonday = (8 - now.getDay()) % 7 || 7; // 0 = Sunday, 1 = Monday
+      nextReset.setDate(now.getDate() + daysUntilMonday);
+      nextReset.setHours(1, 0, 0, 0);
+      
+      // If it's already Monday and past 1 AM, set to next Monday
+      if (now.getDay() === 1 && now.getHours() >= 1) {
+        nextReset.setDate(nextReset.getDate() + 7);
+      }
+      
+      const timeRemaining = nextReset.getTime() - now.getTime();
+      
+      if (timeRemaining > 0) {
+        const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+        
+        setCountdown({ days, hours, minutes, seconds });
+      } else {
+        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+    
+    calculateCountdown();
+    const interval = setInterval(calculateCountdown, 1000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -306,7 +342,32 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
             </div>
             <h1 className="text-2xl font-bold" style={{ color: '#212121' }}>Mini Projects</h1>
           </div>
-          <div className="relative language-menu-container">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 px-4 py-2 rounded-lg border" style={{ borderColor: '#E0E0E0', backgroundColor: '#FAFAFA' }}>
+              <Clock className="w-4 h-4" style={{ color: '#1B5E20' }} strokeWidth={1.5} />
+              <div className="flex items-center gap-2">
+                <div className="text-center">
+                  <div className="text-lg font-bold" style={{ color: '#212121' }}>{String(countdown.days).padStart(2, '0')}</div>
+                  <div className="text-xs" style={{ color: '#757575' }}>days</div>
+                </div>
+                <span className="text-lg font-bold" style={{ color: '#757575' }}>:</span>
+                <div className="text-center">
+                  <div className="text-lg font-bold" style={{ color: '#212121' }}>{String(countdown.hours).padStart(2, '0')}</div>
+                  <div className="text-xs" style={{ color: '#757575' }}>hours</div>
+                </div>
+                <span className="text-lg font-bold" style={{ color: '#757575' }}>:</span>
+                <div className="text-center">
+                  <div className="text-lg font-bold" style={{ color: '#212121' }}>{String(countdown.minutes).padStart(2, '0')}</div>
+                  <div className="text-xs" style={{ color: '#757575' }}>min</div>
+                </div>
+                <span className="text-lg font-bold" style={{ color: '#757575' }}>:</span>
+                <div className="text-center">
+                  <div className="text-lg font-bold" style={{ color: '#212121' }}>{String(countdown.seconds).padStart(2, '0')}</div>
+                  <div className="text-xs" style={{ color: '#757575' }}>sec</div>
+                </div>
+              </div>
+            </div>
+            <div className="relative language-menu-container">
             <button
               onClick={() => setShowLanguageMenu(!showLanguageMenu)}
               className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-100"
@@ -370,6 +431,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
                 </button>
               </div>
             )}
+          </div>
           </div>
         </div>
         <p className="text-sm" style={{ color: '#757575' }}>

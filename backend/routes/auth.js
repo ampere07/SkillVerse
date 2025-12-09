@@ -286,13 +286,36 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
     console.log('Password hashed successfully');
 
-    const formattedName = toTitleCase(name.trim());
+    const nameParts = name.trim().split(/\s+/);
+    let firstName, middleInitial, lastName;
+
+    if (nameParts.length === 1) {
+      firstName = toTitleCase(nameParts[0]);
+      middleInitial = '';
+      lastName = toTitleCase(nameParts[0]);
+    } else if (nameParts.length === 2) {
+      firstName = toTitleCase(nameParts[0]);
+      middleInitial = '';
+      lastName = toTitleCase(nameParts[1]);
+    } else {
+      firstName = toTitleCase(nameParts[0]);
+      const middle = nameParts[1];
+      if (middle.length === 1 || (middle.length === 2 && middle.endsWith('.'))) {
+        middleInitial = middle.charAt(0).toUpperCase();
+        lastName = toTitleCase(nameParts.slice(2).join(' '));
+      } else {
+        middleInitial = '';
+        lastName = toTitleCase(nameParts.slice(1).join(' '));
+      }
+    }
 
     const user = new User({
       email: email.toLowerCase(),
       password: hashedPassword,
       role,
-      name: formattedName
+      firstName,
+      middleInitial,
+      lastName
     });
 
     console.log('Saving user to database...');
@@ -334,7 +357,10 @@ router.post('/register', async (req, res) => {
       user: {
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
+        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        firstName: user.firstName,
+        middleInitial: user.middleInitial || '',
+        lastName: user.lastName,
         role: user.role,
         surveyCompleted: user.onboardingSurvey?.surveyCompleted || false,
         primaryLanguage: user.primaryLanguage || null
@@ -401,7 +427,10 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
+        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        firstName: user.firstName,
+        middleInitial: user.middleInitial || '',
+        lastName: user.lastName,
         role: user.role,
         surveyCompleted: user.onboardingSurvey?.surveyCompleted || false,
         primaryLanguage: user.primaryLanguage || null
@@ -426,7 +455,10 @@ router.get('/me', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
+        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        firstName: user.firstName,
+        middleInitial: user.middleInitial || '',
+        lastName: user.lastName,
         role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -443,10 +475,10 @@ router.get('/me', authenticateToken, async (req, res) => {
 
 router.put('/update-profile', authenticateToken, async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { firstName, middleInitial, lastName, email } = req.body;
 
-    if (!name || !email) {
-      return res.status(400).json({ message: 'Name and email are required' });
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({ message: 'First name, last name, and email are required' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -464,12 +496,16 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
-    const formattedName = toTitleCase(name.trim());
+    const formattedFirstName = toTitleCase(firstName.trim());
+    const formattedLastName = toTitleCase(lastName.trim());
+    const formattedMiddleInitial = middleInitial ? middleInitial.trim().charAt(0).toUpperCase() : '';
 
     const user = await User.findByIdAndUpdate(
       req.user.userId,
       { 
-        name: formattedName,
+        firstName: formattedFirstName,
+        middleInitial: formattedMiddleInitial,
+        lastName: formattedLastName,
         email: email.toLowerCase()
       },
       { new: true, runValidators: true }
@@ -487,7 +523,10 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
+        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        firstName: user.firstName,
+        middleInitial: user.middleInitial || '',
+        lastName: user.lastName,
         role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -615,7 +654,10 @@ router.put('/change-language', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
+        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        firstName: user.firstName,
+        middleInitial: user.middleInitial || '',
+        lastName: user.lastName,
         role: user.role,
         primaryLanguage: user.primaryLanguage
       }
@@ -680,7 +722,10 @@ router.put('/update-language', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
+        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        firstName: user.firstName,
+        middleInitial: user.middleInitial || '',
+        lastName: user.lastName,
         role: user.role,
         primaryLanguage: user.primaryLanguage,
         surveyCompletedLanguages: user.surveyCompletedLanguages

@@ -33,7 +33,9 @@ export default function Settings() {
   const [countdown, setCountdown] = useState(0);
   
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    middleInitial: '',
+    lastName: '',
     email: '',
     currentPassword: '',
     newPassword: '',
@@ -76,7 +78,9 @@ export default function Settings() {
       if (response.ok) {
         setUserData(data.user);
         setFormData({
-          name: data.user.name,
+          firstName: data.user.firstName || '',
+          middleInitial: data.user.middleInitial || '',
+          lastName: data.user.lastName || '',
           email: data.user.email,
           currentPassword: '',
           newPassword: '',
@@ -244,7 +248,9 @@ export default function Settings() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          name: formData.name,
+          firstName: formData.firstName,
+          middleInitial: formData.middleInitial,
+          lastName: formData.lastName,
           email: formData.email
         })
       });
@@ -415,7 +421,9 @@ export default function Settings() {
                     setIsEditing(false);
                     setFormData({
                       ...formData,
-                      name: userData.name,
+                      firstName: userData.firstName || '',
+                      middleInitial: userData.middleInitial || '',
+                      lastName: userData.lastName || '',
                       email: userData.email
                     });
                   }}
@@ -432,18 +440,51 @@ export default function Settings() {
                 <label className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4" style={{ color: '#757575' }} strokeWidth={1.5} />
-                    Full Name
+                    Name
                   </div>
                 </label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
-                    style={{ color: '#212121' }}
-                  />
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-5">
+                      <input
+                        type="text"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        placeholder="First Name"
+                        required
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+                        style={{ color: '#212121' }}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        name="middleInitial"
+                        value={formData.middleInitial}
+                        onChange={(e) => {
+                          const value = e.target.value.toUpperCase();
+                          setFormData({ ...formData, middleInitial: value.slice(0, 1) });
+                        }}
+                        placeholder="M.I."
+                        maxLength={1}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent text-center"
+                        style={{ color: '#212121' }}
+                      />
+                    </div>
+                    <div className="col-span-5">
+                      <input
+                        type="text"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        placeholder="Last Name"
+                        required
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+                        style={{ color: '#212121' }}
+                      />
+                    </div>
+                  </div>
                 ) : (
                   <p style={{ color: '#212121' }}>{userData.name}</p>
                 )}
