@@ -1,108 +1,109 @@
 import { google } from 'googleapis';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
-const TOKEN_PATH = join(__dirname, '../config/gmail-token.json');
-const CREDENTIALS_PATH = join(__dirname, '../config/gmail-credentials.json');
+const REDIRECT_URI = 'http://localhost';
 
-let oAuth2Client = null;
-
-const loadCredentials = () => {
-  try {
-    const credentials = JSON.parse(readFileSync(CREDENTIALS_PATH, 'utf8'));
-    return credentials.installed || credentials.web;
-  } catch (error) {
-    console.error('Error loading Gmail credentials:', error);
-    throw new Error('Gmail credentials file not found. Please add gmail-credentials.json to backend/config/');
+function createOAuth2Client() {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error('Missing credentials:');
+    console.error('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'Set' : 'Missing');
+    console.error('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'Set' : 'Missing');
+    throw new Error('Missing Google OAuth credentials in .env file');
   }
-};
 
-const loadToken = () => {
-  try {
-    const token = JSON.parse(readFileSync(TOKEN_PATH, 'utf8'));
-    return token;
-  } catch (error) {
-    return null;
-  }
-};
-
-const initializeOAuth2Client = () => {
-  if (oAuth2Client) return oAuth2Client;
-
-  const credentials = loadCredentials();
-  oAuth2Client = new google.auth.OAuth2(
-    credentials.client_id,
-    credentials.client_secret,
-    credentials.redirect_uris[0]
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    REDIRECT_URI
   );
+}
 
-  const token = loadToken();
-  if (token) {
-    oAuth2Client.setCredentials(token);
+let oauth2Client = null;
+
+function getOAuth2Client() {
+  if (!oauth2Client) {
+    oauth2Client = createOAuth2Client();
+    
+    const tokenPath = join(__dirname, '../config/gmail-token.json');
+    if (existsSync(tokenPath)) {
+      try {
+        const token = JSON.parse(readFileSync(tokenPath, 'utf8'));
+        oauth2Client.setCredentials(token);
+        console.log('Gmail API credentials loaded successfully');
+      } catch (error) {
+        console.error('Error loading Gmail token:', error.message);
+      }
+    }
   }
+  return oauth2Client;
+}
 
-  return oAuth2Client;
-};
+export function getAuthUrl() {
+  const client = getOAuth2Client();
+  
+  const authUrl = client.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+    prompt: 'consent'
+  });
 
-const createEmailMessage = (to, subject, htmlBody) => {
-  const emailLines = [
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=utf-8',
-    '',
-    htmlBody
-  ];
+  console.log('\nGenerated Auth URL:');
+  console.log(authUrl);
+  console.log('\nURL Parameters:');
+  const url = new URL(authUrl);
+  url.searchParams.forEach((value, key) => {
+    console.log(`  ${key}: ${value}`);
+  });
 
-  const email = emailLines.join('\r\n');
-  const encodedEmail = Buffer.from(email)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  return authUrl;
+}
 
-  return encodedEmail;
-};
+export async function generateTokenFromCode(code) {
+  const client = getOAuth2Client();
+  const { tokens } = await client.getToken(code);
+  return tokens;
+}
 
-export const sendEmail = async (to, subject, htmlBody) => {
+export async function sendEmail(to, subject, htmlBody) {
   try {
-    const auth = initializeOAuth2Client();
-    const gmail = google.gmail({ version: 'v1', auth });
+    const client = getOAuth2Client();
+    const gmail = google.gmail({ version: 'v1', auth: client });
+    
+    const message = [
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      '',
+      htmlBody
+    ].join('\n');
 
-    const encodedMessage = createEmailMessage(to, subject, htmlBody);
+    const encodedMessage = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
 
-    const response = await gmail.users.messages.send({
+    await gmail.users.messages.send({
       userId: 'me',
       requestBody: {
         raw: encodedMessage
       }
     });
 
-    console.log('Email sent successfully:', response.data.id);
-    return { success: true, messageId: response.data.id };
+    console.log(`Email sent successfully to ${to}`);
+    return true;
   } catch (error) {
-    console.error('Error sending email via Gmail API:', error);
-    throw new Error('Failed to send email');
+    console.error('Error sending email:', error);
+    throw error;
   }
-};
-
-export const getAuthUrl = () => {
-  const auth = initializeOAuth2Client();
-  const authUrl = auth.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-  });
-  return authUrl;
-};
-
-export const generateTokenFromCode = async (code) => {
-  const auth = initializeOAuth2Client();
-  const { tokens } = await auth.getToken(code);
-  auth.setCredentials(tokens);
-  return tokens;
-};
+}

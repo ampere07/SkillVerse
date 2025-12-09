@@ -2,41 +2,10 @@ import express from 'express';
 import User from '../models/User.js';
 import Survey from '../models/Survey.js';
 import MiniProject from '../models/MiniProject.js';
-import { analyzeStudentSkills, validateLearningInputs } from '../services/ollamaService.js';
+import { analyzeStudentSkills } from '../services/ollamaService.js';
 import { generateWeeklyProjects } from '../services/projectGenerationService.js';
 
 const router = express.Router();
-
-router.post('/validate-inputs', async (req, res) => {
-  try {
-    const { courseInterest, learningGoals } = req.body;
-
-    if (!courseInterest || !learningGoals) {
-      return res.status(400).json({ 
-        valid: false,
-        message: 'Both fields are required'
-      });
-    }
-
-    const validation = await validateLearningInputs(courseInterest, learningGoals);
-
-    if (validation.valid) {
-      res.status(200).json({ valid: true });
-    } else {
-      res.status(200).json({ 
-        valid: false,
-        message: validation.reason
-      });
-    }
-  } catch (error) {
-    console.error('Validation error:', error);
-    res.status(500).json({ 
-      valid: false,
-      message: 'AI validation service failed. Please try again.',
-      error: error.message
-    });
-  }
-});
 
 router.post('/submit', async (req, res) => {
   try {

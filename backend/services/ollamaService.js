@@ -10,76 +10,6 @@ console.log('Ollama Service Initialized');
 console.log('Model:', MODEL_NAME);
 console.log('URL:', OLLAMA_URL);
 
-export const validateLearningInputs = async (courseInterest, learningGoals) => {
-  try {
-    const prompt = `You are validating student responses. Accept ANY language including mixed English-Tagalog (Taglish), shortcuts, and slang.
-
-Question 1: "What are you interested in learning?"
-Answer: "${courseInterest}"
-
-Question 2: "What do you want to achieve with programming?"
-Answer: "${learningGoals}"
-
-ACCEPT these as VALID:
-- Any mix of English and Tagalog
-- Shortcuts like "ng", "yung", "ano", "pag", "kasi", "dun"
-- "I dont know", "wala pa", "di ko sure" - uncertainty is OK
-- Any programming words: "web", "app", "coding", "games", etc.
-- Typos and informal grammar
-
-REJECT only if:
-- Only curse words with no programming mention
-- Random letters like "aaaaa" or "qwerty"
-- Only non-tech topics like "basketball" or "cooking"
-
-If VALID, respond: "VALID"
-If INVALID, respond: "INVALID: " then explain what word or phrase you did not understand (max 8 words)
-
-Be specific about what confused you. Examples:
-- "INVALID: The word tangina is not about programming"
-- "INVALID: Random letters aaaaa do not tell us anything"
-- "INVALID: Basketball is not a programming topic"
-
-Validate now:`;
-
-    const response = await ollama.chat({
-      model: MODEL_NAME,
-      messages: [{ role: 'user', content: prompt }],
-      options: {
-        temperature: 0.9,
-        num_predict: 2500,
-        num_ctx: 2048,
-        num_thread: 10
-      }
-    });
-
-    const result = response.message.content.trim();
-    const isValid = result.toUpperCase().includes('VALID') && !result.toUpperCase().includes('INVALID');
-    
-    let reason = result
-      .replace(/^VALID\s*:?\s*/i, '')
-      .replace(/^INVALID\s*:?\s*/i, '')
-      .replace(/\*\*/g, '')
-      .replace(/###/g, '')
-      .replace(/---/g, '')
-      .replace(/^-+\s*/, '')
-      .replace(/^=+\s*/, '')
-      .replace(/Question\s*\d+:/gi, '')
-      .replace(/Student Answer:/gi, '')
-      .replace(/Validation:/gi, '')
-      .replace(/Answer:/gi, '')
-      .trim();
-
-    return {
-      valid: isValid,
-      reason: reason || (isValid ? 'OK' : 'Please tell us about programming or say I dont know')
-    };
-  } catch (error) {
-    console.error('Validation error:', error.message);
-    throw new Error(`AI validation failed: ${error.message}`);
-  }
-};
-
 export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => {
   try {
     console.log('[Survey] Starting AI analysis for student skills...');
@@ -93,8 +23,8 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
       options: {
         temperature: 0.7,
         top_p: 0.95,
-        num_predict: 1500,
-        num_thread: 12
+        num_predict: 1000,
+        num_thread: 10
       }
     });
     

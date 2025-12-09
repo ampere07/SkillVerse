@@ -13,7 +13,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: 'teacher' | 'student') => Promise<void>;
+  register: (email: string, password: string, name: string, role: 'teacher' | 'student', verificationCode: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
   isNewStudent: boolean;
@@ -75,11 +75,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string, role: 'teacher' | 'student') => {
+  const register = async (email: string, password: string, name: string, role: 'teacher' | 'student', verificationCode: string) => {
     const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, name, role })
+      body: JSON.stringify({ email, password, name, role, verificationCode })
     });
 
     if (!response.ok) {

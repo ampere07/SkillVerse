@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
 import Dashboard from './components/Dashboard';
 
 
 function App() {
-  const [showLogin, setShowLogin] = useState(true);
+  const [view, setView] = useState<'login' | 'register' | 'forgot-password'>('login');
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -25,11 +26,24 @@ function App() {
     );
   }
 
-  return showLogin ? (
-    <Login onToggle={() => setShowLogin(false)} />
-  ) : (
-    <Register onToggle={() => setShowLogin(true)} />
-  );
+  if (view === 'login') {
+    return (
+      <Login 
+        onToggle={() => setView('register')} 
+        onForgotPassword={() => setView('forgot-password')}
+      />
+    );
+  }
+
+  if (view === 'register') {
+    return <Register onToggle={() => setView('login')} />;
+  }
+
+  if (view === 'forgot-password') {
+    return <ForgotPassword onBack={() => setView('login')} />;
+  }
+
+  return null;
 }
 
 export default App;

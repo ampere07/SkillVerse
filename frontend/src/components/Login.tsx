@@ -4,9 +4,10 @@ import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onToggle: () => void;
+  onForgotPassword: () => void;
 }
 
-export default function Login({ onToggle }: LoginProps) {
+export default function Login({ onToggle, onForgotPassword }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -91,6 +92,13 @@ export default function Login({ onToggle }: LoginProps) {
                 )}
               </button>
             </div>
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="text-xs text-slate-600 hover:text-slate-900 font-medium transition-colors"
+            >
+              Forgot password?
+            </button>
           </div>
 
           <button
