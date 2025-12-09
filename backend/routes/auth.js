@@ -4,8 +4,12 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import MiniProject from '../models/MiniProject.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { sendEmail } from '../services/gmailService.js';
 
 const router = express.Router();
+
+const verificationCodes = new Map();
+const passwordResetCodes = new Map();
 
 const toTitleCase = (str) => {
   return str
@@ -15,16 +19,234 @@ const toTitleCase = (str) => {
     .join(' ');
 };
 
+router.post('/send-verification-code', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    verificationCodes.set(email.toLowerCase(), {
+      code: verificationCode,
+      expiresAt: Date.now() + 10 * 60 * 1000
+    });
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">SkillVerse</h1>
+          <p style="color: #FFB300; margin: 10px 0 0 0; font-size: 14px;">Educational Platform</p>
+        </div>
+        <div style="background: #ffffff; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h2 style="color: #1B5E20; margin-top: 0;">Email Verification</h2>
+          <p style="color: #555; font-size: 16px; line-height: 1.6;">Welcome to SkillVerse! Please use the verification code below to complete your registration:</p>
+          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; text-align: center; margin: 30px 0;">
+            <p style="color: #888; margin: 0 0 10px 0; font-size: 14px;">Your Verification Code</p>
+            <p style="font-size: 36px; font-weight: bold; color: #1B5E20; margin: 0; letter-spacing: 8px;">${verificationCode}</p>
+          </div>
+          <p style="color: #777; font-size: 14px; line-height: 1.6;">
+            This code will expire in <strong>10 minutes</strong>. If you didn't request this code, please ignore this email.
+          </p>
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+            <p style="color: #999; font-size: 12px; margin: 0;">© 2024 SkillVerse. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await sendEmail(email, 'SkillVerse - Email Verification Code', htmlBody);
+
+    console.log(`Verification code sent to: ${email}`);
+
+    res.json({ 
+      message: 'Verification code sent successfully',
+      success: true 
+    });
+  } catch (error) {
+    console.error('Send verification code error:', error);
+    res.status(500).json({ 
+      message: 'Failed to send verification code. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+router.post('/send-password-reset-code', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (!existingUser) {
+      return res.status(404).json({ message: 'No account found with this email' });
+    }
+
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    passwordResetCodes.set(email.toLowerCase(), {
+      code: resetCode,
+      expiresAt: Date.now() + 10 * 60 * 1000
+    });
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">SkillVerse</h1>
+          <p style="color: #FFB300; margin: 10px 0 0 0; font-size: 14px;">Educational Platform</p>
+        </div>
+        <div style="background: #ffffff; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h2 style="color: #1B5E20; margin-top: 0;">Password Reset Request</h2>
+          <p style="color: #555; font-size: 16px; line-height: 1.6;">You requested to reset your password. Please use the verification code below:</p>
+          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; text-align: center; margin: 30px 0;">
+            <p style="color: #888; margin: 0 0 10px 0; font-size: 14px;">Your Password Reset Code</p>
+            <p style="font-size: 36px; font-weight: bold; color: #1B5E20; margin: 0; letter-spacing: 8px;">${resetCode}</p>
+          </div>
+          <p style="color: #777; font-size: 14px; line-height: 1.6;">
+            This code will expire in <strong>10 minutes</strong>. If you didn't request a password reset, please ignore this email and your password will remain unchanged.
+          </p>
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+            <p style="color: #999; font-size: 12px; margin: 0;">© 2024 SkillVerse. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await sendEmail(email, 'SkillVerse - Password Reset Code', htmlBody);
+
+    console.log(`Password reset code sent to: ${email}`);
+
+    res.json({ 
+      message: 'Password reset code sent successfully',
+      success: true 
+    });
+  } catch (error) {
+    console.error('Send password reset code error:', error);
+    res.status(500).json({ 
+      message: 'Failed to send password reset code. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, verificationCode, newPassword } = req.body;
+
+    if (!email || !verificationCode || !newPassword) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const storedData = passwordResetCodes.get(email.toLowerCase());
+    if (!storedData) {
+      return res.status(400).json({ message: 'Verification code not found. Please request a new code.' });
+    }
+
+    if (Date.now() > storedData.expiresAt) {
+      passwordResetCodes.delete(email.toLowerCase());
+      return res.status(400).json({ message: 'Verification code has expired. Please request a new code.' });
+    }
+
+    if (storedData.code !== verificationCode) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    passwordResetCodes.delete(email.toLowerCase());
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+
+    if (!hasUpperCase) {
+      return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+    }
+
+    if (!hasNumber) {
+      return res.status(400).json({ message: 'Password must contain at least one number' });
+    }
+
+    if (!hasSpecialChar) {
+      return res.status(400).json({ message: 'Password must contain at least one special character' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    user.password = hashedPassword;
+    await user.save();
+
+    console.log(`Password reset successfully for user: ${user.email}`);
+
+    res.json({ 
+      message: 'Password reset successfully',
+      success: true 
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ 
+      message: 'Failed to reset password. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 router.post('/register', async (req, res) => {
   try {
     console.log('Registration request received:', { email: req.body.email, role: req.body.role, name: req.body.name });
     
-    const { email, password, role, name } = req.body;
+    const { email, password, role, name, verificationCode } = req.body;
 
     if (!email || !password || !role || !name) {
       console.log('Missing required fields');
       return res.status(400).json({ message: 'All fields are required' });
     }
+
+    if (!verificationCode) {
+      return res.status(400).json({ message: 'Verification code is required' });
+    }
+
+    const storedData = verificationCodes.get(email.toLowerCase());
+    if (!storedData) {
+      return res.status(400).json({ message: 'Verification code not found. Please request a new code.' });
+    }
+
+    if (Date.now() > storedData.expiresAt) {
+      verificationCodes.delete(email.toLowerCase());
+      return res.status(400).json({ message: 'Verification code has expired. Please request a new code.' });
+    }
+
+    if (storedData.code !== verificationCode) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    verificationCodes.delete(email.toLowerCase());
 
     if (!['teacher', 'student'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });

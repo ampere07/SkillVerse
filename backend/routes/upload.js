@@ -18,7 +18,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024
+    fileSize: 50 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
     const allowedMimes = [
@@ -94,7 +94,12 @@ router.post('/single', authenticateToken, upload.single('file'), async (req, res
 
 router.post('/multiple', authenticateToken, upload.array('files', 10), async (req, res) => {
   try {
+    console.log('[Upload] Multiple file upload request received');
+    console.log('[Upload] Files count:', req.files?.length || 0);
+    console.log('[Upload] Body:', req.body);
+    
     if (!req.files || req.files.length === 0) {
+      console.log('[Upload] No files in request');
       return res.status(400).json({
         success: false,
         message: 'No files uploaded'
@@ -102,11 +107,25 @@ router.post('/multiple', authenticateToken, upload.array('files', 10), async (re
     }
 
     const { classroomName, postTitle, postType } = req.body;
+    
+    if (!classroomName || !postTitle || !postType) {
+      console.error('[Upload] Missing required metadata:', { classroomName, postTitle, postType });
+      req.files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required metadata: classroomName, postTitle, and postType are required'
+      });
+    }
 
-    console.log(`Uploading ${req.files.length} files to: skillverse/${classroomName}/${postTitle}`);
+    console.log(`[Upload] Uploading ${req.files.length} files to: skillverse/${classroomName}/${postTitle}`);
 
     const uploadPromises = req.files.map(async (file) => {
       try {
+        console.log(`[Upload] Processing file: ${file.originalname}`);
         const result = await uploadFile(file, {
           classroomName,
           postTitle,
@@ -115,7 +134,7 @@ router.post('/multiple', authenticateToken, upload.array('files', 10), async (re
 
         fs.unlinkSync(file.path);
 
-        console.log(`  - Uploaded: ${result.public_id}`);
+        console.log(`[Upload] Successfully uploaded: ${result.public_id}`);
 
         return {
           fileName: file.originalname,
@@ -126,6 +145,7 @@ router.post('/multiple', authenticateToken, upload.array('files', 10), async (re
           uploadedAt: new Date()
         };
       } catch (error) {
+        console.error(`[Upload] Error uploading ${file.originalname}:`, error.message);
         if (fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
@@ -135,12 +155,15 @@ router.post('/multiple', authenticateToken, upload.array('files', 10), async (re
 
     const files = await Promise.all(uploadPromises);
 
+    console.log(`[Upload] All files uploaded successfully`);
     res.json({
       success: true,
       message: 'Files uploaded successfully',
       files
     });
   } catch (error) {
+    console.error('[Upload] Multiple file upload error:', error.message);
+    console.error('[Upload] Error stack:', error.stack);
     if (req.files) {
       req.files.forEach(file => {
         if (fs.existsSync(file.path)) {
@@ -148,7 +171,6 @@ router.post('/multiple', authenticateToken, upload.array('files', 10), async (re
         }
       });
     }
-    console.error('Multiple file upload error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to upload files',

@@ -129,7 +129,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
         messages: [{ role: 'user', content: prompt }],
         options: {
           temperature: 0.9,
-          num_predict: 2500,
+          num_predict: 1500,
           num_ctx: 2048,
           num_thread: 10
         }
@@ -186,18 +186,15 @@ const constructRoadmapBasedPrompt = (survey) => {
   }
 
   const aiAnalysisSection = aiAnalysis 
-    ? `\n\nSTUDENT AI ANALYSIS:\nBased on comprehensive assessment, here's what we know about this student:\n${aiAnalysis}\n\nUSE THIS ANALYSIS to tailor project difficulty, explanations, and focus areas. Address their specific strengths and weaknesses identified above.`
+    ? `\n\nAI ANALYSIS:\n${aiAnalysis}\n\nUse this to tailor difficulty, explanations, focus. Address strengths/weaknesses.`
     : '';
 
-  return `You are creating 6 UNIQUE mini programming projects based on a personalized learning roadmap.
+  return `Create 6 unique mini projects based on personalized roadmap.
 
-CRITICAL LANGUAGE REQUIREMENT:
-ALL projects MUST be in ${language} programming language.
-EVERY project Language field MUST say: ${language}
-Do NOT mix languages - if the student selected ${language}, generate ONLY ${language} projects.
+LANGUAGE: ${language} ONLY
+All projects MUST be ${language}. Do not mix languages.
 
-STUDENT LEARNING ROADMAP:
-The student has a structured learning path with specific concepts to master:
+LEARNING ROADMAP:
 
 Phase 1 - Foundation:
 ${learningRoadmap.phase1.map((item, i) => `${i + 1}. ${item}`).join('\n')}
@@ -208,13 +205,12 @@ ${learningRoadmap.phase2.map((item, i) => `${i + 1}. ${item}`).join('\n')}
 Phase 3 - Advanced Practice:
 ${learningRoadmap.phase3.map((item, i) => `${i + 1}. ${item}`).join('\n')}
 
-Primary Language: ${language}
-Skill Level: ${skillLevel}${aiAnalysisSection}
+Language: ${language}
+Level: ${skillLevel}${aiAnalysisSection}
 
-PROJECT GENERATION REQUIREMENTS:
-
-CRITICAL: ALL 6 PROJECTS MUST BE FROM PHASE 1 CONCEPTS ONLY.
-Create ONE project for EACH of the 6 Phase 1 roadmap items:
+GENERATION:
+All 6 projects from Phase 1 only.
+One project per Phase 1 item:
 - Project 1: Based on Phase 1, Item 1 (${phase1Items[0]})
 - Project 2: Based on Phase 1, Item 2 (${phase1Items[1]})
 - Project 3: Based on Phase 1, Item 3 (${phase1Items[2]})
@@ -223,28 +219,22 @@ Create ONE project for EACH of the 6 Phase 1 roadmap items:
 - Project 6: Based on Phase 1, Item 6 (${phase1Items[5]})
 
 Each project MUST:
-1. Teach the SPECIFIC concept from the roadmap item
-2. Be a SINGLE FILE console program
-3. Use Scanner (Java) or input() (Python) for user interaction
-4. Include 3-4 clear requirements (concise and specific)
-5. Progress in difficulty following the roadmap phases
+1. Teach the SPECIFIC roadmap concept
+2. Single-file console program
+3. Use Scanner/input() for interaction
+4. Include 3-4 specific requirements
 
-TECHNICAL CONSTRAINTS:
-- SINGLE FILE ONLY - One .java or .py file
-- CONSOLE INPUT/OUTPUT - Scanner (Java) or input() (Python)
-- NO WEB SERVERS - No servlets, JSP, Flask, Django
-- NO DATABASES - Use arrays/lists to store data
-- NO GUI - Text-based console only
-- NO EXTERNAL LIBRARIES - Use standard library only
-- NO FILE I/O - No reading/writing files (use in-memory data only)
-- NO FILE UPLOAD/DOWNLOAD - All data must be entered via console
-- NO EXTERNAL FILES - Everything must be in one code file
+CONSTRAINTS:
+- Single .java/.py file only
+- Console I/O: Scanner/input()
+- No web servers, databases, GUI
+- No external libraries
+- No file I/O - in-memory only
+- All data via console
 
-SKILL LEVEL REQUIREMENT:
-Student Skill Level: ${skillLevel}
+SKILL: ${skillLevel}
 ${getSkillLevelGuidance(skillLevel)}
-
-ALL 6 PROJECTS MUST BE AT EXACTLY ${skillLevel} LEVEL
+All projects ${skillLevel} level
 
 FORMAT EACH PROJECT:
 
@@ -252,79 +242,74 @@ IMPORTANT: Language field MUST be exactly: ${language}
 
 PROJECT 1:
 Title: [Concept] - [App Name]
-Description: Teaches [CONCEPT]. [1 sentence why important]. [1 sentence what to build]. (Max 3 sentences total)
+Description: Teaches [CONCEPT]. [Why important]. [What to build].
 Language: ${language}
 Requirements:
-- [Requirement 1 - specific and measurable]
-- [Requirement 2 - specific and measurable]
-- [Requirement 3 - specific and measurable]
-- [Requirement 4 - specific and measurable]
+- [Specific requirement 1]
+- [Specific requirement 2]
+- [Specific requirement 3]
+- [Specific requirement 4]
 Rubrics:
-[4-5 grading criteria totaling 100 points]
+[4-5 criteria, 100 pts total]
 
-EXAMPLE PROJECT (Roadmap Item: "Practice basic syntax and variables"):
+EXAMPLE:
 
 PROJECT 1:
-Title: Variables and Data Types - Student Profile
-Description: Teaches variables and data types. Understanding different data types is essential for storing information. You will create a program that stores and displays student information.
+Title: Variables - Student Profile
+Description: Teaches variables/data types for storing information. Create a program to store and display student data.
 Language: ${language}
 Requirements:
-- Declare 4 variables: studentName (String), age (int), gpa (double), isEnrolled (boolean)
-- Use Scanner/input() to accept user input for each variable
-- Validate age (1-100) and GPA (0.0-4.0)
-- Display formatted profile with all information
+- Declare 4 variables: name(String), age(int), gpa(double), enrolled(boolean)
+- Accept input via Scanner/input()
+- Validate age(1-100) and GPA(0.0-4.0)
+- Display formatted profile
 Rubrics:
-- Variable Declaration (25 pts): All 4 data types declared correctly
-- User Input (25 pts): Proper Scanner/input() usage
-- Validation (25 pts): Age and GPA validated correctly
-- Output Format (15 pts): Clean display
-- Code Quality (10 pts): Proper naming
+- Variables (25pts): Correct declarations
+- Input (25pts): Proper usage
+- Validation (25pts): Age/GPA checks
+- Output (15pts): Clean display
+- Code Quality (10pts): Naming
 
-EXAMPLE PROJECT (Roadmap Item: "Object-oriented programming basics"):
+EXAMPLE:
 
 PROJECT 3:
-Title: OOP Basics - Book Manager
-Description: Teaches object-oriented programming with classes and objects. OOP helps organize code for larger programs. You will create a Book class with properties and methods.
+Title: OOP - Book Manager
+Description: Teaches OOP with classes/objects for code organization. Create a Book class with properties and methods.
 Language: ${language}
 Requirements:
-- Create Book class with properties: title, author, pages, isRead
-- Implement displayInfo() and markAsRead() methods
-- Create ArrayList to store 3+ Book objects
-- Implement menu: Add Book, Display All, Mark as Read, Exit
+- Book class: title, author, pages, isRead
+- Methods: displayInfo(), markAsRead()
+- ArrayList storing 3+ Book objects
+- Menu: Add, Display, Mark Read, Exit
 Rubrics:
-- Class Definition (25 pts): Proper Book class with all properties
-- Methods (25 pts): Working display and markAsRead methods
-- Object Management (20 pts): ArrayList with multiple objects
-- Menu System (20 pts): All menu options functional
-- Code Quality (10 pts): Clean structure
+- Class (25pts): Properties defined
+- Methods (25pts): Functions work
+- Objects (20pts): ArrayList usage
+- Menu (20pts): All options work
+- Code (10pts): Structure
 
-IMPORTANT REMINDERS:
-- Each project MUST directly teach a specific Phase 1 concept
-- All 6 projects focus on Phase 1 - Foundation concepts only
-- Projects should be at similar difficulty level (all foundation)
-- Phase 2 and Phase 3 will be covered in future weeks
-- All single-file console programs with clear learning objectives
-- DO NOT use asterisks ** in titles
-- NO FILE I/O OPERATIONS - Use in-memory data only
-- NO FILE READING/WRITING - All data via Scanner/input()
-- Focus on TEACHING the Phase 1 roadmap concept through practical application
+REMINDERS:
+- Each project teaches specific Phase 1 concept
+- All 6 projects Phase 1 only
+- Similar difficulty (foundation level)
+- Single-file console programs
+- No ** in titles
+- No file I/O, use in-memory data
+- All data via Scanner/input()
+- Focus on teaching Phase 1 concepts
 
-REQUIREMENTS GENERATION:
-- EVERY project MUST have exactly 4 UNIQUE, SPECIFIC requirements
-- Requirements must be MEASURABLE and TESTABLE
-- Each requirement should specify EXACTLY what needs to be implemented
-- Requirements must be DIFFERENT for each project
-- Keep requirements concise (one clear sentence each)
+REQUIREMENTS:
+- 4 unique, specific, measurable requirements per project
+- Each different from other projects
 
-RUBRICS GENERATION:
-- Include 4-5 grading criteria totaling 100 points
-- Rubrics must align with project requirements
-- Each criterion should be specific and measurable
+RUBRICS:
+- 4-5 criteria totaling 100 pts
+- Align with requirements
 
 PERSONALIZATION:
-- USE THE AI ANALYSIS to personalize difficulty, explanations, and focus areas
-- Address the student's specific strengths and weaknesses in project design
-- Adjust requirements complexity based on skill level
+- Use AI analysis for difficulty/explanations
+- Address student strengths/weaknesses
+- Adjust complexity to skill level
 
 CRITICAL: ALL 6 PROJECTS MUST BE IN ${language}. DO NOT GENERATE PYTHON IF LANGUAGE IS JAVA. DO NOT GENERATE JAVA IF LANGUAGE IS PYTHON.
 
@@ -346,216 +331,178 @@ const constructPersonalizedPrompt = (survey) => {
   const { strengths, weaknesses } = studentSkills;
   
   const aiAnalysisSection = aiAnalysis 
-    ? `\n\nSTUDENT AI ANALYSIS:\nBased on comprehensive assessment:\n${aiAnalysis}\n\nUSE THIS ANALYSIS to create projects that address the student's specific needs, learning style, and areas for improvement.`
+    ? `\n\nAI ANALYSIS:\n${aiAnalysis}\n\nUse this for student needs, learning style, improvement areas.`
     : '';
   
-  return `You are creating 6 UNIQUE mini programming projects that teach FUNDAMENTAL PROGRAMMING CONCEPTS needed for the student's goal.
+  return `Create 6 unique mini projects teaching fundamental concepts for student goal.
 
-STUDENT PROFILE:
-Student Interest: "${courseInterest || 'General Programming'}"
-Student Goals: "${learningGoals || 'Improve programming skills'}"
-Primary Language: ${language}
-Skill Level: ${skillLevel}
+PROFILE:
+Interest: "${courseInterest || 'General Programming'}"
+Goals: "${learningGoals || 'Improve skills'}"
+Language: ${language}
+Level: ${skillLevel}
 
-STUDENT SKILLS ASSESSMENT:
-AI Analysis: ${aiAnalysis || 'No analysis available'}
-
+SKILLS:
 Strengths: ${strengths.join(', ')}
 Weaknesses: ${weaknesses.join(', ')}${aiAnalysisSection}
 
-PROJECT GENERATION STRATEGY:
-Based on the student's skills, create projects that:
-1. Build on their STRENGTHS (${strengths.slice(0, 2).join(', ')})
-2. Address their WEAKNESSES (${weaknesses.slice(0, 2).join(', ')})
-3. Progress gradually from concepts they know to concepts they need to learn
-4. Each project should target ONE specific weakness while using their strengths
+STRATEGY:
+1. Build on strengths (${strengths.slice(0, 2).join(', ')})
+2. Address weaknesses (${weaknesses.slice(0, 2).join(', ')})
+3. Progress from known to new concepts
+4. Target one weakness per project
 
-CRITICAL UNDERSTANDING:
-The student wants to learn "${courseInterest || 'programming'}", but we have a SINGLE FILE CONSOLE COMPILER with ONE code editor and ONE output window.
+KEY: Single-file console compiler.
+Create console projects teaching concepts foundational to "${courseInterest || 'programming'}".
 
-Therefore, create CONSOLE PROJECTS that teach PROGRAMMING CONCEPTS that are foundational to "${courseInterest || 'programming'}".
-
-CONCEPT MAPPING FOR "${courseInterest || 'programming'}":
+CONCEPTS FOR "${courseInterest || 'programming'}":
 ${conceptsMapping}
 
-PROJECT APPROACH:
-Instead of: "Build an HTTP server" (impossible - needs web server)
-Create: "Employee Inheritance System - Learn inheritance which web frameworks use for request handlers"
+APPROACH:
+- Not HTTP server → Inheritance System (teach concepts for web frameworks)
+- Not Database CRUD → Record Manager (teach collections)
+- Not React component → State Manager (teach objects/state)
+- Not File Log Viewer → Entry Manager (teach arrays/structures)
 
-Instead of: "Database CRUD app" (impossible - needs database)
-Create: "Student Record Manager - Learn collections which databases use internally"
+PERSONALIZATION:
+1. Each project teaches a DIFFERENT concept
+2. Concept is RELEVANT to "${courseInterest || 'programming'}"
+3. Explain WHY it matters for their goal
+4. Single-file console programs
+5. Use Scanner/input()
+6. 4-6 unique requirements per project
 
-Instead of: "React component" (impossible - needs React)
-Create: "Component State Manager - Learn objects and state which React uses"
-
-Instead of: "Log Viewer reading from file" (impossible - needs file system)
-Create: "Log Entry Manager - Learn arrays and data structures used in logging systems"
-
-PERSONALIZATION REQUIREMENTS:
-1. Each project teaches a DIFFERENT programming concept
-2. Each concept is RELEVANT to "${courseInterest || 'programming'}"
-3. Explain WHY this concept matters for their goal
-4. All projects are SINGLE FILE console programs
-5. Use Scanner (Java) or input() (Python) for user interaction
-6. Every project must have UNIQUE, DETAILED requirements (4-6 specific requirements each)
-
-6 DIFFERENT CONCEPTS TO TEACH (choose from based on interest):
+CONCEPTS (${skillLevel}):
 ${getConcepts(skillLevel)}
 
-PROJECT DIVERSITY (Each must be UNIQUE):
-Project 1: ${conceptsMapping.split('\n')[0]}
-Project 2: ${conceptsMapping.split('\n')[1] || 'File operations'}
-Project 3: ${conceptsMapping.split('\n')[2] || 'Data structures'}
-Project 4: ${conceptsMapping.split('\n')[3] || 'Error handling'}
-Project 5: ${conceptsMapping.split('\n')[4] || 'Algorithm practice'}
-Project 6: ${conceptsMapping.split('\n')[5] || 'Object-oriented design'}
+DIVERSITY:
+P1: ${conceptsMapping.split('\n')[0]}
+P2: ${conceptsMapping.split('\n')[1] || 'File ops'}
+P3: ${conceptsMapping.split('\n')[2] || 'Data structures'}
+P4: ${conceptsMapping.split('\n')[3] || 'Error handling'}
+P5: ${conceptsMapping.split('\n')[4] || 'Algorithms'}
+P6: ${conceptsMapping.split('\n')[5] || 'OOP design'}
 
-TECHNICAL CONSTRAINTS:
-- SINGLE FILE ONLY - One .java or .py file
-- CONSOLE INPUT/OUTPUT - Scanner (Java) or input() (Python)
-- NO WEB SERVERS - No servlets, JSP, Flask, Django
-- NO DATABASES - Use arrays/lists to store data
-- NO GUI - Text-based console only
-- NO EXTERNAL LIBRARIES - Use standard library only
-- NO FILE I/O - No reading/writing files (use in-memory data only)
-- NO FILE UPLOAD/DOWNLOAD - All data must be entered via console
-- NO EXTERNAL FILES - Everything must be in one code file
+CONSTRAINTS:
+- Single .java/.py file
+- Console I/O: Scanner/input()
+- No web servers, databases, GUI
+- No external libraries
+- No file I/O - in-memory only
+- All data via console
 
-CRITICAL SKILL LEVEL REQUIREMENT:
-Student Skill Level: ${skillLevel}
+SKILL: ${skillLevel}
 ${getSkillLevelGuidance(skillLevel)}
+All projects exactly ${skillLevel} level.
 
-ALL 6 PROJECTS MUST BE AT EXACTLY ${skillLevel} LEVEL - NO EXCEPTIONS
-
-This means:
 ${getSkillLevelExamples(skillLevel, courseInterest)}
 
-IMPORTANT: Do NOT create easier projects "to warm up" or harder projects "to challenge". EVERY project must match their ${skillLevel} ability exactly.
+No easier/harder projects. Match ${skillLevel} exactly.
 
 FORMAT EACH PROJECT:
 
 PROJECT 1:
-Title: [Concept Name + Application] (e.g., "Inheritance - User Account System")
-Description: This project teaches [CONCEPT] which is essential for ${courseInterest || 'programming'}. In ${courseInterest || 'this field'}, [explain how concept is used]. You will create a console program that [what they build]. This helps you understand [why it matters for their goal].
+Title: [Concept] - [Application]
+Description: Teaches [CONCEPT] essential for ${courseInterest || 'programming'}. [How used in field]. Create console program [what to build]. [Why it matters].
 Language: ${language}
 Requirements:
-- [SPECIFIC requirement with exact technical details - must be unique to THIS project]
-- [MEASURABLE requirement that can be tested - include numbers/criteria]
-- [DETAILED requirement for user interaction - specify exact input format]
-- [CLEAR requirement for expected behavior - describe exact output]
-- [Optional: Additional unique requirement based on concept complexity]
+- [Specific requirement 1]
+- [Measurable requirement 2]
+- [User interaction requirement 3]
+- [Expected behavior requirement 4]
 Sample Output:
-[Show realistic console interaction demonstrating the concept]
+[Console interaction example]
 Rubrics:
-[Detailed grading criteria for this project with point distribution totaling 100 points]
+[Criteria, 100 pts total]
 
-EXAMPLE FOR WEB DEVELOPMENT STUDENT:
+EXAMPLE (Web Dev):
 
 PROJECT 1:
-Title: Inheritance - Request Handler System
-Description: This project teaches inheritance which is essential for Web Development. In web frameworks like Spring Boot, inheritance is used to create different types of request handlers (GET, POST, PUT, DELETE) that share common behavior. You will create a console program that simulates a request handling system using inheritance. This helps you understand how web frameworks organize code and handle different HTTP methods.
+Title: Inheritance - Request Handler
+Description: Teaches inheritance for web dev. Web frameworks use inheritance for request handlers (GET, POST) with shared behavior. Create console program simulating request handling. Understand how frameworks organize code.
 Language: Java
 Requirements:
-- Create an abstract RequestHandler base class with protected properties: timestamp (String), statusCode (int), and method processRequest()
-- Implement GetHandler class extending RequestHandler with a retrieve() method for fetching data
-- Implement PostHandler class extending RequestHandler with a create() method for adding data
-- Create an array or ArrayList to store at least 3 different handler objects
-- Use Scanner to accept menu choice (1=GET, 2=POST, 3=Exit) and resource path input
-- Demonstrate polymorphism by calling processRequest() on handler objects stored in a collection
+- Abstract RequestHandler: timestamp, statusCode, processRequest()
+- GetHandler extends RequestHandler with retrieve()
+- PostHandler extends RequestHandler with create()
+- Store 3+ handlers in ArrayList
+- Scanner menu (1=GET, 2=POST, 3=Exit)
+- Demonstrate polymorphism
 Sample Output:
-=== Request Handler System ===
-1. Process GET request
-2. Process POST request
-3. Exit
-Enter choice: 1
-Enter resource path: /users
-[GET] Processing request for /users
+=== Request Handler ===
+1. GET 2. POST 3. Exit
+Choice: 1
+Path: /users
+[GET] /users
 Status: 200 OK
-Timestamp: 2025-11-15 10:30:45
-Data retrieved successfully
 Rubrics:
-- Base Class Design (20 points): Proper RequestHandler base class with required properties
-- Inheritance Implementation (25 points): Correct child classes inheriting from base
-- Polymorphism (20 points): Successful demonstration of polymorphic behavior
-- Unique Behaviors (15 points): Each handler type has distinct functionality
-- Menu and Input (10 points): Working menu system with proper input handling
-- Code Structure (10 points): Clean organization and proper OOP principles
+- Base Class (20pts): RequestHandler proper
+- Inheritance (25pts): Child classes correct
+- Polymorphism (20pts): Demonstrated
+- Behaviors (15pts): Distinct functionality
+- Menu (10pts): Working input
+- Structure (10pts): Clean OOP
 
-EXAMPLE FOR DATA ANALYTICS STUDENT:
+EXAMPLE (Data Analytics):
 
 PROJECT 1:
-Title: Collections - Student Records Manager
-Description: This project teaches Collections which are essential for Data Analytics. In data systems, collections like ArrayList and HashMap are used to store and manage records efficiently. You will create a console program that manages student records using collections. This helps you understand how databases and analytics tools organize data internally.
+Title: Collections - Records Manager
+Description: Teaches Collections for data analytics. Data systems use ArrayList/HashMap for efficient storage. Create console program managing student records. Understand data organization.
 Language: Java
 Requirements:
-- Create a Student class with properties: id (int), name (String), grade (double)
-- Use ArrayList<Student> to store all student records (minimum capacity: 10)
-- Use HashMap<Integer, Student> to index students by ID for O(1) lookup time
-- Implement addStudent() method that adds to both ArrayList and HashMap
-- Implement searchById() method that uses HashMap for fast retrieval
-- Implement calculateStatistics() method that computes: average grade, highest grade, lowest grade
-- Use Scanner to accept menu choice and student data (validate grade is between 0-100)
+- Student class: id, name, grade
+- ArrayList<Student> for records
+- HashMap<Integer, Student> for indexing
+- Methods: addStudent(), searchById(), calculateStatistics()
+- Scanner menu with grade validation (0-100)
 Sample Output:
-=== Student Records Manager ===
-1. Add student
-2. Search by ID
-3. Display all
-4. Calculate average grade
-5. Exit
-Enter choice: 1
-Enter student ID: 1001
-Enter name: Juan Dela Cruz
-Enter grade: 85
-Student added successfully!
-
-Enter choice: 4
-Average grade: 85.0
-Total students: 1
+=== Records Manager ===
+1. Add 2. Search 3. Display 4. Stats 5. Exit
+Choice: 1
+ID: 1001
+Name: Juan
+Grade: 85
+Added!
 Rubrics:
-- ArrayList Implementation (20 points): Proper use of ArrayList for storing records
-- HashMap Implementation (20 points): Correct HashMap usage for indexing by ID
-- CRUD Operations (25 points): Working add, search, and display functionality
-- Statistics Calculation (20 points): Accurate average and highest score computation
-- Menu System (10 points): Functional menu with all options
-- Code Quality (5 points): Clean code and proper naming
+- ArrayList (20pts): Proper usage
+- HashMap (20pts): Indexing correct
+- CRUD (25pts): Operations work
+- Statistics (20pts): Calculations accurate
+- Menu (10pts): Functional
+- Code (5pts): Clean
 
-IMPORTANT REMINDERS:
-- Connect EVERY project to "${courseInterest || 'programming'}"
-- Teach programming concepts that matter for their goal
+REMINDERS:
+- Connect projects to "${courseInterest || 'programming'}"
+- Teach relevant concepts for their goal
+- Each project completely different
+- Single-file console programs
+- Explain WHY concept matters
+- Show console interaction
+- All ${skillLevel} level
+- No ** in titles
+- No file I/O, use in-memory data
+- All data via Scanner/input()
+
+REQUIREMENTS:
+- 4-7 unique, specific, measurable requirements per project
+- Describe exact implementation details
 - Each project must be completely different
-- All single-file console programs
-- Include clear explanation of WHY this concept matters
-- Show realistic console interaction
-- All at ${skillLevel} level
-- DO NOT use asterisks ** in titles
-- NO FILE I/O OPERATIONS - Use in-memory data only (arrays, lists, maps)
-- NO FILE READING/WRITING - All data via Scanner/input()
-- Users enter data through console, not files
 
-REQUIREMENTS GENERATION (CRITICAL):
-- EVERY project MUST have 4-7 UNIQUE, DETAILED requirements
-- Each requirement must be SPECIFIC and MEASURABLE
-- Bad: "Handle user input" - Good: "Use Scanner to accept 3 integers between 1-100"
-- Bad: "Create a class" - Good: "Create Employee class with name, id, salary properties"
-- Requirements must describe EXACT implementation details
-- Each project's requirements must be COMPLETELY DIFFERENT from others
-
-RUBRICS GENERATION:
-- ALWAYS include detailed rubrics with clear grading criteria totaling 100 points
-- Rubrics should align perfectly with the requirements listed above
-- Each rubric criterion should directly correspond to a requirement
-- Rubrics should assess both technical implementation and concept understanding
+RUBRICS:
+- Clear grading criteria, 100 pts total
+- Align with requirements
+- Assess technical implementation and concept understanding
 
 PERSONALIZATION:
-- USE THE AI ANALYSIS to personalize projects for the student's learning style
-- Address specific strengths and weaknesses identified in the AI analysis
-- Adjust requirements complexity based on demonstrated skill level
+- Use AI analysis for learning style
+- Address identified strengths/weaknesses
+- Adjust complexity to skill level
 
-CRITICAL: Base the difficulty and concepts on the student's actual skills:
-- Include 2 projects focused on strengthening: ${strengths.slice(0, 2).join(' and ')}
-- Include 4 projects focused on improving: ${weaknesses.join(', ')}
-- Each project should be practical and relevant to ${courseInterest || 'programming'}
-- Projects should progress in difficulty based on the concepts covered
+SKILL-BASED:
+- 2 projects strengthening: ${strengths.slice(0, 2).join(' and ')}
+- 4 projects improving: ${weaknesses.join(', ')}
+- Practical and relevant to ${courseInterest || 'programming'}
+- Progress in difficulty
 
 Generate 6 SKILL-BASED, CONCEPT-FOCUSED projects for ${courseInterest || 'programming'}:`;
 };
@@ -565,159 +512,159 @@ const getConceptsForGoal = (interest, goals, skillLevel) => {
   
   if (text.includes('web') || text.includes('website') || text.includes('html')) {
     if (skillLevel === 'Beginner') {
-      return `- Object-Oriented Programming basics (used in all web frameworks)
-- Arrays and Lists (used to manage data in web apps)
-- String manipulation (used for processing form inputs)
-- Loops and conditionals (used for validation logic)
-- Methods and functions (used to organize web app code)
-- Simple console menus (simulating user interfaces)`;
+      return `- OOP basics (web frameworks)
+- Arrays/Lists (data management)
+- String manipulation (form processing)
+- Loops/conditionals (validation)
+- Methods/functions (code organization)
+- Console menus (UI simulation)`;
     } else if (skillLevel === 'Intermediate') {
-      return `- Inheritance (used in Spring MVC controllers and request handlers)
-- Interfaces and Polymorphism (used in service layers and dependency injection)
-- Collections and Maps (used for session management and caching)
-- Exception handling (used for error handling in web apps)
-- String parsing and validation (used for processing HTTP requests)
-- Data structures for routing (HashMaps for URL mapping)`;
+      return `- Inheritance (MVC controllers)
+- Interfaces/Polymorphism (dependency injection)
+- Collections/Maps (sessions, caching)
+- Exception handling (error handling)
+- String parsing (HTTP requests)
+- Data structures (routing)`;
     } else {
-      return `- Design Patterns (Factory, Singleton used in Spring framework)
-- Advanced OOP (Abstract classes used in framework design)
-- Data structures (HashMaps used for routing and middleware)
-- Algorithm optimization (used in web app performance tuning)
-- State management patterns (used in web applications)
-- Advanced collections (used for caching and session management)`;
+      return `- Patterns (Factory/Singleton)
+- Advanced OOP (framework design)
+- Data structures (routing/middleware)
+- Algorithm optimization (performance)
+- State management
+- Advanced collections (caching)`;
     }
   }
   
   if (text.includes('game') || text.includes('gaming')) {
     if (skillLevel === 'Beginner') {
-      return `- Variables and data types (used for player stats and scores)
-- Loops (used for game loops and repeated actions)
-- Conditionals (used for game rules and logic)
-- Arrays (used for storing game items and enemies)
-- Basic functions (used for game actions like attack, defend)
-- Random numbers (used for game mechanics and chance)`;
+      return `- Variables/types (player stats)
+- Loops (game loops)
+- Conditionals (game rules)
+- Arrays (items/enemies)
+- Functions (actions)
+- Random numbers (mechanics)`;
     } else if (skillLevel === 'Intermediate') {
-      return `- Object-oriented design (used for game entities like Player, Enemy)
-- Inheritance (used for different character types)
-- Collision detection algorithms (used in 2D game logic)
-- State management (used for game states like menu, playing, game over)
-- Data structures (used for inventory and maps)
-- Event handling patterns (used for player input)`;
+      return `- OOP design (entities)
+- Inheritance (character types)
+- Collision detection (2D logic)
+- State management (game states)
+- Data structures (inventory)
+- Event handling (input)`;
     } else {
-      return `- Game AI algorithms (pathfinding, decision trees)
-- Design patterns (State pattern for game states, Observer for events)
-- Performance optimization (efficient collision detection)
-- Advanced data structures (quad trees for spatial partitioning)
-- Procedural generation algorithms
-- Complex game mechanics (physics, combat systems)`;
+      return `- AI algorithms (pathfinding)
+- Patterns (State/Observer)
+- Performance optimization
+- Advanced structures (quad trees)
+- Procedural generation
+- Complex mechanics (physics)`;
     }
   }
   
   if (text.includes('data') || text.includes('analytics') || text.includes('database')) {
     if (skillLevel === 'Beginner') {
-      return `- Arrays and Lists (foundation for data storage)
-- Loops (used for processing multiple records)
-- String parsing (used for data input and formatting)
-- Variables (used for data calculations)
-- Simple sorting (used for organizing data)
-- Console input (simulating data entry)`;
+      return `- Arrays/Lists (data storage)
+- Loops (record processing)
+- String parsing (data formatting)
+- Variables (calculations)
+- Simple sorting (organization)
+- Console input (data entry)`;
     } else if (skillLevel === 'Intermediate') {
-      return `- Collections (ArrayList, HashMap used in data management)
-- Sorting algorithms (used for data organization)
-- Search algorithms (used for querying data)
-- Data validation (used for ensuring data quality)
-- Aggregation logic (used for calculating statistics)
-- Data structures for indexing (used in databases)`;
+      return `- Collections (data management)
+- Sorting algorithms
+- Search algorithms (querying)
+- Data validation
+- Aggregation (statistics)
+- Indexing structures`;
     } else {
-      return `- Advanced data structures (trees, graphs for complex queries)
-- Algorithm optimization (efficient searching and sorting)
-- Indexing algorithms (used in database internals)
-- Query optimization patterns
-- Advanced collections (used for data caching)
-- Statistical algorithms (used in analytics)`;
+      return `- Advanced structures (trees/graphs)
+- Algorithm optimization
+- Indexing algorithms
+- Query optimization
+- Advanced collections (caching)
+- Statistical algorithms`;
     }
   }
   
   if (text.includes('ai') || text.includes('machine learning') || text.includes('ml')) {
     if (skillLevel === 'Beginner') {
-      return `- Arrays (foundation for vectors and matrices)
-- Loops (used for iterating over data)
-- Basic math operations (used in calculations)
-- Conditionals (used for decision making)
-- Functions (used for organizing ML code)
-- Random numbers (used for initialization)`;
+      return `- Arrays (vectors/matrices)
+- Loops (data iteration)
+- Math operations
+- Conditionals (decisions)
+- Functions (code organization)
+- Random numbers`;
     } else if (skillLevel === 'Intermediate') {
-      return `- Matrix operations (foundation of neural networks)
-- Statistical algorithms (mean, variance used in ML)
-- Pattern matching algorithms
-- Data structures for ML (arrays, lists for datasets)
-- File I/O (loading training data)
-- Basic classification algorithms`;
+      return `- Matrix operations (neural nets)
+- Statistical algorithms (mean/variance)
+- Pattern matching
+- Data structures (datasets)
+- File I/O (training data)
+- Classification algorithms`;
     } else {
-      return `- Algorithm implementation (gradient descent, backpropagation)
-- Advanced data structures (trees for decision making)
+      return `- Algorithms (gradient descent)
+- Advanced structures (trees)
 - Optimization algorithms
-- Statistical methods (probability, distributions)
-- Neural network basics (perceptron, activation functions)
-- Performance optimization for ML`;
+- Statistical methods
+- Neural network basics
+- Performance optimization`;
     }
   }
   
   if (text.includes('mobile') || text.includes('app')) {
     if (skillLevel === 'Beginner') {
-      return `- Object-oriented basics (used for app components)
-- Arrays and Lists (used for app data)
-- String handling (used for user input)
-- Validation logic (used for forms)
-- Basic functions (used for button actions)
-- State variables (used for tracking app state)`;
+      return `- OOP basics (app components)
+- Arrays/Lists (app data)
+- String handling (input)
+- Validation logic (forms)
+- Functions (button actions)
+- State variables (tracking)`;
     } else if (skillLevel === 'Intermediate') {
-      return `- Object-oriented design (used for activities and fragments)
-- State management (used for app lifecycle)
-- Event handling (used for user interactions)
-- Collections (used for lists and adapters)
-- Validation patterns (used in forms)
-- Data structures for UI (used in mobile apps)`;
+      return `- OOP design (activities/fragments)
+- State management (lifecycle)
+- Event handling (interactions)
+- Collections (lists/adapters)
+- Validation patterns (forms)
+- UI data structures`;
     } else {
-      return `- Design patterns (MVC, MVVM used in mobile apps)
-- Advanced state management (handling complex app states)
-- Data structures for efficient UI (RecyclerView patterns)
-- Performance optimization (efficient data loading)
-- Architecture patterns (clean architecture)
-- Advanced collections (used for caching)`;
+      return `- Patterns (MVC/MVVM)
+- Advanced state management
+- Efficient UI structures
+- Performance optimization
+- Architecture patterns
+- Advanced collections (caching)`;
     }
   }
   
-  return `- Object-oriented programming fundamentals
-- Data structures (arrays, lists, maps)
-- File input/output operations
-- Error handling and validation
-- Algorithm practice (sorting, searching)
-- Code organization and functions`;
+  return `- OOP fundamentals
+- Data structures (arrays/lists/maps)
+- File I/O operations
+- Error handling, validation
+- Algorithms (sorting/searching)
+- Code organization`;
 };
 
 const getConcepts = (skillLevel) => {
   if (skillLevel === 'Beginner') {
-    return `- Variables and data types
-- Loops (for, while)
-- Conditionals (if-else, switch)
-- Arrays and basic collections
-- Functions and methods
-- Console input/output`;
+    return `- Variables, data types
+- Loops (for/while)
+- Conditionals (if-else/switch)
+- Arrays, collections
+- Functions, methods
+- Console I/O`;
   } else if (skillLevel === 'Intermediate') {
-    return `- Inheritance and polymorphism
-- Interfaces and abstract classes
-- Collections (List, Set, Map)
+    return `- Inheritance, polymorphism
+- Interfaces, abstract classes
+- Collections (List/Set/Map)
 - Exception handling
-- Sorting and searching algorithms
-- String manipulation and parsing`;
+- Sorting, searching
+- String manipulation`;
   } else {
-    return `- Design patterns (Factory, Singleton, Observer)
-- Advanced OOP (abstraction, encapsulation)
-- Complex data structures (trees, graphs, heaps)
+    return `- Design patterns (Factory/Singleton/Observer)
+- Advanced OOP
+- Complex structures (trees/graphs/heaps)
 - Algorithm optimization
-- Recursion and dynamic programming
-- Advanced collections and generics`;
+- Recursion, dynamic programming
+- Advanced collections, generics`;
   }
 };
 
@@ -729,100 +676,94 @@ const getSkillLevelExamples = (level, interest) => {
   
   if (level === 'Beginner') {
     if (isWeb) {
-      return `- Inheritance Example: Simple two-level hierarchy (User -> AdminUser with basic properties)
-- Use basic Scanner input, simple if-else logic
-- No interfaces, no abstract classes yet
-- Focus on understanding "what is inheritance" not complex design`;
+      return `- Simple inheritance: User -> AdminUser
+- Basic Scanner, if-else logic
+- No interfaces/abstract classes
+- Focus: understand inheritance`;
     } else if (isGame) {
-      return `- Inheritance Example: Basic Character with Health/Attack (Character -> Enemy)
-- Use simple variables and methods
-- Basic game logic with if-else for attacks
-- No complex state machines or patterns yet`;
+      return `- Basic Character: Health/Attack
+- Simple variables, methods
+- if-else for game logic
+- No complex patterns`;
     } else if (isData) {
-      return `- Arrays Example: Store list of numbers, calculate average
-- Use basic loops (for, while) to process data
-- Simple sorting with built-in methods
-- Focus on understanding arrays and basic operations`;
+      return `- Arrays: store numbers, calculate average
+- Basic loops for processing
+- Built-in sorting
+- Focus: arrays, basic ops`;
     }
-    return `- Use simple concepts: variables, loops, conditionals
-- Keep logic straightforward and clear
-- No complex structures or algorithms`;
+    return `- Simple: variables, loops, conditionals
+- Clear logic
+- No complex structures`;
   }
   
   if (level === 'Intermediate') {
     if (isWeb) {
-      return `- Inheritance Example: RequestHandler hierarchy with interfaces (Handleable interface, base class, multiple child classes)
-- Use HashMap for session data, ArrayList for request queue
-- Include proper exception handling (try-catch)
-- Demonstrate polymorphism with handler arrays`;
+      return `- Inheritance: RequestHandler + interfaces
+- HashMap sessions, ArrayList queue
+- Exception handling (try-catch)
+- Polymorphism with arrays`;
     } else if (isGame) {
-      return `- Inheritance Example: Complete character system (Character -> Warrior/Mage/Archer with unique abilities)
-- Use ArrayList for inventory, HashMap for stats
-- Implement state management (Idle, Moving, Attacking)
-- Include collision detection algorithms`;
+      return `- Character system: Warrior/Mage/Archer
+- ArrayList inventory, HashMap stats
+- State management
+- Collision detection`;
     } else if (isData) {
-      return `- Collections Example: HashMap for data indexing, ArrayList for records
-- Implement sorting algorithms (quicksort, mergesort)
-- File I/O for CSV reading/writing
-- Statistical calculations (mean, median, standard deviation)`;
+      return `- HashMap indexing, ArrayList records
+- Sorting algorithms
+- File I/O for CSV
+- Statistics: mean, median, std dev`;
     }
-    return `- Use OOP concepts: inheritance, interfaces, polymorphism
-- Work with collections and data structures
-- Include error handling and file operations`;
+    return `- OOP: inheritance, interfaces, polymorphism
+- Collections, data structures
+- Error handling, file ops`;
   }
   
   if (isWeb) {
-    return `- Design Patterns Example: Factory pattern for creating different handler types, Singleton for configuration
-- Use generics with collections, lambda expressions
-- Implement middleware chain pattern
-- Advanced concepts: thread-safe session management, request pooling`;
+    return `- Patterns: Factory, Singleton
+- Generics, lambdas
+- Middleware chain
+- Thread-safe sessions, pooling`;
   } else if (isGame) {
-    return `- Advanced Example: Complete game engine with design patterns (State, Observer, Command)
-- Implement A* pathfinding algorithm
-- Quad-tree spatial partitioning for collision
-- Advanced AI with decision trees`;
+    return `- Patterns: State, Observer, Command
+- A* pathfinding
+- Quad-tree collision
+- Advanced AI, decision trees`;
   } else if (isData) {
-    return `- Advanced Structures: Implement B-tree for indexing, heap for priority queues
-- Complex algorithms: MapReduce simulation, query optimization
-- Stream processing with functional programming
-- Performance analysis and Big O complexity`;
+    return `- B-tree indexing, heaps
+- MapReduce, query optimization
+- Stream processing
+- Big O analysis`;
   }
-  return `- Use design patterns and advanced algorithms
-- Implement complex data structures from scratch
-- Focus on optimization and architectural design`;
+  return `- Design patterns, algorithms
+- Complex data structures
+- Optimization, architecture`;
 };
 
 const getSkillLevelGuidance = (level) => {
   if (level === 'Beginner') {
-    return `BEGINNER LEVEL GUIDANCE:
-- Use simple variables, basic input/output
-- Focus on if-else, loops (for, while)
-- Keep logic straightforward
+    return `BEGINNER:
+- Simple variables, basic I/O
+- if-else, loops (for/while)
+- Straightforward logic
 - No complex algorithms
-- Clear step-by-step flow
-- Teach foundational concepts
-Examples: Simple calculator with object properties, Array sorter with different methods`;
+- Foundational concepts`;
   }
   
   if (level === 'Intermediate') {
-    return `INTERMEDIATE LEVEL GUIDANCE:
-- Use inheritance and interfaces
-- Work with collections (ArrayList, HashMap)
-- Implement moderate algorithms
-- File reading/writing operations
-- Exception handling with try-catch
-- Demonstrate practical OOP concepts
-Examples: Inheritance hierarchy for different types, Collection management system`;
+    return `INTERMEDIATE:
+- Inheritance, interfaces
+- Collections (ArrayList, HashMap)
+- Moderate algorithms
+- Exception handling
+- Practical OOP`;
   }
   
-  return `ADVANCED LEVEL GUIDANCE:
-- Implement design patterns
-- Use advanced data structures
-- Complex algorithm implementations
-- Recursion and optimization
-- Advanced OOP architecture
-- Performance considerations
-Examples: Factory pattern implementation, Recursive tree structures`;
+  return `ADVANCED:
+- Design patterns
+- Advanced data structures
+- Complex algorithms
+- Recursion, optimization
+- Advanced OOP architecture`;
 };
 
 const analyzeStudentSkills = (primaryLanguage, javaQuestions, pythonQuestions) => {

@@ -4,3 +4,4 @@ temp/
 uploads/
 *.log
 config/gmail-token.json
+config/gmail-credentials.json

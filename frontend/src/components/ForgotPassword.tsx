@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { UserPlus, Mail, Lock, User, GraduationCap, BookOpen, Check, X, Eye, EyeOff, Send } from 'lucide-react';
+import { KeyRound, Mail, Lock, Send, ArrowLeft, Eye, EyeOff, Check, X } from 'lucide-react';
 import axios from 'axios';
 
-interface RegisterProps {
-  onToggle: () => void;
+interface ForgotPasswordProps {
+  onBack: () => void;
 }
 
 interface PasswordRequirement {
@@ -31,22 +30,20 @@ const passwordRequirements: PasswordRequirement[] = [
   }
 ];
 
-export default function Register({ onToggle }: RegisterProps) {
-  const [name, setName] = useState('');
+export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'teacher' | 'student'>('student');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [cooldownTime, setCooldownTime] = useState(0);
-  const { register } = useAuth();
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -80,15 +77,16 @@ export default function Register({ onToggle }: RegisterProps) {
 
     setSendingCode(true);
     setError('');
+    setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/send-verification-code', {
+      const response = await axios.post('http://localhost:5000/api/auth/send-password-reset-code', {
         email
       });
 
       if (response.data.success) {
         setCodeSent(true);
-        setError('');
+        setSuccess('Verification code sent to your email');
         setCooldownTime(120);
       }
     } catch (err: any) {
@@ -101,6 +99,7 @@ export default function Register({ onToggle }: RegisterProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (!verificationCode) {
       setError('Please enter the verification code');
@@ -112,17 +111,42 @@ export default function Register({ onToggle }: RegisterProps) {
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+
+    if (!hasUpperCase || !hasNumber || !hasSpecialChar) {
+      setError('Password must meet all requirements');
       return;
     }
 
     setLoading(true);
 
     try {
-      await register(email, password, name, role, verificationCode);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      const response = await axios.post('http://localhost:5000/api/auth/reset-password', {
+        email,
+        verificationCode,
+        newPassword
+      });
+
+      if (response.data.success) {
+        setSuccess('Password reset successfully! Redirecting to login...');
+        setTimeout(() => {
+          onBack();
+        }, 2000);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -131,12 +155,20 @@ export default function Register({ onToggle }: RegisterProps) {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
+        <button
+          onClick={onBack}
+          className="mb-4 flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm">Back to login</span>
+        </button>
+
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 mb-4">
-            <UserPlus className="w-6 h-6 text-white" />
+            <KeyRound className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-light text-slate-900 mb-1 tracking-tight">Create account</h1>
-          <p className="text-slate-500 text-sm">Start your learning experience</p>
+          <h1 className="text-2xl font-light text-slate-900 mb-1 tracking-tight">Reset password</h1>
+          <p className="text-slate-500 text-sm">Enter your email to receive a verification code</p>
         </div>
 
         {error && (
@@ -145,25 +177,13 @@ export default function Register({ onToggle }: RegisterProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="name" className="block text-xs font-medium text-slate-700">
-              Full name
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                placeholder="John Doe"
-              />
-            </div>
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border-l-4 border-green-500 rounded-r">
+            <p className="text-xs text-green-700">{success}</p>
           </div>
+        )}
 
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="email" className="block text-xs font-medium text-slate-700">
               Email address
@@ -210,22 +230,22 @@ export default function Register({ onToggle }: RegisterProps) {
                 {sendingCode ? 'Sending...' : cooldownTime > 0 ? `Wait ${Math.floor(cooldownTime / 60)}:${String(cooldownTime % 60).padStart(2, '0')}` : codeSent ? 'Resend' : 'Send Code'}
               </button>
             </div>
-            {codeSent && (
+            {codeSent && !success && (
               <p className="text-xs text-green-600 mt-1">Verification code sent to your email</p>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-xs font-medium text-slate-700">
-              Password
+            <label htmlFor="newPassword" className="block text-xs font-medium text-slate-700">
+              New Password
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                id="newPassword"
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
                 onFocus={() => setPasswordFocused(true)}
                 required
                 className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
@@ -233,23 +253,23 @@ export default function Register({ onToggle }: RegisterProps) {
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowNewPassword(!showNewPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
               >
-                {showPassword ? (
+                {showNewPassword ? (
                   <EyeOff className="w-4 h-4" />
                 ) : (
                   <Eye className="w-4 h-4" />
                 )}
               </button>
             </div>
-            
+
             {passwordFocused && (
               <div className="mt-2 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-xs font-medium text-gray-700 mb-1.5">Password requirements:</p>
                 <div className="space-y-1">
                   {passwordRequirements.map((requirement, index) => {
-                    const isValid = requirement.test(password);
+                    const isValid = requirement.test(newPassword);
                     return (
                       <div key={index} className="flex items-center space-x-1.5">
                         <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -276,7 +296,7 @@ export default function Register({ onToggle }: RegisterProps) {
 
           <div className="space-y-1.5">
             <label htmlFor="confirmPassword" className="block text-xs font-medium text-slate-700">
-              Confirm password
+              Confirm New Password
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -301,52 +321,9 @@ export default function Register({ onToggle }: RegisterProps) {
                 )}
               </button>
             </div>
-            {confirmPassword && password !== confirmPassword && (
+            {confirmPassword && newPassword !== confirmPassword && (
               <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-xs font-medium text-slate-700">
-              Select your role
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setRole('student')}
-                className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
-                  role === 'student'
-                    ? 'border-slate-900 bg-slate-50'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <BookOpen className={`w-6 h-6 mb-1.5 ${role === 'student' ? 'text-slate-900' : 'text-slate-400'}`} />
-                <span className={`text-xs font-medium ${role === 'student' ? 'text-slate-900' : 'text-slate-600'}`}>
-                  Student
-                </span>
-                {role === 'student' && (
-                  <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-slate-900 rounded-full" />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('teacher')}
-                className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
-                  role === 'teacher'
-                    ? 'border-slate-900 bg-slate-50'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <GraduationCap className={`w-6 h-6 mb-1.5 ${role === 'teacher' ? 'text-slate-900' : 'text-slate-400'}`} />
-                <span className={`text-xs font-medium ${role === 'teacher' ? 'text-slate-900' : 'text-slate-600'}`}>
-                  Teacher
-                </span>
-                {role === 'teacher' && (
-                  <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-slate-900 rounded-full" />
-                )}
-              </button>
-            </div>
           </div>
 
           <button
@@ -354,21 +331,9 @@ export default function Register({ onToggle }: RegisterProps) {
             disabled={loading}
             className="w-full bg-slate-900 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            {loading ? 'Creating account...' : 'Create account'}
+            {loading ? 'Resetting password...' : 'Reset password'}
           </button>
         </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-xs text-slate-600">
-            Already have an account?{' '}
-            <button
-              onClick={onToggle}
-              className="text-slate-900 font-medium hover:underline underline-offset-4 transition-all"
-            >
-              Sign in
-            </button>
-          </p>
-        </div>
       </div>
     </div>
   );

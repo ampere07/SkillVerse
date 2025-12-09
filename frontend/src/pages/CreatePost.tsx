@@ -104,11 +104,14 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
       if (attachments.length > 0) {
         setUploadProgress(true);
         try {
-          const formData = new FormData();
-          attachments.forEach(file => {
-            formData.append('files', file);
-          });
-          const uploadResponse = await uploadAPI.uploadFiles(formData);
+          const uploadResponse = await uploadAPI.uploadMultiple(
+            attachments,
+            {
+              classroomName: classroomName,
+              postTitle: title.trim(),
+              postType: postType
+            }
+          );
           uploadedFiles = uploadResponse.files;
         } catch (uploadError) {
           throw new Error('Failed to upload files. Please try again.');

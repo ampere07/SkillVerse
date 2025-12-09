@@ -1,0 +1,72 @@
+Gmail API Setup Instructions - Desktop App Type
+================================================
+
+Your credentials are now configured for Desktop App OAuth (perfect for this use case!)
+
+Project: emailsender-480621
+Client ID: 330291765772-kaonpk769gbcumpoats4h5e7kg4dkqsk.apps.googleusercontent.com
+
+Step 1: Enable Gmail API
+-------------------------
+1. Go to: https://console.cloud.google.com/apis/library
+2. Make sure project "emailsender-480621" is selected (top dropdown)
+3. Search for "Gmail API"
+4. Click on it and click "ENABLE"
+
+Step 2: Configure OAuth Consent Screen
+---------------------------------------
+1. Go to: https://console.cloud.google.com/apis/credentials/consent
+2. Make sure project "emailsender-480621" is selected
+3. If not configured yet:
+   - Choose "External" user type
+   - Fill in App name: "SkillVerse"
+   - User support email: raven@mynettean.com
+   - Developer contact: raven@mynettean.com
+   - Click "Save and Continue"
+4. On Scopes page:
+   - Click "Add or Remove Scopes"
+   - Search for "gmail.send"
+   - Check the box for ".../auth/gmail.send"
+   - Click "Update" then "Save and Continue"
+5. On Test Users page:
+   - Click "Add Users"
+   - Add: raven@mynettean.com
+   - Click "Save and Continue"
+6. Click "Back to Dashboard"
+
+Step 3: Generate Gmail Token
+-----------------------------
+Run in backend directory:
+node setupGmailAuth.js
+
+This will:
+1. Display an authorization URL
+2. Copy the ENTIRE URL and open it in your browser
+3. Sign in with raven@mynettean.com
+4. Click "Continue" to grant permissions
+5. You'll be redirected to a page showing the authorization code
+6. Copy the code from the page
+7. Paste it back in the terminal
+8. Token will be saved to config/gmail-token.json
+
+Step 4: Start the Server
+-------------------------
+npm start
+
+Step 5: Test Email Verification
+--------------------------------
+1. Go to registration page (http://localhost:5173)
+2. Fill in name and email
+3. Click "Send Code" button
+4. Check your email inbox for the verification code
+5. Enter the 6-digit code
+6. Complete registration
+
+Notes:
+------
+- Desktop app type is perfect for local development
+- The redirect URI http://localhost is already configured
+- Gmail API has daily sending limits (500/day for new accounts)
+- If you get rate limited, wait 24 hours or use a different Google account
+- Token will be auto-refreshed when it expires
+- All credentials are stored securely in .env file

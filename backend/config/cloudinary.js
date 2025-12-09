@@ -10,6 +10,14 @@ export const uploadFile = async (file, metadata) => {
   try {
     const { classroomName, postTitle, postType } = metadata;
     
+    console.log('[Cloudinary] Starting upload...');
+    console.log('[Cloudinary] File:', file.originalname);
+    console.log('[Cloudinary] Metadata:', { classroomName, postTitle, postType });
+    
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      throw new Error('Cloudinary credentials not configured');
+    }
+    
     const timestamp = Date.now();
     const randomNum = Math.round(Math.random() * 1E9);
     
@@ -17,13 +25,12 @@ export const uploadFile = async (file, metadata) => {
     const fileName = `${timestamp}_${randomNum}`;
     const fullPublicId = `skillverse/${fileName}`;
 
-    console.log('Uploading to Cloudinary:');
-    console.log(`  Folder: skillverse`);
+    console.log('[Cloudinary] Upload details:');
+    console.log('  Folder: skillverse');
     console.log(`  File: ${fileName}.${fileExtension}`);
     console.log(`  Original: ${file.originalname}`);
     console.log(`  MIME Type: ${file.mimetype}`);
 
-    // Determine resource type based on file type
     let resourceType = 'auto';
     if (file.mimetype === 'application/pdf' || 
         file.mimetype === 'application/msword' ||
@@ -48,18 +55,18 @@ export const uploadFile = async (file, metadata) => {
       overwrite: false
     };
 
-    console.log('Upload options:', JSON.stringify(uploadOptions, null, 2));
+    console.log('[Cloudinary] Upload options:', JSON.stringify(uploadOptions, null, 2));
 
     const result = await cloudinary.uploader.upload(file.path, uploadOptions);
 
-    console.log(`✓ Upload successful!`);
+    console.log('[Cloudinary] Upload successful!');
     console.log(`  Public ID: ${result.public_id}`);
     console.log(`  URL: ${result.secure_url}`);
-    console.log(`  Access Type: ${result.access_mode || 'public'}`);
 
     return result;
   } catch (error) {
-    console.error('Cloudinary upload error:', error);
+    console.error('[Cloudinary] Upload error:', error.message);
+    console.error('[Cloudinary] Error details:', error);
     throw error;
   }
 };
