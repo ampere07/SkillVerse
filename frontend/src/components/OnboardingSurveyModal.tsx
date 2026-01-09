@@ -28,6 +28,8 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
   const [isTyping, setIsTyping] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [unansweredQuestions, setUnansweredQuestions] = useState<{java: number[], python: number[]}>({java: [], python: []});
+  const [isGeneratingProjects, setIsGeneratingProjects] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
 
   // Reset states when modal opens or language changes
   useEffect(() => {
@@ -41,6 +43,8 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       setError('');
       setValidationError('');
       setUnansweredQuestions({java: [], python: []});
+      setShowLoadingModal(false);
+      setIsGeneratingProjects(false);
       
       // Always start at Step 0 to show language selection
       setStep(0);
@@ -255,72 +259,359 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
     }
   };
 
+  const parseRoadmap = (analysisText: string) => {
+    const roadmap = { phase1: [] as string[], phase2: [] as string[], phase3: [] as string[] };
+    
+    const phase1Match = analysisText.match(/Phase 1[:\s-]*(.+?)(?=Phase 2|$)/is);
+    const phase2Match = analysisText.match(/Phase 2[:\s-]*(.+?)(?=Phase 3|$)/is);
+    const phase3Match = analysisText.match(/Phase 3[:\s-]*(.+?)(?=$)/is);
+    
+    if (phase1Match) {
+      const items = phase1Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
+      if (items) roadmap.phase1 = items.map(item => item.replace(/^[-•]\s*/, '').trim()).filter(item => item.length > 0);
+    }
+    
+    if (phase2Match) {
+      const items = phase2Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
+      if (items) roadmap.phase2 = items.map(item => item.replace(/^[-•]\s*/, '').trim()).filter(item => item.length > 0);
+    }
+    
+    if (phase3Match) {
+      const items = phase3Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
+      if (items) roadmap.phase3 = items.map(item => item.replace(/^[-•]\s*/, '').trim()).filter(item => item.length > 0);
+    }
+    
+    return roadmap;
+  };
+
+  const getWelcomeMessage = (analysisText: string) => {
+    const roadmapIndex = analysisText.indexOf('Your Learning Roadmap');
+    if (roadmapIndex > 0) {
+      return analysisText.substring(0, roadmapIndex).trim();
+    }
+    return analysisText;
+  };
+
+  const handleGetStarted = async () => {
+    if (!user?.id) {
+      setError('User not found. Please login again.');
+      return;
+    }
+
+    // Close AI analysis modal and show loading modal
+    setShowAnalysis(false);
+    setShowLoadingModal(true);
+    setIsGeneratingProjects(true);
+    setError('');
+
+    try {
+      console.log('[OnboardingSurvey] Starting project generation...');
+      
+      const response = await fetch(`http://localhost:5000/api/survey/generate-projects/${user.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log(`[OnboardingSurvey] Projects generated successfully: ${data.projectCount} projects`);
+        // Close everything and let the main page refresh
+        setShowLoadingModal(false);
+        onClose();
+      } else {
+        setError(data.message || 'Failed to generate projects');
+        setShowLoadingModal(false);
+        setIsGeneratingProjects(false);
+      }
+    } catch (error) {
+      console.error('[OnboardingSurvey] Error generating projects:', error);
+      setError('Network error while generating projects. Please try again.');
+      setShowLoadingModal(false);
+      setIsGeneratingProjects(false);
+    }
+  };
+
   if (!isOpen) return null;
 
-  if (showAnalysis && aiAnalysis) {
-    const startTypingAnimation = () => {
-      if (!isTyping) return;
-      
-      let currentIndex = 0;
-      const text = aiAnalysis;
-      const typingSpeed = 15;
-      
-      const typeNextCharacter = () => {
-        if (currentIndex < text.length) {
-          setDisplayedText(text.substring(0, currentIndex + 1));
-          currentIndex++;
-          setTimeout(typeNextCharacter, typingSpeed);
-        } else {
-          setIsTyping(false);
-        }
-      };
-      
-      typeNextCharacter();
-    };
+  // Loading modal for project generation
+  if (showLoadingModal) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+          
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+            <div className="text-center">
+              {error ? (
+                <>
+                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                    <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Generation Failed</h3>
+                  <p className="text-red-600 mb-4">{error}</p>
+                  <button
+                    onClick={() => {
+                      setShowLoadingModal(false);
+                      setError('');
+                      onClose();
+                    }}
+                    className="px-6 py-2 text-white rounded-md transition-colors"
+                    style={{ backgroundColor: '#1B5E20' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2E7D32'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1B5E20'}
+                  >
+                    Close
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                    <svg className="animate-spin h-8 w-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Generating Your Projects</h3>
+                  <p className="text-gray-600 mb-4">
+                    Please wait while we create your personalized mini projects based on your learning roadmap.
+                  </p>
+                  <div className="text-sm text-gray-500">
+                    This may take 2-3 minutes...
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    if (isTyping && displayedText === '') {
-      setTimeout(startTypingAnimation, 100);
-    }
+  if (showAnalysis && aiAnalysis) {
+    const roadmap = parseRoadmap(aiAnalysis);
+    const welcomeMessage = getWelcomeMessage(aiAnalysis);
 
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="flex min-h-screen items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
           
-          <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-              <h2 className="text-2xl font-bold text-gray-900">Your Skills Analysis</h2>
-              <p className="text-sm text-gray-600 mt-1">AI-powered recommendations for your learning path</p>
+          <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
+              <h2 className="text-2xl font-bold text-gray-900">Your Learning Roadmap</h2>
+              <p className="text-sm text-gray-600 mt-1">AI-powered path to mastering {formData.primaryLanguage === 'java' ? 'Java' : 'Python'}</p>
             </div>
 
             <div className="px-6 py-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+              {/* Welcome Message */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
                     <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div className="ml-3 flex-1">
-                    <h3 className="text-sm font-medium text-green-900">Analysis Generated</h3>
-                    <div className="mt-2 text-sm text-green-800 whitespace-pre-line">
-                      {displayedText}
-                      {isTyping && <span className="inline-block w-1 h-4 ml-1 bg-green-600 animate-pulse"></span>}
+                    <h3 className="text-sm font-medium text-green-900 mb-2">Welcome to Your Journey!</h3>
+                    <div className="text-sm text-green-800 whitespace-pre-line">
+                      {welcomeMessage}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              {/* Enhanced Flowchart Roadmap */}
+              <div className="relative">
+                {/* START indicator */}
+                <div className="flex justify-center mb-6">
+                  <div className="bg-gray-900 text-white px-6 py-2 rounded-full font-semibold text-sm shadow-lg">
+                    START YOUR JOURNEY
+                  </div>
+                </div>
+
+                {/* Connecting line */}
+                <div className="flex justify-center">
+                  <div className="w-0.5 h-8 bg-gradient-to-b from-gray-900 to-blue-400"></div>
+                </div>
+
+                {/* Phase 1 - Foundation */}
+                <div className="relative mb-6">
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-2xl">
+                      <div className="relative bg-white border-3 border-blue-500 rounded-2xl shadow-xl overflow-hidden">
+                        {/* Phase Header */}
+                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                <span className="text-2xl font-bold text-blue-600">1</span>
+                              </div>
+                              <h3 className="ml-4 text-xl font-bold text-white">Foundation Phase</h3>
+                            </div>
+                            <div className="bg-blue-400 bg-opacity-30 px-3 py-1 rounded-full">
+                              <span className="text-xs font-semibold text-white">BEGINNER</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Phase Content */}
+                        <div className="p-6 bg-gradient-to-br from-blue-50 to-white">
+                          <div className="space-y-3">
+                            {roadmap.phase1.map((item, index) => (
+                              <div key={index} className="flex items-start group">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                </div>
+                                <span className="ml-3 text-sm text-gray-700 leading-relaxed">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connecting Arrow */}
+                <div className="flex justify-center my-6">
+                  <div className="flex flex-col items-center">
+                    <div className="w-0.5 h-8 bg-gradient-to-b from-blue-400 to-purple-400"></div>
+                    <div className="relative">
+                      <svg className="w-10 h-10 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v10.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phase 2 - Building Skills */}
+                <div className="relative mb-6">
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-2xl">
+                      <div className="relative bg-white border-3 border-purple-500 rounded-2xl shadow-xl overflow-hidden">
+                        {/* Phase Header */}
+                        <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                <span className="text-2xl font-bold text-purple-600">2</span>
+                              </div>
+                              <h3 className="ml-4 text-xl font-bold text-white">Building Skills Phase</h3>
+                            </div>
+                            <div className="bg-purple-400 bg-opacity-30 px-3 py-1 rounded-full">
+                              <span className="text-xs font-semibold text-white">INTERMEDIATE</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Phase Content */}
+                        <div className="p-6 bg-gradient-to-br from-purple-50 to-white">
+                          <div className="space-y-3">
+                            {roadmap.phase2.map((item, index) => (
+                              <div key={index} className="flex items-start group">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                                    <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                </div>
+                                <span className="ml-3 text-sm text-gray-700 leading-relaxed">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connecting Arrow */}
+                <div className="flex justify-center my-6">
+                  <div className="flex flex-col items-center">
+                    <div className="w-0.5 h-8 bg-gradient-to-b from-purple-400 to-amber-400"></div>
+                    <div className="relative">
+                      <svg className="w-10 h-10 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v10.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phase 3 - Advanced Practice */}
+                <div className="relative mb-6">
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-2xl">
+                      <div className="relative bg-white border-3 border-amber-500 rounded-2xl shadow-xl overflow-hidden">
+                        {/* Phase Header */}
+                        <div className="bg-gradient-to-r from-amber-600 to-amber-700 px-6 py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                <span className="text-2xl font-bold text-amber-600">3</span>
+                              </div>
+                              <h3 className="ml-4 text-xl font-bold text-white">Advanced Practice Phase</h3>
+                            </div>
+                            <div className="bg-amber-400 bg-opacity-30 px-3 py-1 rounded-full">
+                              <span className="text-xs font-semibold text-white">ADVANCED</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Phase Content */}
+                        <div className="p-6 bg-gradient-to-br from-amber-50 to-white">
+                          <div className="space-y-3">
+                            {roadmap.phase3.map((item, index) => (
+                              <div key={index} className="flex items-start group">
+                                <div className="flex-shrink-0 mt-0.5">
+                                  <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center group-hover:bg-amber-200 transition-colors">
+                                    <svg className="w-4 h-4 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                </div>
+                                <span className="ml-3 text-sm text-gray-700 leading-relaxed">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connecting line to success */}
+                <div className="flex justify-center">
+                  <div className="w-0.5 h-8 bg-gradient-to-b from-amber-400 to-green-500"></div>
+                </div>
+
+                {/* SUCCESS indicator */}
+                <div className="flex justify-center mt-6">
+                  <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-3 rounded-full font-bold text-sm shadow-xl flex items-center">
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    MASTERY ACHIEVED!
+                  </div>
+                </div>
+              </div>
+
+              {/* Get Started Button */}
+              <div className="flex justify-end mt-8">
                 <button
-                  onClick={onClose}
-                  disabled={isTyping}
-                  className="px-6 py-2 text-white rounded-md transition-colors"
+                  onClick={handleGetStarted}
+                  className="px-8 py-3 text-white rounded-md transition-colors font-semibold"
                   style={{ backgroundColor: '#1B5E20' }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2E7D32'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1B5E20'}
                 >
-                  {isTyping ? 'Analyzing...' : 'Get Started'}
+                  Get Started
                 </button>
               </div>
             </div>

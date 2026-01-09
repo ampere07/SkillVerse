@@ -1,24 +1,17 @@
-import { FolderKanban, Clock, CheckCircle, PlayCircle, Settings } from 'lucide-react';
+import { FolderKanban, Clock, CheckCircle, PlayCircle, Settings, ChevronRight, Zap, TrendingUp, Award } from 'lucide-react';
 import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import axios from 'axios';
-import Compiler from './Compiler';
 import { useAuth } from '../contexts/AuthContext';
 import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-interface ProjectDetails {
-  title: string;
-  description: string;
-  language: string;
-  requirements: string;
-}
-  
 interface MiniProjectsProps {
   onHasUnsavedChanges?: (hasChanges: boolean) => void;
+  onNavigateToDetails?: (projectTitle: string) => void;
 }
 
-const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }, ref) => {
+const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, onNavigateToDetails }, ref) => {
   const { isNewStudent, completeSurvey } = useAuth();
   const [projects, setProjects] = useState([]);
   const [completedThisWeek, setCompletedThisWeek] = useState(0);
@@ -26,12 +19,9 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [completedTitles, setCompletedTitles] = useState(new Set());
-  const [selectedProject, setSelectedProject] = useState<ProjectDetails | null>(null);
   const [projectStatuses, setProjectStatuses] = useState<Map<string, string>>(new Map());
   const [projectScores, setProjectScores] = useState<Map<string, number>>(new Map());
   const [projectFeedback, setProjectFeedback] = useState<Map<string, string>>(new Map());
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [selectedFeedback, setSelectedFeedback] = useState<{title: string, score: number, feedback: string} | null>(null);
   const [showSurvey, setShowSurvey] = useState(false);
   const [surveyLanguage, setSurveyLanguage] = useState<string | undefined>(undefined);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
@@ -39,6 +29,10 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingLanguage, setPendingLanguage] = useState<string | undefined>(undefined);
   const [surveyCompletedLanguages, setSurveyCompletedLanguages] = useState<string[]>([]);
+  const [currentXP, setCurrentXP] = useState(0);
+  const [currentLevel, setCurrentLevel] = useState(1);
+  const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
+  const [consecutiveDays, setConsecutiveDays] = useState(0);
   const compilerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -110,6 +104,141 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
     }
   }));
 
+  // Badge definitions
+  const badges = [
+    {
+      id: 'first_steps',
+      name: 'First Steps',
+      description: 'Complete your first project',
+      image: '/assets/badges/star.png',
+      color: '#3B82F6',
+      bgColor: '#DBEAFE',
+      criteria: (stats: any) => stats.completed >= 1
+    },
+    {
+      id: 'getting_started',
+      name: 'Getting Started',
+      description: 'Complete 3 projects',
+      image: '/assets/badges/target.png',
+      color: '#10B981',
+      bgColor: '#D1FAE5',
+      criteria: (stats: any) => stats.completed >= 3
+    },
+    {
+      id: 'halfway_hero',
+      name: 'Halfway Hero',
+      description: 'Complete 50 projects',
+      image: '/assets/badges/medal.png',
+      color: '#F59E0B',
+      bgColor: '#FEF3C7',
+      criteria: (stats: any) => stats.completed >= 50
+    },
+    {
+      id: 'almost_there',
+      name: 'Almost There',
+      description: 'Complete 100 projects',
+      image: '/assets/badges/trophy.png',
+      color: '#8B5CF6',
+      bgColor: '#EDE9FE',
+      criteria: (stats: any) => stats.completed >= 100
+    },
+    {
+      id: 'perfectionist',
+      name: 'Perfectionist',
+      description: 'Complete 250 projects',
+      image: '/assets/badges/shield.png',
+      color: '#EC4899',
+      bgColor: '#FCE7F3',
+      criteria: (stats: any) => stats.completed >= 250
+    },
+    {
+      id: 'streak_3',
+      name: '3-Day Streak',
+      description: 'Use the system for 3 days in a row',
+      image: '/assets/badges/fire.png',
+      color: '#EF4444',
+      bgColor: '#FEE2E2',
+      criteria: (stats: any) => stats.consecutiveDays >= 3
+    },
+    {
+      id: 'streak_7',
+      name: '7-Day Streak',
+      description: 'Use the system for 7 days in a row',
+      image: '/assets/badges/fire.png',
+      color: '#DC2626',
+      bgColor: '#FEE2E2',
+      criteria: (stats: any) => stats.consecutiveDays >= 7
+    },
+    {
+      id: 'streak_30',
+      name: '30-Day Streak',
+      description: 'Use the system for 30 days in a row',
+      image: '/assets/badges/fire.png',
+      color: '#991B1B',
+      bgColor: '#FEE2E2',
+      criteria: (stats: any) => stats.consecutiveDays >= 30
+    },
+    {
+      id: 'high_achiever',
+      name: 'High Achiever',
+      description: 'Get 90+ score on 5 projects',
+      image: '/assets/badges/star.png',
+      color: '#0891B2',
+      bgColor: '#CFFAFE',
+      criteria: (stats: any) => stats.highScores >= 5
+    },
+    {
+      id: 'perfect_execution',
+      name: 'Perfect Execution',
+      description: 'Get a perfect 100 score',
+      image: '/assets/badges/medal.png',
+      color: '#1B5E20',
+      bgColor: '#E8F5E9',
+      criteria: (stats: any) => stats.perfectScores >= 1
+    }
+  ];
+
+  const calculateBadgeStats = () => {
+    const completedCount = projects.filter(p => {
+      const status = getProjectStatus(p.title);
+      return status === 'completed' || status === 'submitted';
+    }).length;
+
+    const highScoreCount = Array.from(projectScores.values()).filter(score => score >= 90).length;
+    const perfectScoreCount = Array.from(projectScores.values()).filter(score => score === 100).length;
+
+    return {
+      completed: completedCount,
+      total: projects.length,
+      consecutiveDays: consecutiveDays,
+      highScores: highScoreCount,
+      perfectScores: perfectScoreCount
+    };
+  };
+
+  const checkEarnedBadges = () => {
+    const stats = calculateBadgeStats();
+    const earned = badges.filter(badge => badge.criteria(stats)).map(badge => badge.id);
+    setEarnedBadges(earned);
+  };
+
+  // Removed automatic badge checking - badges are now managed by backend
+  // useEffect(() => {
+  //   if (projects.length > 0) {
+  //     checkEarnedBadges();
+  //   }
+  // }, [projects, projectScores, consecutiveDays]);
+
+  const calculateConsecutiveDays = (tasks: any[]) => {
+    // Mock implementation - returns streak based on activity
+    // In production, this should track actual daily logins
+    if (tasks.length === 0) return 0;
+    
+    // Simple calculation: 1 day per completed task (up to 30)
+    // Replace with actual date-based tracking in production
+    return Math.min(tasks.length, 30);
+  };
+
   const fetchProjects = async (fromSurvey = false) => {
     console.log('[MiniProjects] ========== FETCH PROJECTS STARTED ==========');
     console.log('[MiniProjects] From survey:', fromSurvey);
@@ -153,6 +282,18 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
     }
   };
 
+  const calculateXPAndLevel = (completedCount: number) => {
+    const xpPerProject = 100; // Each project gives 100 XP
+    const totalXP = completedCount * xpPerProject;
+    
+    // Calculate level (each level requires 500 XP)
+    const xpPerLevel = 500;
+    const level = Math.floor(totalXP / xpPerLevel) + 1;
+    const currentLevelXP = totalXP % xpPerLevel;
+    
+    return { totalXP, level, currentLevelXP, xpPerLevel };
+  };
+
   const fetchCompletedTasks = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -176,8 +317,37 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
       setProjectStatuses(statusMap);
       setProjectScores(scoreMap);
       setProjectFeedback(feedbackMap);
+
+      // Fetch XP and badges from backend
+      await fetchUserProgress();
+
+      // Calculate consecutive days streak
+      setConsecutiveDays(calculateConsecutiveDays(response.data.completedTasks));
     } catch (error) {
       console.error('[MiniProjects] Error fetching completed tasks:', error);
+    }
+  };
+
+  const fetchUserProgress = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('[MiniProjects] Token for progress API:', token ? 'EXISTS' : 'MISSING');
+      console.log('[MiniProjects] Token length:', token?.length);
+      
+      const response = await axios.get(`${API_URL}/progress/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        setCurrentXP(response.data.xp || 0);
+        setCurrentLevel(response.data.level || 1);
+        setEarnedBadges(response.data.badges || []);
+        console.log('[MiniProjects] Loaded user progress:', response.data);
+      }
+    } catch (error) {
+      console.error('[MiniProjects] Error fetching user progress:', error);
+      console.error('[MiniProjects] Error response:', error.response?.data);
+      // If error, keep default values
     }
   };
 
@@ -279,23 +449,6 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
     );
   }
 
-  if (selectedProject) {
-    return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <Compiler 
-          ref={compilerRef}
-          onMenuClick={() => {}}
-          projectDetails={selectedProject}
-          onBack={() => {
-            setSelectedProject(null);
-            fetchCompletedTasks();
-          }}
-          onHasUnsavedChanges={onHasUnsavedChanges}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="p-6" style={{ backgroundColor: '#FAFAFA', minHeight: '100vh' }}>
       <div className="mb-6">
@@ -393,6 +546,163 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
         </div>
       </div>
 
+      {/* XP Progress Bar */}
+      <div className="mb-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#FFF8E1' }}>
+              <Zap className="w-5 h-5" style={{ color: '#FFB300' }} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: '#212121' }}>Level {currentLevel}</h2>
+              <p className="text-xs" style={{ color: '#757575' }}>Coding Journey Progress</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold" style={{ color: '#212121' }}>{currentXP} / 500 XP</p>
+            <p className="text-xs" style={{ color: '#757575' }}>{500 - currentXP} XP to Level {currentLevel + 1}</p>
+          </div>
+        </div>
+        
+        <div className="relative">
+          <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden"
+              style={{ 
+                width: `${(currentXP / 500) * 100}%`,
+                background: 'linear-gradient(90deg, #FFB300 0%, #FFA000 100%)'
+              }}
+            >
+              <div 
+                className="absolute inset-0 opacity-30"
+                style={{
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+                  animation: 'shimmer 2s infinite'
+                }}
+              />
+            </div>
+          </div>
+          <style>{`
+            @keyframes shimmer {
+              0% { transform: translateX(-100%); }
+              100% { transform: translateX(100%); }
+            }
+          `}</style>
+        </div>
+
+        <div className="flex items-center gap-2 mt-3 text-xs" style={{ color: '#757575' }}>
+          <TrendingUp className="w-4 h-4" style={{ color: '#FFB300' }} strokeWidth={1.5} />
+          <span>Complete projects to earn 100 XP each</span>
+        </div>
+      </div>
+
+      {/* Badges Section */}
+      <div className="mb-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <img 
+            src="/assets/badges/achievements.png" 
+            alt="Achievements" 
+            className="w-5 h-5 object-contain"
+          />
+          <h2 className="text-base font-semibold" style={{ color: '#212121' }}>Achievements</h2>
+          <span className="ml-auto text-sm font-medium" style={{ color: '#757575' }}>
+            {earnedBadges.length} / {badges.length} Unlocked
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {badges.map((badge) => {
+            const isEarned = earnedBadges.includes(badge.id);
+            const stats = calculateBadgeStats();
+            
+            // Calculate progress for locked badges
+            let progress = 0;
+            if (!isEarned) {
+              if (badge.id === 'first_steps') progress = Math.min((stats.completed / 1) * 100, 100);
+              else if (badge.id === 'getting_started') progress = Math.min((stats.completed / 3) * 100, 100);
+              else if (badge.id === 'halfway_hero') progress = Math.min((stats.completed / 50) * 100, 100);
+              else if (badge.id === 'almost_there') progress = Math.min((stats.completed / 100) * 100, 100);
+              else if (badge.id === 'perfectionist') progress = Math.min((stats.completed / 250) * 100, 100);
+              else if (badge.id === 'streak_3') progress = Math.min((stats.consecutiveDays / 3) * 100, 100);
+              else if (badge.id === 'streak_7') progress = Math.min((stats.consecutiveDays / 7) * 100, 100);
+              else if (badge.id === 'streak_30') progress = Math.min((stats.consecutiveDays / 30) * 100, 100);
+              else if (badge.id === 'high_achiever') progress = Math.min((stats.highScores / 5) * 100, 100);
+              else if (badge.id === 'perfect_execution') progress = Math.min((stats.perfectScores / 1) * 100, 100);
+            }
+
+            return (
+              <div
+                key={badge.id}
+                className={`relative p-4 rounded-xl border-2 transition-all ${
+                  isEarned 
+                    ? 'border-transparent shadow-md hover:shadow-lg cursor-pointer' 
+                    : 'border-gray-200 opacity-60 cursor-not-allowed'
+                }`}
+                style={isEarned ? { backgroundColor: badge.bgColor } : { backgroundColor: '#F5F5F5' }}
+                title={badge.description}
+              >
+                {/* Badge Image */}
+                <div className="flex justify-center mb-2">
+                  <img 
+                    src={badge.image}
+                    alt={badge.name}
+                    className="w-16 h-16 object-contain"
+                    style={{ 
+                      filter: isEarned ? 'none' : 'grayscale(100%)',
+                      opacity: isEarned ? 1 : 0.4
+                    }}
+                  />
+                </div>
+
+                {/* Badge Name */}
+                <h3 
+                  className="text-xs font-semibold text-center mb-1"
+                  style={{ color: isEarned ? '#212121' : '#9E9E9E' }}
+                >
+                  {badge.name}
+                </h3>
+
+                {/* Badge Description */}
+                <p 
+                  className="text-[10px] text-center leading-tight"
+                  style={{ color: isEarned ? '#757575' : '#BDBDBD' }}
+                >
+                  {badge.description}
+                </p>
+
+                {/* Progress Bar for Locked Badges */}
+                {!isEarned && progress > 0 && (
+                  <div className="mt-2">
+                    <div className="w-full h-1 bg-gray-300 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gray-400 rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="text-[9px] text-center mt-1 text-gray-500">{Math.round(progress)}%</p>
+                  </div>
+                )}
+
+                {/* Earned Badge Checkmark */}
+                {isEarned && (
+                  <div className="absolute top-1 right-1">
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: badge.color }}>
+                      <CheckCircle className="w-3 h-3 text-white" strokeWidth={2} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {earnedBadges.length === 0 && (
+          <div className="text-center py-4 mt-2">
+            <p className="text-sm" style={{ color: '#757575' }}>Complete projects to earn your first badge!</p>
+          </div>
+        )}
+      </div>
+
       {projects.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -417,173 +727,40 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges }
             return (
               <div
                 key={index}
-                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-all"
+                onClick={() => {
+                  onNavigateToDetails?.(project.title);
+                }}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer group"
               >
-                <div className="mb-3">
-                  <h3 className="text-base font-semibold" style={{ color: '#212121' }}>
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="text-base font-semibold flex-1" style={{ color: '#212121' }}>
                     {project.title || 'Untitled Project'}
                   </h3>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0 ml-2" strokeWidth={1.5} />
                 </div>
 
-                <p className="text-sm mb-4" style={{ color: '#757575' }}>
+                <p className="text-sm mb-4 line-clamp-3" style={{ color: '#757575' }}>
                   {project.description || 'No description available'}
                 </p>
 
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 text-xs" style={{ color: '#757575' }}>
-                    <span className="font-medium">Language:</span>
-                    <span 
-                      className="px-2 py-1 rounded font-medium" 
-                      style={{ 
-                        backgroundColor: project.language?.toLowerCase() === 'python' ? '#FEF3C7' : '#DBEAFE', 
-                        color: project.language?.toLowerCase() === 'python' ? '#F59E0B' : '#3B82F6' 
-                      }}
-                    >
-                      {project.language || 'Not specified'}
-                    </span>
-                  </div>
-                </div>
-
-                {project.requirements && (
-                  <div className="mb-4 pb-3 border-b border-gray-100">
-                    <p className="text-xs font-medium mb-1" style={{ color: '#212121' }}>Requirements:</p>
-                    <div className="text-xs whitespace-pre-line" style={{ color: '#757575' }}>
-                      {project.requirements}
-                    </div>
-                  </div>
-                )}
-
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  <div className="flex items-center gap-3">
-                    {getStatusBadge(status)}
-                    {(status === 'submitted' || status === 'completed') && projectScores.get(project.title.toLowerCase()) !== undefined && (
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-sm">
-                          <span className="font-medium" style={{ color: '#212121' }}>Score:</span>
-                          <span className={`font-bold ${
-                            projectScores.get(project.title.toLowerCase())! >= 70 
-                              ? 'text-green-600' 
-                              : 'text-red-600'
-                          }`}>
-                            {projectScores.get(project.title.toLowerCase())}/100
-                          </span>
-                        </div>
-                        {projectFeedback.get(project.title.toLowerCase()) && (
-                          <button
-                            onClick={() => {
-                              setSelectedFeedback({
-                                title: project.title,
-                                score: projectScores.get(project.title.toLowerCase())!,
-                                feedback: projectFeedback.get(project.title.toLowerCase())!
-                              });
-                              setShowFeedbackModal(true);
-                            }}
-                            className="text-xs underline"
-                            style={{ color: '#1B5E20' }}
-                          >
-                            View Feedback
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <button 
-                    className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
-                      status === 'completed' || status === 'submitted'
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : 'text-white hover:shadow-md'
-                    }`}
-                    style={status === 'completed' || status === 'submitted' 
-                      ? { color: '#757575' }
-                      : { backgroundColor: '#1B5E20' }
-                    }
-                    disabled={status === 'completed' || status === 'submitted'}
-                    onClick={() => {
-                      if (status !== 'completed' && status !== 'submitted') {
-                        console.log('[MiniProjects] Opening project:', project.title);
-                        console.log('[MiniProjects] Project language:', project.language);
-                        setSelectedProject({
-                          title: project.title,
-                          description: project.description,
-                          language: project.language,
-                          requirements: project.requirements
-                        });
-                      }
-                    }}
-                  >
-                    {status === 'completed' ? 'Completed' : 
-                     status === 'submitted' ? 'Submitted' :
-                     status === 'paused' ? 'Continue' : 'Start'}
-                  </button>
+                  {getStatusBadge(status)}
+                  {(status === 'submitted' || status === 'completed') && projectScores.get(project.title.toLowerCase()) !== undefined && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-medium" style={{ color: '#757575' }}>Score:</span>
+                      <span className={`text-sm font-bold ${
+                        projectScores.get(project.title.toLowerCase())! >= 70 
+                          ? 'text-green-600' 
+                          : 'text-red-600'
+                      }`}>
+                        {projectScores.get(project.title.toLowerCase())}/100
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
-        </div>
-      )}
-
-      {showFeedbackModal && selectedFeedback && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold" style={{ color: '#212121' }}>Grading Feedback</h2>
-                <button
-                  onClick={() => setShowFeedbackModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold" style={{ color: '#212121' }}>{selectedFeedback.title}</h3>
-                <div className={`text-3xl font-bold ${
-                  selectedFeedback.score >= 70 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {selectedFeedback.score}/100
-                </div>
-              </div>
-
-              <div className={`text-center py-3 rounded-lg ${
-                selectedFeedback.score >= 70 ? 'bg-green-50' : 'bg-red-50'
-              }`}>
-                <span className={`text-base font-semibold ${
-                  selectedFeedback.score >= 70 ? 'text-green-700' : 'text-red-700'
-                }`}>
-                  {selectedFeedback.score >= 70 ? 'You Passed!' : 'Keep Practicing!'}
-                </span>
-              </div>
-
-              <div className="text-sm whitespace-pre-line leading-relaxed" style={{ color: '#212121' }}>
-                {selectedFeedback.feedback.split('\n').map((line, index) => {
-                  if (line.startsWith('**') && line.endsWith('**')) {
-                    const text = line.replace(/\*\*/g, '');
-                    return (
-                      <div key={index} className="font-semibold mt-3 mb-1" style={{ color: '#212121' }}>
-                        {text}
-                      </div>
-                    );
-                  }
-                  return line ? <div key={index}>{line}</div> : <div key={index} className="h-2" />;
-                })}
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-xl">
-              <button
-                onClick={() => setShowFeedbackModal(false)}
-                className="w-full px-4 py-2.5 text-white rounded-lg text-sm font-medium transition-all hover:shadow-md"
-                style={{ backgroundColor: '#1B5E20' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

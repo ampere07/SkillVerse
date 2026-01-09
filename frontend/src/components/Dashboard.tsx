@@ -19,6 +19,7 @@ import { useState, useRef, useEffect } from 'react';
 import Compiler from '../pages/Compiler';
 import Classrooms from '../pages/Classrooms';
 import MiniProjects from '../pages/MiniProjects';
+import MiniProjectDetails from '../pages/MiniProjectDetails';
 import Settings from '../pages/Settings';
 import Assignments from '../pages/Assignments';
 import CreateAssignment from '../pages/CreateAssignment';
@@ -28,7 +29,7 @@ import UnsavedChangesModal from './UnsavedChangesModal';
 import TeacherDashboardContent from './TeacherDashboardContent';
 
 interface NavItem {
-  icon: any;
+  icon: string; // Changed to string for image path
   label: string;
   href: string;
   roles: ('student' | 'teacher')[];
@@ -36,43 +37,43 @@ interface NavItem {
 
 const navigationItems: NavItem[] = [
   {
-    icon: LayoutDashboard,
+    icon: '/assets/sidebar/dashboard.png',
     label: 'Dashboard',
     href: '/dashboard',
     roles: ['student', 'teacher']
   },
   {
-    icon: BookOpen,
+    icon: '/assets/sidebar/classroom.png',
     label: 'My Classrooms',
     href: '/classrooms',
     roles: ['student', 'teacher']
   },
   {
-    icon: FileText,
+    icon: '/assets/sidebar/assignment.png',
     label: 'Assignments',
     href: '/assignments',
     roles: ['student']
   },
   {
-    icon: CheckCircle,
+    icon: '/assets/sidebar/assignment.png', // Using assignment icon as fallback for submissions
     label: 'Submissions',
     href: '/submissions',
     roles: ['teacher']
   },
   {
-    icon: Code,
+    icon: '/assets/sidebar/compiler.png',
     label: 'Compiler',
     href: '/compiler',
     roles: ['student']
   },
   {
-    icon: FolderKanban,
+    icon: '/assets/sidebar/miniprojects.png',
     label: 'Mini Projects',
     href: '/mini-projects',
     roles: ['student']
   },
   {
-    icon: SettingsIcon,
+    icon: '/assets/sidebar/settings.png',
     label: 'Settings',
     href: '/settings',
     roles: ['student', 'teacher']
@@ -95,6 +96,7 @@ export default function Dashboard() {
   const [createPostClassroomId, setCreatePostClassroomId] = useState<string | null>(null);
   const [createPostClassroomName, setCreatePostClassroomName] = useState<string | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [selectedProjectTitle, setSelectedProjectTitle] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.role === 'student') {
@@ -331,19 +333,22 @@ export default function Dashboard() {
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center px-4 h-16 border-b border-[#E0E0E0]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white border-2 border-[#1B5E20] rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-[#1B5E20]" />
+          <div className="flex items-center justify-center px-4 py-4 border-b border-[#E0E0E0]">
+            <div className="flex flex-col items-center gap-0 w-full">
+              <div className="w-[100px] h-[100px] bg-white rounded-lg flex items-center justify-center p-2">
+                <img 
+                  src="/assets/badges/graduationhat.png" 
+                  alt="SkillVerse Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
-              <span className="text-[15px] font-semibold text-[#212121]">SkillVerse</span>
+              <span className="text-xl font-bold text-[#212121]">SkillVerse</span>
             </div>
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
             {filteredNavigation.map((item) => {
-              const Icon = item.icon;
               const isActive = activeNav === item.href;
               
               return (
@@ -358,7 +363,11 @@ export default function Dashboard() {
                     }
                   `}
                 >
-                  <Icon className="w-5 h-5" />
+                  <img 
+                    src={item.icon} 
+                    alt={item.label}
+                    className="w-6 h-6 object-contain"
+                  />
                   <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
                 </button>
               );
@@ -381,10 +390,14 @@ export default function Dashboard() {
             
             <button
               onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
+              className="w-full flex items-center justify-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
             >
-              <LogOut className="w-5 h-5" />
-              <span className="text-sm font-semibold text-center">Logout</span>
+              <img 
+                src="/assets/badges/logout.png" 
+                alt="Logout" 
+                className="w-6 h-6 object-contain"
+              />
+              <span className="text-sm font-semibold">Logout</span>
             </button>
           </div>
         </div>
@@ -420,10 +433,24 @@ export default function Dashboard() {
               selectedClassroomId={selectedClassroomId}
               onClearSelection={() => setSelectedClassroomId(null)}
             />
+          ) : activeNav.startsWith('/mini-projects/') ? (
+            <MiniProjectDetails 
+              ref={miniProjectsRef}
+              onHasUnsavedChanges={setHasUnsavedChanges}
+              projectTitle={selectedProjectTitle || ''}
+              onBack={() => {
+                setActiveNav('/mini-projects');
+                setSelectedProjectTitle(null);
+              }}
+            />
           ) : activeNav === '/mini-projects' ? (
             <MiniProjects 
               ref={miniProjectsRef}
               onHasUnsavedChanges={setHasUnsavedChanges}
+              onNavigateToDetails={(title: string) => {
+                setSelectedProjectTitle(title);
+                setActiveNav(`/mini-projects/${encodeURIComponent(title)}`);
+              }}
             />
           ) : activeNav === '/settings' ? (
             <Settings />

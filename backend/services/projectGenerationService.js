@@ -93,8 +93,8 @@ export const generateProjectsForLanguage = async (userId, language) => {
       throw new Error(`Survey found but no ${language} data available`);
     }
 
-    if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length < 6) {
-      throw new Error(`Phase 1 must have at least 6 items for ${language}`);
+    if (!survey.learningRoadmap || !survey.learningRoadmap.phase1 || survey.learningRoadmap.phase1.length < 3) {
+      throw new Error(`Phase 1 must have at least 3 items for ${language}`);
     }
 
     const skillLevel = language.toLowerCase() === 'java'
@@ -123,46 +123,47 @@ export const generateProjectsForLanguage = async (userId, language) => {
       console.log(`[ProjectGen] AI Analysis preview:`, languageSpecificSurvey.aiAnalysis.substring(0, 200));
     }
     
-    try {
-      const response = await ollama.chat({
-        model: MODEL_NAME,
-        messages: [{ role: 'user', content: prompt }],
-        options: {
-          temperature: 0.9,
-          num_predict: 1500,
-          num_ctx: 2048,
-          num_thread: 10
-        }
-      });
-
-      const projectsText = response.message.content;
-      console.log(`[ProjectGen] AI Response length: ${projectsText.length} characters`);
-      console.log(`[ProjectGen] AI Response preview (first 500 chars):`, projectsText.substring(0, 500));
-      
-      const projects = parseProjectsFromAI(projectsText);
-      console.log(`[ProjectGen] Parsed ${projects.length} projects from AI response`);
-      
-      if (projects.length > 0) {
-        console.log(`[ProjectGen] First parsed project:`, JSON.stringify(projects[0], null, 2));
+    console.log(`[ProjectGen] Calling Ollama API (no timeout - will wait until completion)...`);
+    const startTime = Date.now();
+    
+    const response = await ollama.chat({
+      model: MODEL_NAME,
+      messages: [{ role: 'user', content: prompt }],
+      options: {
+        temperature: 0.9,
+        num_predict: 1500,
+        num_ctx: 2048,
+        num_thread: 10
       }
-      
-      // Ensure all projects have the correct language
-      const correctedProjects = projects.map(project => ({
-        ...project,
-        language: language  // Force the correct language
-      }));
+    });
 
-      if (correctedProjects.length < 6) {
-        throw new Error(`Only generated ${correctedProjects.length} projects, expected 6`);
-      }
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[ProjectGen] AI Response received after ${duration} seconds`);
 
-      console.log(`[ProjectGen] Successfully generated ${correctedProjects.length} roadmap-based projects`);
-      console.log(`[ProjectGen] All projects set to language: ${language}`);
-      return correctedProjects.slice(0, 6);
-    } catch (apiError) {
-      console.error('[ProjectGen] Ollama Error:', apiError.message);
-      throw new Error(`AI generation failed: ${apiError.message}`);
+    const projectsText = response.message.content;
+    console.log(`[ProjectGen] AI Response length: ${projectsText.length} characters`);
+    console.log(`[ProjectGen] AI Response preview (first 500 chars):`, projectsText.substring(0, 500));
+    
+    const projects = parseProjectsFromAI(projectsText);
+    console.log(`[ProjectGen] Parsed ${projects.length} projects from AI response`);
+    
+    if (projects.length > 0) {
+      console.log(`[ProjectGen] First parsed project:`, JSON.stringify(projects[0], null, 2));
     }
+    
+    // Ensure all projects have the correct language
+    const correctedProjects = projects.map(project => ({
+      ...project,
+      language: language  // Force the correct language
+    }));
+
+    if (correctedProjects.length < 3) {
+      throw new Error(`Only generated ${correctedProjects.length} projects, expected at least 3. AI may need better prompting.`);
+    }
+
+    console.log(`[ProjectGen] Successfully generated ${correctedProjects.length} roadmap-based projects in ${duration}s`);
+    console.log(`[ProjectGen] All projects set to language: ${language}`);
+    return correctedProjects;
   } catch (error) {
     console.error('[GenerateProjectsForLanguage] Error:', error);
     throw error;
@@ -180,16 +181,16 @@ const constructRoadmapBasedPrompt = (survey) => {
   
   const phase1Items = learningRoadmap.phase1 || [];
   
-  // Ensure Phase 1 has at least 6 items
-  if (phase1Items.length < 6) {
-    throw new Error(`Phase 1 must have at least 6 items, found ${phase1Items.length}`);
+  // Ensure Phase 1 has at least 3 items
+  if (phase1Items.length < 3) {
+    throw new Error(`Phase 1 must have at least 3 items, found ${phase1Items.length}`);
   }
 
   const aiAnalysisSection = aiAnalysis 
     ? `\n\nAI ANALYSIS:\n${aiAnalysis}\n\nUse this to tailor difficulty, explanations, focus. Address strengths/weaknesses.`
     : '';
 
-  return `Create 6 unique mini projects based on personalized roadmap.
+  return `Create 3 unique mini projects based on personalized roadmap.
 
 LANGUAGE: ${language} ONLY
 All projects MUST be ${language}. Do not mix languages.
@@ -209,14 +210,11 @@ Language: ${language}
 Level: ${skillLevel}${aiAnalysisSection}
 
 GENERATION:
-All 6 projects from Phase 1 only.
+All 3 projects from Phase 1 only.
 One project per Phase 1 item:
 - Project 1: Based on Phase 1, Item 1 (${phase1Items[0]})
 - Project 2: Based on Phase 1, Item 2 (${phase1Items[1]})
 - Project 3: Based on Phase 1, Item 3 (${phase1Items[2]})
-- Project 4: Based on Phase 1, Item 4 (${phase1Items[3]})
-- Project 5: Based on Phase 1, Item 5 (${phase1Items[4]})
-- Project 6: Based on Phase 1, Item 6 (${phase1Items[5]})
 
 Each project MUST:
 1. Teach the SPECIFIC roadmap concept
@@ -290,7 +288,7 @@ Rubrics:
 
 REMINDERS:
 - Each project teaches specific Phase 1 concept
-- All 6 projects Phase 1 only
+- All 3 projects Phase 1 only
 - Similar difficulty (foundation level)
 - Single-file console programs
 - No ** in titles
@@ -311,9 +309,9 @@ PERSONALIZATION:
 - Address student strengths/weaknesses
 - Adjust complexity to skill level
 
-CRITICAL: ALL 6 PROJECTS MUST BE IN ${language}. DO NOT GENERATE PYTHON IF LANGUAGE IS JAVA. DO NOT GENERATE JAVA IF LANGUAGE IS PYTHON.
+CRITICAL: ALL 3 PROJECTS MUST BE IN ${language}. DO NOT GENERATE PYTHON IF LANGUAGE IS JAVA. DO NOT GENERATE JAVA IF LANGUAGE IS PYTHON.
 
-Generate 6 projects, ONE for EACH Phase 1 roadmap item in order:`;
+Generate 3 projects, ONE for EACH of the first 3 Phase 1 roadmap items in order:`;
 };
 
 const constructPersonalizedPrompt = (survey) => {
@@ -845,17 +843,31 @@ const determineSkillLevel = (javaExpertise, pythonExpertise, javaScore, pythonSc
 
 const parseProjectsFromAI = (text) => {
   const projects = [];
-  const projectMatches = text.split(/PROJECT \d+:/i).filter(p => p.trim());
+  
+  // Try multiple splitting patterns
+  let projectMatches = text.split(/###\s*Project\s*\d+:/i).filter(p => p.trim());
+  
+  if (projectMatches.length <= 1) {
+    projectMatches = text.split(/PROJECT\s*\d+:/i).filter(p => p.trim());
+  }
   
   console.log(`[ProjectGen-Parse] Found ${projectMatches.length} potential project blocks`);
   
   for (const projectText of projectMatches) {
     try {
-      const titleMatch = projectText.match(/\*\*Title:\*\*\s*(.+?)(?=\n)/i);
-      const descMatch = projectText.match(/\*\*Description:\*\*\s*(.+?)(?=\n\*\*Language:)/is);
-      const langMatch = projectText.match(/\*\*Language:\*\*\s*(.+?)(?=\n)/i);
-      const reqMatch = projectText.match(/\*\*Requirements:\*\*\s*([\s\S]+?)(?=\n\*\*Rubrics:)/i);
-      const rubricsMatch = projectText.match(/\*\*Rubrics:\*\*\s*([\s\S]+?)(?=\n\n|PROJECT|$)/i);
+      // More flexible title matching
+      const titleMatch = projectText.match(/\*\*Title:\*\*\s*(.+?)(?=\n|$)/i);
+      
+      // More flexible description matching - look for Description until Language
+      const descMatch = projectText.match(/\*\*Description:\*\*\s*(.+?)(?=\*\*Language)/is);
+      
+      // More flexible language matching - handle both formats
+      const langMatch = projectText.match(/\*\*Language:\s*\*\*?\s*(.+?)(?=\n|$)/i) || 
+                        projectText.match(/Language:\s*(.+?)(?=\n|$)/i);
+      
+      // Requirements and Rubrics
+      const reqMatch = projectText.match(/\*\*Requirements:\*\*\s*([\s\S]+?)(?=\*\*Rubrics:|$)/i);
+      const rubricsMatch = projectText.match(/\*\*Rubrics:\*\*\s*([\s\S]+?)(?=\n\n|###|PROJECT|$)/i);
       
       if (titleMatch && descMatch && langMatch) {
         let title = titleMatch[1].trim();
@@ -863,12 +875,18 @@ const parseProjectsFromAI = (text) => {
         title = title.replace(/^["']|["']$/g, '');
         title = title.trim();
         
+        let language = langMatch[1].trim();
+        language = language.replace(/^\*\*|\*\*$/g, '');
+        language = language.trim();
+        
         const requirements = reqMatch 
-          ? reqMatch[1].split('\n').filter(r => r.trim().startsWith('-')).join('\n')
+          ? reqMatch[1].split('\n').filter(r => r.trim() && (r.trim().startsWith('-') || r.trim().match(/^\d+\./)))
+              .map(r => r.trim()).join('\n')
           : '';
         
         const rubrics = rubricsMatch
-          ? rubricsMatch[1].split('\n').filter(r => r.trim().startsWith('-')).join('\n').trim()
+          ? rubricsMatch[1].split('\n').filter(r => r.trim() && (r.trim().startsWith('-') || r.trim().match(/^\d+\./)))
+              .map(r => r.trim()).join('\n')
           : '';
         
         console.log(`[ProjectGen-Parse] Project "${title}" fields: Req=${!!reqMatch}, Rubrics=${!!rubricsMatch}`);
@@ -876,17 +894,24 @@ const parseProjectsFromAI = (text) => {
         projects.push({
           title: title,
           description: descMatch[1].trim().replace(/\n/g, ' '),
-          language: langMatch[1].trim(),
+          language: language,
           requirements: requirements.trim(),
           rubrics: rubrics
         });
         console.log(`[ProjectGen-Parse] Successfully parsed project: ${title}`);
       } else {
         console.log(`[ProjectGen-Parse] Failed to parse project - missing fields. Title: ${!!titleMatch}, Desc: ${!!descMatch}, Lang: ${!!langMatch}`);
-        if (!descMatch) {
-          console.log(`[ProjectGen-Parse] Description section:`, projectText.substring(projectText.indexOf('Description'), projectText.indexOf('Description') + 300));
+        if (!descMatch && projectText.includes('Description')) {
+          const descStart = projectText.indexOf('Description');
+          console.log(`[ProjectGen-Parse] Description section:`, projectText.substring(descStart, descStart + 300));
         }
-        if (!titleMatch) console.log(`[ProjectGen-Parse] Title match failed for text:`, projectText.substring(0, 200));
+        if (!titleMatch && projectText.length > 50) {
+          console.log(`[ProjectGen-Parse] Title match failed for text:`, projectText.substring(0, 200));
+        }
+        if (!langMatch && projectText.includes('Language')) {
+          const langStart = projectText.indexOf('Language');
+          console.log(`[ProjectGen-Parse] Language section:`, projectText.substring(langStart, langStart + 100));
+        }
       }
     } catch (error) {
       console.error('[ProjectGen-Parse] Error parsing project:', error.message);
