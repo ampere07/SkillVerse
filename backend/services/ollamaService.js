@@ -159,40 +159,31 @@ Phase 1 - Foundation
 - [Concept 1 - something they know]
 - [Concept 2 - basic new skill]
 - [Concept 3 - basic new skill]
-- [Concept 4 - basic new skill]
-- [Concept 5 - basic new skill]
-- [Concept 6 - basic new skill]
 
 Phase 2 - Building Skills
-- [Concept 7 - intermediate skill]
-- [Concept 8 - intermediate skill]
-- [Concept 9 - intermediate skill]
-- [Concept 10 - intermediate skill]
-- [Concept 11 - intermediate skill]
-- [Concept 12 - intermediate skill]
+- [Concept 4 - intermediate skill]
+- [Concept 5 - intermediate skill]
+- [Concept 6 - intermediate skill]
 
 Phase 3 - Advanced Practice
-- [Concept 13 - advanced skill]
-- [Concept 14 - advanced skill]
-- [Concept 15 - advanced skill]
-- [Concept 16 - advanced skill]
-- [Concept 17 - advanced skill]
-- [Concept 18 - advanced skill]
+- [Concept 7 - advanced skill]
+- [Concept 8 - advanced skill]
+- [Concept 9 - advanced skill]
 
 CRITICAL REQUIREMENTS FOR ROADMAP:
 
-1. PHASE 1 must include EXACTLY 6 concepts:
+1. PHASE 1 must include EXACTLY 3 concepts:
    - First concept: Something they already know (from strengths) to build confidence
-   - Next 5 concepts: Foundation concepts they need to master
+   - Next 2 concepts: Foundation concepts they need to master
    - All should be basic/fundamental concepts
    - Examples: variables, data types, loops, conditionals, arrays, functions
 
-2. PHASE 2 must include EXACTLY 6 concepts:
+2. PHASE 2 must include EXACTLY 3 concepts:
    - All should be intermediate concepts addressing their weaknesses
    - Build directly on Phase 1 concepts
    - Examples: OOP basics, classes and objects, inheritance, collections, exception handling, file I/O
 
-3. PHASE 3 must include EXACTLY 6 concepts:
+3. PHASE 3 must include EXACTLY 3 concepts:
    - All should be advanced concepts that combine previous learning
    - Prepare them for real-world applications
    - Examples: design patterns, algorithms, data structures, API integration, testing, project architecture
@@ -225,25 +216,16 @@ Phase 1 - Foundation
 - ${strengths.length > 0 ? strengths[0] : 'Basic syntax and variables'} (practice what you know)
 - ${weaknesses.length > 0 ? weaknesses[0] : 'Understanding conditional statements'} (new skill)
 - Working with loops and iteration (new skill)
-- Understanding data types and type conversion (new skill)
-- Creating and using functions (new skill)
-- Working with arrays and lists (new skill)
 
 Phase 2 - Building Skills
 - ${weaknesses.length > 1 ? weaknesses[1] : 'Object-oriented programming basics'} (intermediate)
 - Working with collections and data structures (intermediate)
 - Understanding inheritance and polymorphism (intermediate)
-- Exception handling and error management (intermediate)
-- File input and output operations (intermediate)
-- Working with interfaces and abstract classes (intermediate)
 
 Phase 3 - Advanced Practice
 - ${weaknesses.length > 2 ? weaknesses[2] : 'Algorithm design and problem solving'} (advanced)
 - Implementing common data structures (advanced)
 - Understanding design patterns (advanced)
-- Building complete applications with multiple components (advanced)
-- Code optimization and performance tuning (advanced)
-- Testing and debugging strategies (advanced)
 
 WRITING STYLE:
 - Write like talking to a friend, not a textbook
@@ -271,6 +253,54 @@ CRITICAL: The roadmap items will be used to generate mini projects, so each item
 Now create the analysis and roadmap for this ${currentLevel} level ${language} student:`;
 
   return prompt;
+};
+
+export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
+  const language = primaryLanguage.toLowerCase();
+  
+  if (language === 'java') {
+    return {
+      phase1: [
+        'Variables and data types',
+        'Conditional statements (if/else)',
+        'Loops and iteration'
+      ],
+      phase2: [
+        'Object-oriented programming basics',
+        'Classes and objects',
+        'Inheritance and polymorphism'
+      ],
+      phase3: [
+        'Abstract classes and interfaces',
+        'Generic types and methods',
+        'Lambda expressions and streams'
+      ]
+    };
+  } else if (language === 'python') {
+    return {
+      phase1: [
+        'Variables and data types',
+        'Conditional statements (if/elif/else)',
+        'Loops (for/while)'
+      ],
+      phase2: [
+        'Dictionaries and sets',
+        'List comprehensions',
+        'File handling'
+      ],
+      phase3: [
+        'Decorators and generators',
+        'Working with APIs',
+        'Data processing with pandas'
+      ]
+    };
+  }
+  
+  return {
+    phase1: ['Basic syntax', 'Variables', 'Conditionals'],
+    phase2: ['OOP basics', 'Classes', 'Inheritance'],
+    phase3: ['Advanced OOP', 'Algorithms', 'Design patterns']
+  };
 };
 
 export const checkOllamaConnection = async () => {
