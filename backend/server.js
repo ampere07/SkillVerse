@@ -18,6 +18,8 @@ import moduleRoutes from './routes/module.js';
 import uploadRoutes from './routes/upload.js';
 import miniProjectsRoutes from './routes/miniProjects.js';
 import ollamaTestRoutes from './routes/ollamaTest.js';
+import demoRoutes from './routes/demo.js';
+import progressRoutes from './routes/progress.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
 import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
 import { initializeCronJobs } from './services/cronService.js';
@@ -47,6 +49,8 @@ app.use('/api/modules', moduleRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/mini-projects', miniProjectsRoutes);
 app.use('/api/ollama', ollamaTestRoutes);
+app.use('/api/demo', demoRoutes);
+app.use('/api/progress', progressRoutes);
 
 setupCompilerSocket(io);
 setupPythonCompilerSocket(io);

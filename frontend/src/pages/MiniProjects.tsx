@@ -222,11 +222,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
     setEarnedBadges(earned);
   };
 
-  useEffect(() => {
-    if (projects.length > 0) {
-      checkEarnedBadges();
-    }
-  }, [projects, projectScores, consecutiveDays]);
+  // Removed automatic badge checking - badges are now managed by backend
+  // useEffect(() => {
+  //   if (projects.length > 0) {
+  //     checkEarnedBadges();
+  //   }
+  // }, [projects, projectScores, consecutiveDays]);
 
   const calculateConsecutiveDays = (tasks: any[]) => {
     // Mock implementation - returns streak based on activity
@@ -317,18 +318,36 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       setProjectScores(scoreMap);
       setProjectFeedback(feedbackMap);
 
-      // Calculate XP and Level
-      const completedSubmittedCount = response.data.completedTasks.filter(
-        (task: any) => task.status === 'submitted' || task.status === 'completed'
-      ).length;
-      const xpData = calculateXPAndLevel(completedSubmittedCount);
-      setCurrentXP(xpData.currentLevelXP);
-      setCurrentLevel(xpData.level);
+      // Fetch XP and badges from backend
+      await fetchUserProgress();
 
       // Calculate consecutive days streak
       setConsecutiveDays(calculateConsecutiveDays(response.data.completedTasks));
     } catch (error) {
       console.error('[MiniProjects] Error fetching completed tasks:', error);
+    }
+  };
+
+  const fetchUserProgress = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      console.log('[MiniProjects] Token for progress API:', token ? 'EXISTS' : 'MISSING');
+      console.log('[MiniProjects] Token length:', token?.length);
+      
+      const response = await axios.get(`${API_URL}/progress/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        setCurrentXP(response.data.xp || 0);
+        setCurrentLevel(response.data.level || 1);
+        setEarnedBadges(response.data.badges || []);
+        console.log('[MiniProjects] Loaded user progress:', response.data);
+      }
+    } catch (error) {
+      console.error('[MiniProjects] Error fetching user progress:', error);
+      console.error('[MiniProjects] Error response:', error.response?.data);
+      // If error, keep default values
     }
   };
 

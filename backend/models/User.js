@@ -66,6 +66,30 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
+  }],
+  // XP and Badge System (for students)
+  xp: {
+    type: Number,
+    default: 0
+  },
+  level: {
+    type: Number,
+    default: 1
+  },
+  badges: [{
+    type: String
+  }],
+  // Demo/Presentation fields (separate from real progress)
+  demoXP: {
+    type: Number,
+    default: 0
+  },
+  demoLevel: {
+    type: Number,
+    default: 1
+  },
+  demoBadges: [{
+    type: String
   }]
 }, {
   timestamps: true
