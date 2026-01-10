@@ -20,6 +20,7 @@ import miniProjectsRoutes from './routes/miniProjects.js';
 import ollamaTestRoutes from './routes/ollamaTest.js';
 import demoRoutes from './routes/demo.js';
 import progressRoutes from './routes/progress.js';
+import healthRoutes from './routes/health.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
 import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
 import { initializeCronJobs } from './services/cronService.js';
@@ -51,6 +52,7 @@ app.use('/api/mini-projects', miniProjectsRoutes);
 app.use('/api/ollama', ollamaTestRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/progress', progressRoutes);
+app.use('/api/health', healthRoutes);
 
 setupCompilerSocket(io);
 setupPythonCompilerSocket(io);
@@ -76,6 +78,7 @@ httpServer.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`API Health: http://localhost:${PORT}/api/health`);
+  console.log(`AI Status: http://localhost:${PORT}/api/health/ai-status`);
   console.log(`WebSocket server running`);
   
   const uploadsDir = path.join(process.cwd(), 'uploads');

@@ -1,14 +1,91 @@
 import { Ollama } from 'ollama';
 import OLLAMA_CONFIG from '../config/ollamaConfig.js';
+import axios from 'axios';
 
 const MODEL_NAME = OLLAMA_CONFIG.model;
 const OLLAMA_URL = OLLAMA_CONFIG.url;
+const MAX_RETRIES = OLLAMA_CONFIG.maxRetries || 3;
+const TIMEOUT = OLLAMA_CONFIG.timeout || 180000;
 
-const ollama = new Ollama({ host: OLLAMA_URL });
+const isKaggleMode = OLLAMA_URL.includes('ngrok');
+
+let ollama;
+
+if (!isKaggleMode) {
+  ollama = new Ollama({ host: OLLAMA_URL });
+}
 
 console.log('Ollama Service Initialized');
+console.log('Mode:', isKaggleMode ? 'Kaggle (ngrok)' : 'Direct');
 console.log('Model:', MODEL_NAME);
 console.log('URL:', OLLAMA_URL);
+
+const generateWithKaggle = async (prompt, options = {}) => {
+  const requestData = {
+    prompt: prompt,
+    max_tokens: options.num_predict || 1000
+  };
+
+  const response = await axios.post(
+    `${OLLAMA_URL}/api/generate`,
+    requestData,
+    {
+      timeout: TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.data.success) {
+    throw new Error(response.data.error || 'Kaggle generation failed');
+  }
+
+  return {
+    message: {
+      content: response.data.response
+    }
+  };
+};
+
+export const generateWithRetry = async (prompt, options = {}) => {
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`AI Generation attempt ${attempt}/${MAX_RETRIES}`);
+      const startTime = Date.now();
+
+      let response;
+      if (isKaggleMode) {
+        response = await generateWithKaggle(prompt, options);
+      } else {
+        response = await ollama.chat({
+          model: MODEL_NAME,
+          messages: [{ role: 'user', content: prompt }],
+          options: options
+        });
+      }
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`Generation completed in ${duration} seconds`);
+
+      return response;
+
+    } catch (error) {
+      lastError = error;
+      console.error(`Attempt ${attempt} failed:`, error.message);
+
+      if (attempt < MAX_RETRIES) {
+        const delay = 2000 * attempt;
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw new Error(`AI generation failed after ${MAX_RETRIES} attempts: ${lastError.message}`);
+};
 
 export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => {
   try {
@@ -17,15 +94,11 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
     
     const prompt = constructPrompt(surveyData, fullName);
     
-    const response = await ollama.chat({
-      model: MODEL_NAME,
-      messages: [{ role: 'user', content: prompt }],
-      options: {
-        temperature: 0.7,
-        top_p: 0.95,
-        num_predict: 1000,
-        num_thread: 10
-      }
+    const response = await generateWithRetry(prompt, {
+      temperature: 0.7,
+      top_p: 0.95,
+      num_predict: 1000,
+      num_thread: 10
     });
     
     const endTime = Date.now();
@@ -35,7 +108,7 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
     const analysis = response.message.content;
     
     if (!analysis || analysis.trim().length === 0) {
-      throw new Error('Empty analysis received from Ollama');
+      throw new Error('Empty analysis received from AI');
     }
 
     console.log('[Survey] AI analysis completed successfully');
@@ -48,7 +121,7 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
       roadmap: roadmap
     };
   } catch (error) {
-    console.error('Ollama API Error:', error.message);
+    console.error('AI Service Error:', error.message);
     console.error('Error stack:', error.stack);
     return {
       success: false,
@@ -305,10 +378,31 @@ export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
 
 export const checkOllamaConnection = async () => {
   try {
-    await ollama.list();
-    return { connected: true, model: MODEL_NAME };
+    if (isKaggleMode) {
+      const response = await axios.get(`${OLLAMA_URL}/health`, { timeout: 5000 });
+      return { 
+        connected: true, 
+        model: MODEL_NAME,
+        mode: 'Kaggle',
+        status: response.data.status
+      };
+    } else {
+      await ollama.list();
+      return { 
+        connected: true, 
+        model: MODEL_NAME,
+        mode: 'Direct'
+      };
+    }
   } catch (error) {
-    console.error('Ollama connection failed:', error.message);
-    return { connected: false, error: error.message };
+    console.error('AI connection failed:', error.message);
+    return { 
+      connected: false, 
+      error: error.message,
+      mode: isKaggleMode ? 'Kaggle' : 'Direct'
+    };
   }
 };
+
+// Export Ollama config for other services
+export { MODEL_NAME, OLLAMA_URL, isKaggleMode };
