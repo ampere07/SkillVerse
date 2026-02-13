@@ -7,6 +7,7 @@ interface User {
   role: 'teacher' | 'student';
   surveyCompleted?: boolean;
   surveyCompletedLanguages?: string[];
+  primaryLanguage?: string;
 }
 
 interface AuthContextType {
@@ -36,7 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const parsedUser = JSON.parse(storedUser);
       setToken(storedToken);
       setUser(parsedUser);
-      
+
       // Check if student hasn't completed any survey
       if (parsedUser.role === 'student') {
         const surveyCompletedLanguages = parsedUser.surveyCompletedLanguages || [];
@@ -65,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(data.user);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    
+
     // Check if student hasn't completed any survey
     if (data.user.role === 'student') {
       const surveyCompletedLanguages = data.user.surveyCompletedLanguages || [];
@@ -92,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(data.user);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    
+
     if (role === 'student') {
       setIsNewStudent(true);
     }

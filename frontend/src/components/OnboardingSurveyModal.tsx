@@ -27,7 +27,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [validationError, setValidationError] = useState('');
-  const [unansweredQuestions, setUnansweredQuestions] = useState<{java: number[], python: number[]}>({java: [], python: []});
+  const [unansweredQuestions, setUnansweredQuestions] = useState<{ java: number[], python: number[] }>({ java: [], python: [] });
   const [isGeneratingProjects, setIsGeneratingProjects] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
 
@@ -42,13 +42,13 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       setIsTyping(false);
       setError('');
       setValidationError('');
-      setUnansweredQuestions({java: [], python: []});
+      setUnansweredQuestions({ java: [], python: [] });
       setShowLoadingModal(false);
       setIsGeneratingProjects(false);
-      
+
       // Always start at Step 0 to show language selection
       setStep(0);
-      
+
       // If preselected language is provided, pre-fill it but still show Step 0
       if (preselectedLanguage) {
         setFormData({
@@ -90,7 +90,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       const newAnswers = [...javaAnswers];
       newAnswers[questionIndex] = answerIndex;
       setJavaAnswers(newAnswers);
-      
+
       if (unansweredQuestions.java.includes(questionIndex)) {
         setUnansweredQuestions(prev => ({
           ...prev,
@@ -101,7 +101,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       const newAnswers = [...pythonAnswers];
       newAnswers[questionIndex] = answerIndex;
       setPythonAnswers(newAnswers);
-      
+
       if (unansweredQuestions.python.includes(questionIndex)) {
         setUnansweredQuestions(prev => ({
           ...prev,
@@ -109,7 +109,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
         }));
       }
     }
-    
+
     if (validationError && unansweredQuestions.java.length === 0 && unansweredQuestions.python.length === 0) {
       setValidationError('');
     }
@@ -162,17 +162,17 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
   const handleSubmit = async () => {
     setError('');
     setValidationError('');
-    setUnansweredQuestions({java: [], python: []});
+    setUnansweredQuestions({ java: [], python: [] });
     setIsSubmitting(true);
-    
+
     if (!user?.id) {
       setError('User not found. Please login again.');
       setIsSubmitting(false);
       return;
     }
 
-    const unanswered = {java: [] as number[], python: [] as number[]};
-    
+    const unanswered = { java: [] as number[], python: [] as number[] };
+
     if (formData.primaryLanguage === 'java') {
       javaAnswers.forEach((answer, index) => {
         if (answer === -1) {
@@ -180,7 +180,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
         }
       });
     }
-    
+
     if (formData.primaryLanguage === 'python') {
       pythonAnswers.forEach((answer, index) => {
         if (answer === -1) {
@@ -188,7 +188,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
         }
       });
     }
-    
+
     if (unanswered.java.length > 0 || unanswered.python.length > 0) {
       setUnansweredQuestions(unanswered);
       setValidationError('Please answer all questions before submitting.');
@@ -196,18 +196,18 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       return;
     }
 
-    const javaScore = formData.primaryLanguage === 'java' 
-      ? calculateScore(javaAnswers, javaQuestions) 
+    const javaScore = formData.primaryLanguage === 'java'
+      ? calculateScore(javaAnswers, javaQuestions)
       : null;
-    const pythonScore = formData.primaryLanguage === 'python' 
-      ? calculateScore(pythonAnswers, pythonQuestions) 
+    const pythonScore = formData.primaryLanguage === 'python'
+      ? calculateScore(pythonAnswers, pythonQuestions)
       : null;
 
     const requestData: any = {
       userId: user.id,
       primaryLanguage: formData.primaryLanguage
     };
-    
+
     if (formData.primaryLanguage === 'java') {
       requestData.javaExpertise = formData.javaExpertise;
       requestData.javaQuestions = {
@@ -215,7 +215,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
         score: javaScore
       };
     }
-    
+
     if (formData.primaryLanguage === 'python') {
       requestData.pythonExpertise = formData.pythonExpertise;
       requestData.pythonQuestions = {
@@ -261,26 +261,26 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
 
   const parseRoadmap = (analysisText: string) => {
     const roadmap = { phase1: [] as string[], phase2: [] as string[], phase3: [] as string[] };
-    
+
     const phase1Match = analysisText.match(/Phase 1[:\s-]*(.+?)(?=Phase 2|$)/is);
     const phase2Match = analysisText.match(/Phase 2[:\s-]*(.+?)(?=Phase 3|$)/is);
     const phase3Match = analysisText.match(/Phase 3[:\s-]*(.+?)(?=$)/is);
-    
+
     if (phase1Match) {
       const items = phase1Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
       if (items) roadmap.phase1 = items.map(item => item.replace(/^[-•]\s*/, '').trim()).filter(item => item.length > 0);
     }
-    
+
     if (phase2Match) {
       const items = phase2Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
       if (items) roadmap.phase2 = items.map(item => item.replace(/^[-•]\s*/, '').trim()).filter(item => item.length > 0);
     }
-    
+
     if (phase3Match) {
       const items = phase3Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
       if (items) roadmap.phase3 = items.map(item => item.replace(/^[-•]\s*/, '').trim()).filter(item => item.length > 0);
     }
-    
+
     return roadmap;
   };
 
@@ -306,7 +306,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
 
     try {
       console.log('[OnboardingSurvey] Starting project generation...');
-      
+
       const response = await fetch(`http://localhost:5000/api/survey/generate-projects/${user.id}`, {
         method: 'POST',
         headers: {
@@ -342,7 +342,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="flex min-h-screen items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
-          
+
           <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-8">
             <div className="text-center">
               {error ? (
@@ -392,6 +392,32 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
     );
   }
 
+  // Loading modal for survey submission
+  if (isSubmitting) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <svg className="animate-spin h-8 w-8 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Submitting Survey</h3>
+              <p className="text-gray-600 mb-4">
+                Please wait while we process your answers and generate your AI analysis.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (showAnalysis && aiAnalysis) {
     const roadmap = parseRoadmap(aiAnalysis);
     const welcomeMessage = getWelcomeMessage(aiAnalysis);
@@ -400,7 +426,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="flex min-h-screen items-center justify-center p-4">
           <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
-          
+
           <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
               <h2 className="text-2xl font-bold text-gray-900">Your Learning Roadmap</h2>
@@ -625,7 +651,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
-        
+
         <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto scrollbar-hide">
           <style>{`
             .scrollbar-hide::-webkit-scrollbar {
@@ -854,9 +880,8 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                     </h3>
                     <div className="space-y-6">
                       {javaQuestions.map((question, index) => (
-                        <div key={question.id} className={`border rounded-lg p-4 ${
-                          unansweredQuestions.java.includes(index) ? 'border-red-500 border-2' : 'border-gray-200'
-                        }`}>
+                        <div key={question.id} className={`border rounded-lg p-4 ${unansweredQuestions.java.includes(index) ? 'border-red-500 border-2' : 'border-gray-200'
+                          }`}>
                           <div className="mb-3">
                             <p className="text-sm font-medium text-gray-900">
                               {index + 1}. {question.question}
@@ -866,11 +891,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             {question.options.map((option, optionIndex) => (
                               <label
                                 key={optionIndex}
-                                className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
-                                  javaAnswers[index] === optionIndex
+                                className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${javaAnswers[index] === optionIndex
                                     ? 'border-blue-500 bg-blue-50'
                                     : 'border-gray-300 hover:bg-gray-50'
-                                }`}
+                                  }`}
                               >
                                 <input
                                   type="radio"
@@ -897,9 +921,8 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                     </h3>
                     <div className="space-y-6">
                       {pythonQuestions.map((question, index) => (
-                        <div key={question.id} className={`border rounded-lg p-4 ${
-                          unansweredQuestions.python.includes(index) ? 'border-red-500 border-2' : 'border-gray-200'
-                        }`}>
+                        <div key={question.id} className={`border rounded-lg p-4 ${unansweredQuestions.python.includes(index) ? 'border-red-500 border-2' : 'border-gray-200'
+                          }`}>
                           <div className="mb-3">
                             <p className="text-sm font-medium text-gray-900">
                               {index + 1}. {question.question}
@@ -909,11 +932,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             {question.options.map((option, optionIndex) => (
                               <label
                                 key={optionIndex}
-                                className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
-                                  pythonAnswers[index] === optionIndex
+                                className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${pythonAnswers[index] === optionIndex
                                     ? 'border-yellow-500 bg-yellow-50'
                                     : 'border-gray-300 hover:bg-gray-50'
-                                }`}
+                                  }`}
                               >
                                 <input
                                   type="radio"

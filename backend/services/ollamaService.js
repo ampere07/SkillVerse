@@ -32,7 +32,9 @@ const generateWithKaggle = async (prompt, options = {}) => {
     {
       timeout: TIMEOUT,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        'User-Agent': 'SkillVerse-Backend'
       }
     }
   );
@@ -91,30 +93,30 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
   try {
     console.log('[Survey] Starting AI analysis for student skills...');
     const startTime = Date.now();
-    
+
     const prompt = constructPrompt(surveyData, fullName);
-    
+
     const response = await generateWithRetry(prompt, {
       temperature: 0.7,
       top_p: 0.95,
       num_predict: 1000,
       num_thread: 10
     });
-    
+
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     console.log(`[Survey] ✓ AI analysis completed in ${duration} seconds`);
 
     const analysis = response.message.content;
-    
+
     if (!analysis || analysis.trim().length === 0) {
       throw new Error('Empty analysis received from AI');
     }
 
     console.log('[Survey] AI analysis completed successfully');
-    
+
     const roadmap = parseRoadmap(analysis);
-    
+
     return {
       success: true,
       analysis: analysis.trim(),
@@ -138,32 +140,32 @@ const parseRoadmap = (analysisText) => {
     phase2: [],
     phase3: []
   };
-  
+
   const phase1Match = analysisText.match(/Phase 1[:\s-]*(.+?)(?=Phase 2|$)/is);
   const phase2Match = analysisText.match(/Phase 2[:\s-]*(.+?)(?=Phase 3|$)/is);
   const phase3Match = analysisText.match(/Phase 3[:\s-]*(.+?)(?=$)/is);
-  
+
   if (phase1Match) {
     const items = phase1Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
     if (items) roadmap.phase1 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
   }
-  
+
   if (phase2Match) {
     const items = phase2Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
     if (items) roadmap.phase2 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
   }
-  
+
   if (phase3Match) {
     const items = phase3Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
     if (items) roadmap.phase3 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
   }
-  
+
   return roadmap;
 };
 
 const constructPrompt = (surveyData, fullName = 'Student') => {
   const { primaryLanguage, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = surveyData;
-  
+
   const language = primaryLanguage;
   const currentLevel = primaryLanguage === 'java' ? (javaExpertise || 'not specified') : (pythonExpertise || 'not specified');
 
@@ -180,13 +182,13 @@ Self-Assessment Level: ${currentLevel}
 
   if (primaryLanguage === 'java' && javaQuestions?.score) {
     const score = javaQuestions.score;
-    
+
     if (score.easy >= 2) strengths.push('basic Java syntax and fundamentals');
     else weaknesses.push('basic Java syntax');
-    
+
     if (score.medium >= 2) strengths.push('intermediate concepts like collections and OOP');
     else weaknesses.push('object-oriented programming concepts');
-    
+
     if (score.hard >= 2) strengths.push('advanced Java features and algorithms');
     else weaknesses.push('advanced programming concepts');
 
@@ -199,13 +201,13 @@ Areas that need improvement: ${weaknesses.length > 0 ? weaknesses.join(', ') : '
 
   if (primaryLanguage === 'python' && pythonQuestions?.score) {
     const score = pythonQuestions.score;
-    
+
     if (score.easy >= 2) strengths.push('basic Python syntax and fundamentals');
     else weaknesses.push('basic Python syntax');
-    
+
     if (score.medium >= 2) strengths.push('intermediate concepts like data structures');
     else weaknesses.push('data structures and algorithms');
-    
+
     if (score.hard >= 2) strengths.push('advanced Python features');
     else weaknesses.push('advanced programming concepts');
 
@@ -330,7 +332,7 @@ Now create the analysis and roadmap for this ${currentLevel} level ${language} s
 
 export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
   const language = primaryLanguage.toLowerCase();
-  
+
   if (language === 'java') {
     return {
       phase1: [
@@ -368,7 +370,7 @@ export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
       ]
     };
   }
-  
+
   return {
     phase1: ['Basic syntax', 'Variables', 'Conditionals'],
     phase2: ['OOP basics', 'Classes', 'Inheritance'],
@@ -380,24 +382,24 @@ export const checkOllamaConnection = async () => {
   try {
     if (isKaggleMode) {
       const response = await axios.get(`${OLLAMA_URL}/health`, { timeout: 5000 });
-      return { 
-        connected: true, 
+      return {
+        connected: true,
         model: MODEL_NAME,
         mode: 'Kaggle',
         status: response.data.status
       };
     } else {
       await ollama.list();
-      return { 
-        connected: true, 
+      return {
+        connected: true,
         model: MODEL_NAME,
         mode: 'Direct'
       };
     }
   } catch (error) {
     console.error('AI connection failed:', error.message);
-    return { 
-      connected: false, 
+    return {
+      connected: false,
       error: error.message,
       mode: isKaggleMode ? 'Kaggle' : 'Direct'
     };
