@@ -24,6 +24,7 @@ import healthRoutes from './routes/health.js';
 import bugHuntRoutes from './routes/bugHunt.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
 import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
+import { setupDashboardSocket } from './routes/dashboardSocket.js';
 import { initializeCronJobs } from './services/cronService.js';
 
 const app = express();
@@ -58,6 +59,7 @@ app.use('/api/bug-hunt', bugHuntRoutes);
 
 setupCompilerSocket(io);
 setupPythonCompilerSocket(io);
+setupDashboardSocket(io);
 
 app.get('/api/health', (req, res) => {
   res.json({

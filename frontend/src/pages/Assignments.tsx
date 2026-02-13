@@ -60,7 +60,7 @@ export default function Assignments() {
       setClassrooms(userClassrooms);
 
       const allAssignments: Assignment[] = [];
-      
+
       for (const classroom of userClassrooms) {
         try {
           const token = localStorage.getItem('token');
@@ -73,10 +73,10 @@ export default function Assignments() {
               }
             }
           );
-          
+
           if (activityResponse.ok) {
             const activityData = await activityResponse.json();
-            
+
             if (activityData.success && activityData.activities) {
               const classroomActivities = activityData.activities.map((a: any) => ({
                 ...a,
@@ -114,18 +114,18 @@ export default function Assignments() {
 
   const getSubmissionStatus = (assignment: Assignment) => {
     if (!user) return 'not-submitted';
-    
+
     const submission = assignment.submissions.find(
       s => s.student === user.id || s.student._id === user.id
     );
-    
+
     if (submission) {
       if (submission.grade !== undefined && submission.grade !== null) {
         return 'graded';
       }
       return 'submitted';
     }
-    
+
     if (assignment.dueDate) {
       const now = new Date();
       const dueDate = new Date(assignment.dueDate);
@@ -133,7 +133,7 @@ export default function Assignments() {
         return 'overdue';
       }
     }
-    
+
     return 'not-submitted';
   };
 
@@ -158,7 +158,7 @@ export default function Assignments() {
 
     filteredAssignments.forEach(assignment => {
       const status = getSubmissionStatus(assignment);
-      
+
       if (status === 'overdue') {
         missing.push(assignment);
       } else if (status === 'not-submitted') {
@@ -239,12 +239,11 @@ export default function Assignments() {
               <nav className="flex">
                 <button
                   onClick={() => setActiveTab('todo')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'todo'
+                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'todo'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
-                  }`}
-                  style={activeTab === 'todo' ? { 
+                    }`}
+                  style={activeTab === 'todo' ? {
                     borderColor: '#1B5E20',
                     color: '#1B5E20'
                   } : { color: '#757575' }}
@@ -253,12 +252,11 @@ export default function Assignments() {
                 </button>
                 <button
                   onClick={() => setActiveTab('dueToday')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'dueToday'
+                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dueToday'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
-                  }`}
-                  style={activeTab === 'dueToday' ? { 
+                    }`}
+                  style={activeTab === 'dueToday' ? {
                     borderColor: '#1B5E20',
                     color: '#1B5E20'
                   } : { color: '#757575' }}
@@ -267,12 +265,11 @@ export default function Assignments() {
                 </button>
                 <button
                   onClick={() => setActiveTab('missing')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'missing'
+                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'missing'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
-                  }`}
-                  style={activeTab === 'missing' ? { 
+                    }`}
+                  style={activeTab === 'missing' ? {
                     borderColor: '#1B5E20',
                     color: '#1B5E20'
                   } : { color: '#757575' }}
@@ -288,7 +285,7 @@ export default function Assignments() {
                   value={selectedClassroom}
                   onChange={(e) => setSelectedClassroom(e.target.value)}
                   className="w-full max-w-md px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
-                  style={{ 
+                  style={{
                     borderColor: '#1B5E20',
                     color: '#212121'
                   }}
@@ -477,12 +474,12 @@ function AssignmentCard({ assignment, status, daysUntilDue, onNavigate }: Assign
     if (!assignment.dueDate) return null;
 
     const dueDate = new Date(assignment.dueDate);
-    const options: Intl.DateTimeFormatOptions = { 
+    const options: Intl.DateTimeFormatOptions = {
       weekday: 'long',
       month: 'short',
       day: 'numeric'
     };
-    
+
     return dueDate.toLocaleDateString('en-US', options);
   };
 
@@ -493,14 +490,14 @@ function AssignmentCard({ assignment, status, daysUntilDue, onNavigate }: Assign
   const dueDateDisplay = getDueDateDisplay();
 
   return (
-    <div 
+    <div
       onClick={handleClick}
       className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all cursor-pointer"
     >
       <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#E8F5E9' }}>
         <FileText className="w-5 h-5" style={{ color: '#1B5E20' }} strokeWidth={1.5} />
       </div>
-      
+
       <div className="flex-1 min-w-0">
         <h4 className="text-sm font-medium mb-1" style={{ color: '#212121' }}>{assignment.title}</h4>
         <p className="text-xs mb-1" style={{ color: '#757575' }}>{assignment.classroom.name}</p>
