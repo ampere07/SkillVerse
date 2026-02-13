@@ -162,7 +162,7 @@ export default function Dashboard() {
               }
             }
           } catch (err) {
-            console.error(`Error fetching activities for classroom ${classroom._id}:`, err);
+            // Error fetching activities for classroom
           }
         }
 
@@ -257,7 +257,7 @@ export default function Dashboard() {
         ]);
       }
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      // Error fetching dashboard stats
     }
   };
 
@@ -580,12 +580,11 @@ function StudentDashboardContent({
           }
         } catch (err) {
           // If there's an error fetching completed tasks, just show all available projects
-          console.log('Could not fetch completed tasks, showing all projects');
           setProjects(data.availableProjects.slice(0, 4));
         }
       }
     } catch (error) {
-      console.error('Error fetching mini projects:', error);
+      // Error fetching mini projects
     } finally {
       setLoading(false);
     }

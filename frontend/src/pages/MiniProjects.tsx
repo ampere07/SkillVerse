@@ -67,30 +67,27 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
           const response = await axios.get(`${API_URL}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          
+
           const surveyCompletedLanguages = response.data.user.surveyCompletedLanguages || [];
           const userPrimaryLanguage = response.data.user.primaryLanguage || 'java';
-          
+
           // Do NOT set surveyLanguage here for new students
           // Let them choose the language in step 0 of the modal
           setCurrentLanguage(userPrimaryLanguage);
-          
+
           // Only show if no surveys completed at all (truly new student)
           if (surveyCompletedLanguages.length === 0) {
-            console.log('[MiniProjects] First survey - student will choose language');
             // Do not set surveyLanguage, leave it undefined for step 0
             setShowSurvey(true);
           } else {
-            console.log('[MiniProjects] Survey already completed for:', userPrimaryLanguage);
             setShowSurvey(false);
           }
         } catch (error) {
-          console.error('Error checking survey completion:', error);
           setShowSurvey(false);
         }
       }
     };
-    
+
     checkIfTrulyNew();
   }, [isNewStudent]);
 
@@ -233,50 +230,30 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
     // Mock implementation - returns streak based on activity
     // In production, this should track actual daily logins
     if (tasks.length === 0) return 0;
-    
+
     // Simple calculation: 1 day per completed task (up to 30)
     // Replace with actual date-based tracking in production
     return Math.min(tasks.length, 30);
   };
 
   const fetchProjects = async (fromSurvey = false) => {
-    console.log('[MiniProjects] ========== FETCH PROJECTS STARTED ==========');
-    console.log('[MiniProjects] From survey:', fromSurvey);
     try {
       const token = localStorage.getItem('token');
-      console.log('[MiniProjects] Fetching projects from API...');
-      
+
       const response = await axios.get(`${API_URL}/mini-projects/available-projects`, {
         params: { fromSurvey: fromSurvey.toString() },
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      console.log('[MiniProjects] API Response received');
-      console.log('[MiniProjects] Response data:', response.data);
-      
       const projectsData = response.data.availableProjects || [];
-      console.log('[MiniProjects] Projects count:', projectsData.length);
-      
-      if (projectsData.length > 0) {
-        console.log('[MiniProjects] First project:', projectsData[0]);
-        console.log('[MiniProjects] Project languages:', projectsData.map(p => p.language));
-      }
-      
+
       setProjects(projectsData);
-      console.log('[MiniProjects] Updated projects state');
-      
+
       setCompletedThisWeek(response.data.completedThisWeek || 0);
       setAllCompleted(response.data.allCompleted || false);
       setLoading(false);
       setError(null);
-      
-      console.log('[MiniProjects] Completed this week:', response.data.completedThisWeek);
-      console.log('[MiniProjects] All completed:', response.data.allCompleted);
-      console.log('[MiniProjects] ========== FETCH PROJECTS COMPLETED ==========');
     } catch (error) {
-      console.error('[MiniProjects] ========== FETCH PROJECTS ERROR ==========');
-      console.error('[MiniProjects] Error fetching projects:', error);
-      console.error('[MiniProjects] Error response:', error.response?.data);
       setError(error.response?.data?.message || error.message);
       setLoading(false);
     }
@@ -285,12 +262,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
   const calculateXPAndLevel = (completedCount: number) => {
     const xpPerProject = 100; // Each project gives 100 XP
     const totalXP = completedCount * xpPerProject;
-    
+
     // Calculate level (each level requires 500 XP)
     const xpPerLevel = 500;
     const level = Math.floor(totalXP / xpPerLevel) + 1;
     const currentLevelXP = totalXP % xpPerLevel;
-    
+
     return { totalXP, level, currentLevelXP, xpPerLevel };
   };
 
@@ -324,16 +301,14 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       // Calculate consecutive days streak
       setConsecutiveDays(calculateConsecutiveDays(response.data.completedTasks));
     } catch (error) {
-      console.error('[MiniProjects] Error fetching completed tasks:', error);
+      // Error fetching completed tasks
     }
   };
 
   const fetchUserProgress = async () => {
     try {
       const token = localStorage.getItem('token');
-      console.log('[MiniProjects] Token for progress API:', token ? 'EXISTS' : 'MISSING');
-      console.log('[MiniProjects] Token length:', token?.length);
-      
+
       const response = await axios.get(`${API_URL}/progress/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -342,11 +317,8 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
         setCurrentXP(response.data.xp || 0);
         setCurrentLevel(response.data.level || 1);
         setEarnedBadges(response.data.badges || []);
-        console.log('[MiniProjects] Loaded user progress:', response.data);
       }
     } catch (error) {
-      console.error('[MiniProjects] Error fetching user progress:', error);
-      console.error('[MiniProjects] Error response:', error.response?.data);
       // If error, keep default values
     }
   };
@@ -361,19 +333,19 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       if (response.data.user.primaryLanguage) {
         setCurrentLanguage(response.data.user.primaryLanguage);
       }
-      
+
       if (response.data.user.surveyCompletedLanguages) {
         setSurveyCompletedLanguages(response.data.user.surveyCompletedLanguages);
       }
     } catch (error) {
-      console.error('[MiniProjects] Error fetching user language:', error);
+      // Error fetching user language
     }
   };
 
   const getProjectStatus = (projectTitle) => {
     const titleLower = projectTitle.toLowerCase();
     const status = projectStatuses.get(titleLower);
-    
+
     if (status === 'paused') return 'paused';
     if (status === 'submitted') return 'submitted';
     if (status === 'completed' || completedTitles.has(titleLower)) return 'completed';
@@ -438,7 +410,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center shadow-sm">
           <p className="text-red-600 font-medium mb-2">Error loading projects</p>
           <p className="text-sm text-red-500">{error}</p>
-          <button 
+          <button
             onClick={fetchProjects}
             className="mt-4 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium"
           >
@@ -473,8 +445,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                   onClick={async () => {
                     setShowLanguageMenu(false);
                     const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
-                    console.log('[MiniProjects] Switch language clicked:', otherLanguage);
-                    
+
                     // Check if projects exist or survey is done for target language
                     try {
                       const token = localStorage.getItem('token');
@@ -482,27 +453,21 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                         params: { language: otherLanguage },
                         headers: { Authorization: `Bearer ${token}` }
                       });
-                      
+
                       const { hasProjects, surveyCompleted } = response.data;
-                      console.log('[MiniProjects] Check result:', { hasProjects, surveyCompleted });
-                      
+
                       if (hasProjects || surveyCompleted) {
                         // Show confirmation modal if projects exist or survey is done
-                        console.log('[MiniProjects] Showing confirmation modal');
                         setPendingLanguage(otherLanguage);
                         setShowConfirmationModal(true);
                       } else {
                         // No projects and no survey - go directly to survey modal
-                        console.log('[MiniProjects] No projects and no survey for', otherLanguage);
-                        console.log('[MiniProjects] Showing survey modal directly');
                         setPendingLanguage(otherLanguage);
                         setSurveyLanguage(otherLanguage);
                         setShowSurvey(true);
                       }
                     } catch (error) {
-                      console.error('[MiniProjects] Error checking language projects:', error);
                       // On error, show confirmation modal as fallback
-                      console.log('[MiniProjects] Error - showing confirmation modal as fallback');
                       setPendingLanguage(otherLanguage);
                       setShowConfirmationModal(true);
                     }
@@ -563,17 +528,17 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
             <p className="text-xs" style={{ color: '#757575' }}>{500 - currentXP} XP to Level {currentLevel + 1}</p>
           </div>
         </div>
-        
+
         <div className="relative">
           <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden"
-              style={{ 
+              style={{
                 width: `${(currentXP / 500) * 100}%`,
                 background: 'linear-gradient(90deg, #FFB300 0%, #FFA000 100%)'
               }}
             >
-              <div 
+              <div
                 className="absolute inset-0 opacity-30"
                 style={{
                   background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
@@ -599,9 +564,9 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       {/* Badges Section */}
       <div className="mb-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <img 
-            src="/assets/badges/achievements.png" 
-            alt="Achievements" 
+          <img
+            src="/assets/badges/achievements.png"
+            alt="Achievements"
             className="w-5 h-5 object-contain"
           />
           <h2 className="text-base font-semibold" style={{ color: '#212121' }}>Achievements</h2>
@@ -612,42 +577,41 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {badges.map((badge) => {
-            const isEarned = earnedBadges.includes(badge.id);
             const stats = calculateBadgeStats();
-            
-            // Calculate progress for locked badges
+
+            // Calculate progress
             let progress = 0;
-            if (!isEarned) {
-              if (badge.id === 'first_steps') progress = Math.min((stats.completed / 1) * 100, 100);
-              else if (badge.id === 'getting_started') progress = Math.min((stats.completed / 3) * 100, 100);
-              else if (badge.id === 'halfway_hero') progress = Math.min((stats.completed / 50) * 100, 100);
-              else if (badge.id === 'almost_there') progress = Math.min((stats.completed / 100) * 100, 100);
-              else if (badge.id === 'perfectionist') progress = Math.min((stats.completed / 250) * 100, 100);
-              else if (badge.id === 'streak_3') progress = Math.min((stats.consecutiveDays / 3) * 100, 100);
-              else if (badge.id === 'streak_7') progress = Math.min((stats.consecutiveDays / 7) * 100, 100);
-              else if (badge.id === 'streak_30') progress = Math.min((stats.consecutiveDays / 30) * 100, 100);
-              else if (badge.id === 'high_achiever') progress = Math.min((stats.highScores / 5) * 100, 100);
-              else if (badge.id === 'perfect_execution') progress = Math.min((stats.perfectScores / 1) * 100, 100);
-            }
+            if (badge.id === 'first_steps') progress = Math.min((stats.completed / 1) * 100, 100);
+            else if (badge.id === 'getting_started') progress = Math.min((stats.completed / 3) * 100, 100);
+            else if (badge.id === 'halfway_hero') progress = Math.min((stats.completed / 50) * 100, 100);
+            else if (badge.id === 'almost_there') progress = Math.min((stats.completed / 100) * 100, 100);
+            else if (badge.id === 'perfectionist') progress = Math.min((stats.completed / 250) * 100, 100);
+            else if (badge.id === 'streak_3') progress = Math.min((stats.consecutiveDays / 3) * 100, 100);
+            else if (badge.id === 'streak_7') progress = Math.min((stats.consecutiveDays / 7) * 100, 100);
+            else if (badge.id === 'streak_30') progress = Math.min((stats.consecutiveDays / 30) * 100, 100);
+            else if (badge.id === 'high_achiever') progress = Math.min((stats.highScores / 5) * 100, 100);
+            else if (badge.id === 'perfect_execution') progress = Math.min((stats.perfectScores / 1) * 100, 100);
+
+            // Badge is earned if either: backend says so OR local progress is 100%
+            const isEarned = earnedBadges.includes(badge.id) || progress >= 100;
 
             return (
               <div
                 key={badge.id}
-                className={`relative p-4 rounded-xl border-2 transition-all ${
-                  isEarned 
-                    ? 'border-transparent shadow-md hover:shadow-lg cursor-pointer' 
-                    : 'border-gray-200 opacity-60 cursor-not-allowed'
-                }`}
+                className={`relative p-4 rounded-xl border-2 transition-all ${isEarned
+                  ? 'border-transparent shadow-md hover:shadow-lg cursor-pointer'
+                  : 'border-gray-200 opacity-60 cursor-not-allowed'
+                  }`}
                 style={isEarned ? { backgroundColor: badge.bgColor } : { backgroundColor: '#F5F5F5' }}
                 title={badge.description}
               >
                 {/* Badge Image */}
                 <div className="flex justify-center mb-2">
-                  <img 
+                  <img
                     src={badge.image}
                     alt={badge.name}
                     className="w-16 h-16 object-contain"
-                    style={{ 
+                    style={{
                       filter: isEarned ? 'none' : 'grayscale(100%)',
                       opacity: isEarned ? 1 : 0.4
                     }}
@@ -655,7 +619,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                 </div>
 
                 {/* Badge Name */}
-                <h3 
+                <h3
                   className="text-xs font-semibold text-center mb-1"
                   style={{ color: isEarned ? '#212121' : '#9E9E9E' }}
                 >
@@ -663,7 +627,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                 </h3>
 
                 {/* Badge Description */}
-                <p 
+                <p
                   className="text-[10px] text-center leading-tight"
                   style={{ color: isEarned ? '#757575' : '#BDBDBD' }}
                 >
@@ -674,7 +638,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                 {!isEarned && progress > 0 && (
                   <div className="mt-2">
                     <div className="w-full h-1 bg-gray-300 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gray-400 rounded-full transition-all duration-300"
                         style={{ width: `${progress}%` }}
                       />
@@ -712,7 +676,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
           <p className="text-sm mb-6" style={{ color: '#757575' }}>
             Complete your onboarding survey to get personalized AI-generated projects
           </p>
-          <button 
+          <button
             onClick={fetchProjects}
             className="px-6 py-2.5 text-white rounded-lg transition-all text-sm font-medium hover:shadow-md"
             style={{ backgroundColor: '#1B5E20' }}
@@ -748,11 +712,10 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                   {(status === 'submitted' || status === 'completed') && projectScores.get(project.title.toLowerCase()) !== undefined && (
                     <div className="flex items-center gap-1">
                       <span className="text-xs font-medium" style={{ color: '#757575' }}>Score:</span>
-                      <span className={`text-sm font-bold ${
-                        projectScores.get(project.title.toLowerCase())! >= 70 
-                          ? 'text-green-600' 
-                          : 'text-red-600'
-                      }`}>
+                      <span className={`text-sm font-bold ${projectScores.get(project.title.toLowerCase())! >= 70
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                        }`}>
                         {projectScores.get(project.title.toLowerCase())}/100
                       </span>
                     </div>
@@ -770,7 +733,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-xl font-bold" style={{ color: '#212121' }}>Switch Programming Language</h2>
             </div>
-            
+
             <div className="px-6 py-6 space-y-4">
               <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
                 <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'java' ? '#DBEAFE' : '#FEF3C7' }}>
@@ -823,12 +786,9 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
               <button
                 onClick={async () => {
                   setShowConfirmationModal(false);
-                  
+
                   // Check if student has completed survey for target language
                   if (surveyCompletedLanguages.includes(pendingLanguage)) {
-                    console.log('[MiniProjects] Survey already completed for:', pendingLanguage);
-                    console.log('[MiniProjects] Switching language directly without survey');
-                    
                     // Direct switch without survey - use update-language endpoint
                     try {
                       setLoading(true);
@@ -838,23 +798,18 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                         { primaryLanguage: pendingLanguage },
                         { headers: { Authorization: `Bearer ${token}` } }
                       );
-                      
+
                       setCurrentLanguage(pendingLanguage);
-                      console.log('[MiniProjects] Updated current language to:', pendingLanguage);
-                      
+
                       await fetchProjects();
                       await fetchCompletedTasks();
                       setLoading(false);
                       setPendingLanguage(undefined);
                     } catch (error) {
-                      console.error('[MiniProjects] Error switching language:', error);
                       setLoading(false);
                       setPendingLanguage(undefined);
                     }
                   } else {
-                    console.log('[MiniProjects] Survey not completed for:', pendingLanguage);
-                    console.log('[MiniProjects] Opening survey modal');
-                    
                     // Show survey modal if not completed
                     setSurveyLanguage(pendingLanguage);
                     setShowSurvey(true);
@@ -874,16 +829,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       <OnboardingSurveyModal
         isOpen={showSurvey}
         onClose={async () => {
-          console.log('[MiniProjects] ========== SURVEY MODAL CLOSED ==========');
-          console.log('[MiniProjects] Survey language was:', surveyLanguage);
           setShowSurvey(false);
           const languageToFetch = surveyLanguage;
-          
+
           // If surveyLanguage is set, this is a language switch
           if (languageToFetch && languageToFetch !== currentLanguage) {
-            console.log('[MiniProjects] Language switch detected');
-            console.log('[MiniProjects] Switching from', currentLanguage, 'to', languageToFetch);
-            
+
             // Update backend language using update-language endpoint
             try {
               const token = localStorage.getItem('token');
@@ -892,25 +843,21 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                 { primaryLanguage: languageToFetch },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
-              
+
               setCurrentLanguage(languageToFetch);
-              console.log('[MiniProjects] Updated currentLanguage to:', languageToFetch);
             } catch (error) {
-              console.error('[MiniProjects] Error updating language:', error);
+              // Error updating language
             }
           }
-          
+
           setSurveyLanguage(undefined);
           completeSurvey();
-          
-          console.log('[MiniProjects] Fetching projects after survey completion...');
+
           await fetchProjects(true); // Pass true to indicate request is from survey
           await fetchCompletedTasks();
           await fetchUserLanguage(); // Refresh survey completion status
-          console.log('[MiniProjects] Survey modal close handler complete');
         }}
         onCancel={() => {
-          console.log('[MiniProjects] Survey cancelled');
           setShowSurvey(false);
           setSurveyLanguage(undefined);
         }}
