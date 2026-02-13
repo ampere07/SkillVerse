@@ -512,7 +512,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       </div>
 
       {/* XP Progress Bar */}
-      <div className="mb-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <div className="mb-6 rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#FFF8E1' }}>
@@ -571,11 +571,28 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
           />
           <h2 className="text-base font-semibold" style={{ color: '#212121' }}>Achievements</h2>
           <span className="ml-auto text-sm font-medium" style={{ color: '#757575' }}>
-            {earnedBadges.length} / {badges.length} Unlocked
+            {(() => {
+              const stats = calculateBadgeStats();
+              const earnedCount = badges.filter((badge) => {
+                let progress = 0;
+                if (badge.id === 'first_steps') progress = Math.min((stats.completed / 1) * 100, 100);
+                else if (badge.id === 'getting_started') progress = Math.min((stats.completed / 3) * 100, 100);
+                else if (badge.id === 'halfway_hero') progress = Math.min((stats.completed / 50) * 100, 100);
+                else if (badge.id === 'almost_there') progress = Math.min((stats.completed / 100) * 100, 100);
+                else if (badge.id === 'perfectionist') progress = Math.min((stats.completed / 250) * 100, 100);
+                else if (badge.id === 'streak_3') progress = Math.min((stats.consecutiveDays / 3) * 100, 100);
+                else if (badge.id === 'streak_7') progress = Math.min((stats.consecutiveDays / 7) * 100, 100);
+                else if (badge.id === 'streak_30') progress = Math.min((stats.consecutiveDays / 30) * 100, 100);
+                else if (badge.id === 'high_achiever') progress = Math.min((stats.highScores / 5) * 100, 100);
+                else if (badge.id === 'perfect_execution') progress = Math.min((stats.perfectScores / 1) * 100, 100);
+                return earnedBadges.includes(badge.id) || progress >= 100;
+              }).length;
+              return `${earnedCount} / ${badges.length} Unlocked`;
+            })()}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
           {badges.map((badge) => {
             const stats = calculateBadgeStats();
 
@@ -598,7 +615,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
             return (
               <div
                 key={badge.id}
-                className={`relative p-4 rounded-xl border-2 transition-all ${isEarned
+                className={`relative p-4 rounded-xl border-2 transition-all flex-shrink-0 w-44 ${isEarned
                   ? 'border-transparent shadow-md hover:shadow-lg cursor-pointer'
                   : 'border-gray-200 opacity-60 cursor-not-allowed'
                   }`}
@@ -660,11 +677,29 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
           })}
         </div>
 
-        {earnedBadges.length === 0 && (
-          <div className="text-center py-4 mt-2">
-            <p className="text-sm" style={{ color: '#757575' }}>Complete projects to earn your first badge!</p>
-          </div>
-        )}
+        {(() => {
+          const stats = calculateBadgeStats();
+          const earnedCount = badges.filter((badge) => {
+            let progress = 0;
+            if (badge.id === 'first_steps') progress = Math.min((stats.completed / 1) * 100, 100);
+            else if (badge.id === 'getting_started') progress = Math.min((stats.completed / 3) * 100, 100);
+            else if (badge.id === 'halfway_hero') progress = Math.min((stats.completed / 50) * 100, 100);
+            else if (badge.id === 'almost_there') progress = Math.min((stats.completed / 100) * 100, 100);
+            else if (badge.id === 'perfectionist') progress = Math.min((stats.completed / 250) * 100, 100);
+            else if (badge.id === 'streak_3') progress = Math.min((stats.consecutiveDays / 3) * 100, 100);
+            else if (badge.id === 'streak_7') progress = Math.min((stats.consecutiveDays / 7) * 100, 100);
+            else if (badge.id === 'streak_30') progress = Math.min((stats.consecutiveDays / 30) * 100, 100);
+            else if (badge.id === 'high_achiever') progress = Math.min((stats.highScores / 5) * 100, 100);
+            else if (badge.id === 'perfect_execution') progress = Math.min((stats.perfectScores / 1) * 100, 100);
+            return earnedBadges.includes(badge.id) || progress >= 100;
+          }).length;
+
+          return earnedCount === 0 ? (
+            <div className="text-center py-4 mt-2">
+              <p className="text-sm" style={{ color: '#757575' }}>Complete projects to earn your first badge!</p>
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {projects.length === 0 ? (

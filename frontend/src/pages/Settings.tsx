@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Shield, Calendar, Save, Code2, AlertCircle, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { User, Mail, Shield, Calendar, Save, Code2, AlertCircle, Loader2, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
 import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
 
 export default function Settings() {
@@ -42,6 +42,9 @@ export default function Settings() {
   const [selectedLanguage, setSelectedLanguage] = useState<'java' | 'python'>('java');
   const [showSurveyModal, setShowSurveyModal] = useState(false);
   const [switchingLanguage, setSwitchingLanguage] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const formatCountdown = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -388,17 +391,15 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-4 sm:p-6" style={{ backgroundColor: '#FAFAFA', minHeight: '100vh' }}>
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-4 sm:mb-6">
+    <div className="bg-white -m-6" style={{ minHeight: 'calc(100vh + 3rem)' }}>
+      <div className="px-6 py-8">
+        <div className="mb-8 sm:mb-10">
           <h1 className="text-xl sm:text-2xl font-bold" style={{ color: '#212121' }}>Settings</h1>
           <p className="text-xs sm:text-sm mt-1" style={{ color: '#757575' }}>Manage your account settings and preferences</p>
         </div>
 
-
-
-        <div className="space-y-4 sm:space-y-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
+        <div className="space-y-8 sm:space-y-12">
+          <div className="pb-8 sm:pb-10 border-b border-gray-200">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h2 className="text-base sm:text-lg font-semibold" style={{ color: '#212121' }}>Profile Information</h2>
               {!isEditing ? (
@@ -505,77 +506,7 @@ export default function Settings() {
             )}
           </div>
 
-          {userData.role === 'student' && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
-              <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6" style={{ color: '#212121' }}>Programming Language Preference</h2>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-3" style={{ color: '#212121' }}>
-                    <div className="flex items-center gap-2">
-                      <Code2 className="w-4 h-4" style={{ color: '#757575' }} strokeWidth={1.5} />
-                      Select Primary Language
-                    </div>
-                  </label>
-
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <button
-                      onClick={() => setSelectedLanguage('java')}
-                      className={`p-3 sm:p-4 rounded-lg border-2 transition-all ${selectedLanguage === 'java' ? 'border-green-800 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-                    >
-                      <div className="flex flex-col items-center gap-1.5 sm:gap-2">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: selectedLanguage === 'java' ? '#E8F5E9' : '#F5F5F5' }}>
-                          <span className="text-xl sm:text-2xl font-bold" style={{ color: selectedLanguage === 'java' ? '#1B5E20' : '#757575' }}>J</span>
-                        </div>
-                        <span className="text-sm sm:text-base font-semibold" style={{ color: selectedLanguage === 'java' ? '#1B5E20' : '#212121' }}>Java</span>
-                        {userData?.surveyCompletedLanguages?.includes('java') && (
-                          <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}>Survey Completed</span>
-                        )}
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => setSelectedLanguage('python')}
-                      className={`p-3 sm:p-4 rounded-lg border-2 transition-all ${selectedLanguage === 'python' ? 'border-green-800 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-                    >
-                      <div className="flex flex-col items-center gap-1.5 sm:gap-2">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: selectedLanguage === 'python' ? '#E8F5E9' : '#F5F5F5' }}>
-                          <span className="text-xl sm:text-2xl font-bold" style={{ color: selectedLanguage === 'python' ? '#1B5E20' : '#757575' }}>P</span>
-                        </div>
-                        <span className="text-sm sm:text-base font-semibold" style={{ color: selectedLanguage === 'python' ? '#1B5E20' : '#212121' }}>Python</span>
-                        {userData?.surveyCompletedLanguages?.includes('python') && (
-                          <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}>Survey Completed</span>
-                        )}
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 pt-2">
-                  <div className="text-sm" style={{ color: '#757575' }}>
-                    Current Language: <span className="font-semibold" style={{ color: '#1B5E20' }}>{userData?.primaryLanguage?.toUpperCase() || 'Not Set'}</span>
-                  </div>
-                  <button
-                    onClick={handleLanguageSwitch}
-                    disabled={switchingLanguage || selectedLanguage === userData?.primaryLanguage}
-                    className="w-full sm:w-auto px-4 sm:px-6 py-2.5 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md text-sm font-medium"
-                    style={{ backgroundColor: '#1B5E20' }}
-                  >
-                    {switchingLanguage ? 'Switching...' : 'Switch Language'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <OnboardingSurveyModal
-            isOpen={showSurveyModal}
-            onClose={handleSurveyComplete}
-            onCancel={handleSurveyCancel}
-            preselectedLanguage={selectedLanguage}
-          />
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
+          <div className="pb-8 sm:pb-10 border-b border-gray-200">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h2 className="text-base sm:text-lg font-semibold" style={{ color: '#212121' }}>Change Password</h2>
               {!showPasswordChange && (
@@ -625,30 +556,56 @@ export default function Settings() {
                   <label className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
                     Current Password
                   </label>
-                  <input
-                    type="password"
-                    name="currentPassword"
-                    value={formData.currentPassword}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
-                    placeholder="Enter current password"
-                    style={{ color: '#212121' }}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      name="currentPassword"
+                      value={formData.currentPassword}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+                      placeholder="Enter current password"
+                      style={{ color: '#212121' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showCurrentPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
                     New Password
                   </label>
-                  <input
-                    type="password"
-                    name="newPassword"
-                    value={formData.newPassword}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
-                    placeholder="Enter new password"
-                    style={{ color: '#212121' }}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      name="newPassword"
+                      value={formData.newPassword}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+                      placeholder="Enter new password"
+                      style={{ color: '#212121' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showNewPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                   {formData.newPassword && (
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center gap-2">
@@ -715,15 +672,28 @@ export default function Settings() {
                   <label className="block text-sm font-medium mb-2" style={{ color: '#212121' }}>
                     Confirm New Password
                   </label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
-                    placeholder="Confirm new password"
-                    style={{ color: '#212121' }}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+                      placeholder="Confirm new password"
+                      style={{ color: '#212121' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                   {formData.confirmPassword && passwordsMatch !== null && (
                     <div className="mt-2 flex items-center gap-2">
                       {passwordsMatch ? (
@@ -780,7 +750,7 @@ export default function Settings() {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
+          <div>
             <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6" style={{ color: '#212121' }}>Account Information</h2>
 
             <div className="space-y-3 text-xs sm:text-sm">

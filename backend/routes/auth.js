@@ -38,7 +38,7 @@ router.post('/send-verification-code', async (req, res) => {
     }
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     verificationCodes.set(email.toLowerCase(), {
       code: verificationCode,
       expiresAt: Date.now() + 10 * 60 * 1000
@@ -71,13 +71,13 @@ router.post('/send-verification-code', async (req, res) => {
 
     console.log(`Verification code sent to: ${email}`);
 
-    res.json({ 
+    res.json({
       message: 'Verification code sent successfully',
-      success: true 
+      success: true
     });
   } catch (error) {
     console.error('Send verification code error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to send verification code. Please try again.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -103,7 +103,7 @@ router.post('/send-password-reset-code', async (req, res) => {
     }
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     passwordResetCodes.set(email.toLowerCase(), {
       code: resetCode,
       expiresAt: Date.now() + 10 * 60 * 1000
@@ -136,13 +136,13 @@ router.post('/send-password-reset-code', async (req, res) => {
 
     console.log(`Password reset code sent to: ${email}`);
 
-    res.json({ 
+    res.json({
       message: 'Password reset code sent successfully',
-      success: true 
+      success: true
     });
   } catch (error) {
     console.error('Send password reset code error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to send password reset code. Please try again.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -204,13 +204,13 @@ router.post('/reset-password', async (req, res) => {
 
     console.log(`Password reset successfully for user: ${user.email}`);
 
-    res.json({ 
+    res.json({
       message: 'Password reset successfully',
-      success: true 
+      success: true
     });
   } catch (error) {
     console.error('Reset password error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to reset password. Please try again.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -220,7 +220,7 @@ router.post('/reset-password', async (req, res) => {
 router.post('/register', async (req, res) => {
   try {
     console.log('Registration request received:', { email: req.body.email, role: req.body.role, name: req.body.name });
-    
+
     const { email, password, role, name, verificationCode } = req.body;
 
     if (!email || !password || !role || !name) {
@@ -345,17 +345,17 @@ router.post('/register', async (req, res) => {
     console.error('Error stack:', error.stack);
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
-    
+
     if (error.code === 11000) {
       return res.status(400).json({ message: 'Email already registered' });
     }
-    
+
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ message: messages.join(', ') });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       message: 'Server error during registration',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -373,7 +373,7 @@ router.post('/login', async (req, res) => {
     }
 
     const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
-    
+
     if (!user) {
       console.log('User not found for email:', email);
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -381,7 +381,7 @@ router.post('/login', async (req, res) => {
 
     console.log('User found, comparing password...');
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    
+
     if (!isPasswordValid) {
       console.log('Invalid password for user:', email);
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -416,12 +416,12 @@ router.post('/login', async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    res.json({ 
+
+    res.json({
       user: {
         _id: user._id.toString(),
         id: user._id.toString(),
@@ -455,7 +455,7 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
     }
 
     // Check if email is already taken by another user
-    const existingUser = await User.findOne({ 
+    const existingUser = await User.findOne({
       email: email.toLowerCase(),
       _id: { $ne: req.user.userId }
     });
@@ -468,7 +468,7 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.user.userId,
-      { 
+      {
         name: formattedName,
         email: email.toLowerCase()
       },
@@ -500,13 +500,110 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Send password change verification code (for authenticated users)
+router.post('/send-password-change-code', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Verify that the email belongs to the authenticated user
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.email.toLowerCase() !== email.toLowerCase()) {
+      return res.status(403).json({ message: 'Email does not match your account' });
+    }
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store the code with a 2-minute expiration (as shown in the frontend)
+    passwordResetCodes.set(email.toLowerCase(), {
+      code: verificationCode,
+      expiresAt: Date.now() + 2 * 60 * 1000, // 2 minutes
+      userId: user._id.toString()
+    });
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">SkillVerse</h1>
+          <p style="color: #FFB300; margin: 10px 0 0 0; font-size: 14px;">Educational Platform</p>
+        </div>
+        <div style="background: #ffffff; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h2 style="color: #1B5E20; margin-top: 0;">Password Change Verification</h2>
+          <p style="color: #555; font-size: 16px; line-height: 1.6;">You requested to change your password. Please use the verification code below to continue:</p>
+          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; text-align: center; margin: 30px 0;">
+            <p style="color: #888; margin: 0 0 10px 0; font-size: 14px;">Your Verification Code</p>
+            <p style="font-size: 36px; font-weight: bold; color: #1B5E20; margin: 0; letter-spacing: 8px;">${verificationCode}</p>
+          </div>
+          <p style="color: #777; font-size: 14px; line-height: 1.6;">
+            This code will expire in <strong>2 minutes</strong>. If you didn't request a password change, please ignore this email and your password will remain unchanged.
+          </p>
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+            <p style="color: #999; font-size: 12px; margin: 0;">© 2024 SkillVerse. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await sendEmail(email, 'SkillVerse - Password Change Verification Code', htmlBody);
+
+    console.log(`Password change verification code sent to: ${email}`);
+
+    res.json({
+      message: 'Verification code sent successfully',
+      success: true
+    });
+  } catch (error) {
+    console.error('Send password change verification code error:', error);
+    res.status(500).json({
+      message: 'Failed to send verification code. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 router.put('/change-password', authenticateToken, async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword, verificationCode } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'Current password and new password are required' });
+    if (!currentPassword || !newPassword || !verificationCode) {
+      return res.status(400).json({ message: 'Current password, new password, and verification code are required' });
     }
+
+    const user = await User.findById(req.user.userId).select('+password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify the verification code
+    const storedData = passwordResetCodes.get(user.email.toLowerCase());
+    if (!storedData) {
+      return res.status(400).json({ message: 'Verification code not found. Please request a new code.' });
+    }
+
+    if (Date.now() > storedData.expiresAt) {
+      passwordResetCodes.delete(user.email.toLowerCase());
+      return res.status(400).json({ message: 'Verification code has expired. Please request a new code.' });
+    }
+
+    if (storedData.code !== verificationCode) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    // Verify that the stored userId matches the authenticated user
+    if (storedData.userId !== user._id.toString()) {
+      return res.status(403).json({ message: 'Verification code does not match this account' });
+    }
+
+    // Clear the verification code after successful verification
+    passwordResetCodes.delete(user.email.toLowerCase());
 
     if (newPassword.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
@@ -528,14 +625,8 @@ router.put('/change-password', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Password must contain at least one special character' });
     }
 
-    const user = await User.findById(req.user.userId).select('+password');
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-    
+
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Current password is incorrect' });
     }
@@ -561,14 +652,14 @@ router.post('/logout', authenticateToken, (req, res) => {
 router.get('/check-survey-status', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const needsSurvey = !user.surveyCompletedLanguages || 
-                        !user.surveyCompletedLanguages.includes(user.primaryLanguage);
-    
+    const needsSurvey = !user.surveyCompletedLanguages ||
+      !user.surveyCompletedLanguages.includes(user.primaryLanguage);
+
     res.json({ needsSurvey });
   } catch (error) {
     console.error('Check survey status error:', error);
@@ -589,18 +680,18 @@ router.put('/change-language', authenticateToken, async (req, res) => {
     }
 
     const user = await User.findById(req.user.userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     console.log(`[Auth] User found: ${user.email}`);
     console.log(`[Auth] Current primaryLanguage in DB: ${user.primaryLanguage}`);
-    
+
     const oldLanguage = user.primaryLanguage;
     user.primaryLanguage = language;
     await user.save();
-    
+
     console.log(`[Auth] Language updated from ${oldLanguage} to ${language}`);
     console.log(`[Auth] Saved to database successfully`);
     console.log(`[Auth] User primaryLanguage after save: ${user.primaryLanguage}`);
@@ -608,7 +699,7 @@ router.put('/change-language', authenticateToken, async (req, res) => {
 
     console.log(`Language changed to ${language} for user: ${user.email}`);
 
-    res.json({ 
+    res.json({
       success: true,
       message: 'Language changed successfully',
       user: {
@@ -638,22 +729,22 @@ router.put('/update-language', authenticateToken, async (req, res) => {
     }
 
     const user = await User.findById(req.user.userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    console.log('[Update Language] User found:', { 
-      email: user.email, 
+    console.log('[Update Language] User found:', {
+      email: user.email,
       currentLanguage: user.primaryLanguage,
-      surveyCompletedLanguages: user.surveyCompletedLanguages 
+      surveyCompletedLanguages: user.surveyCompletedLanguages
     });
 
     const completedLanguages = user.surveyCompletedLanguages || [];
     if (!completedLanguages.includes(primaryLanguage)) {
       console.log('[Update Language] Survey not completed for language:', primaryLanguage);
-      return res.status(400).json({ 
-        message: `You must complete the ${primaryLanguage.toUpperCase()} survey before switching to this language` 
+      return res.status(400).json({
+        message: `You must complete the ${primaryLanguage.toUpperCase()} survey before switching to this language`
       });
     }
 
@@ -661,9 +752,9 @@ router.put('/update-language', authenticateToken, async (req, res) => {
     user.primaryLanguage = primaryLanguage;
     await user.save();
 
-    console.log('[Update Language] User language updated:', { 
-      oldLanguage, 
-      newLanguage: primaryLanguage 
+    console.log('[Update Language] User language updated:', {
+      oldLanguage,
+      newLanguage: primaryLanguage
     });
 
     // DO NOT clear projects when switching languages
@@ -673,7 +764,7 @@ router.put('/update-language', authenticateToken, async (req, res) => {
     console.log(`[Update Language] Language changed to ${primaryLanguage} for user: ${user.email}`);
     console.log('[Update Language] Sending success response');
 
-    return res.json({ 
+    return res.json({
       success: true,
       message: 'Language updated successfully',
       user: {
@@ -689,9 +780,9 @@ router.put('/update-language', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('[Update Language] Error:', error);
     console.error('[Update Language] Error stack:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Server error',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
