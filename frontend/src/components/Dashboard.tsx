@@ -1,25 +1,20 @@
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  GraduationCap,
-  LayoutDashboard,
+import {
   BookOpen,
   FileText,
   Code,
-  FolderKanban,
-  Settings as SettingsIcon,
-  LogOut,
   Trophy,
   TrendingUp,
   Clock,
   Calendar,
-  Sparkles,
-  CheckCircle
+  Sparkles
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Compiler from '../pages/Compiler';
 import Classrooms from '../pages/Classrooms';
 import MiniProjects from '../pages/MiniProjects';
 import MiniProjectDetails from '../pages/MiniProjectDetails';
+import BugHunt from '../pages/BugHunt';
 import Settings from '../pages/Settings';
 import Assignments from '../pages/Assignments';
 import CreateAssignment from '../pages/CreateAssignment';
@@ -73,6 +68,12 @@ const navigationItems: NavItem[] = [
     roles: ['student']
   },
   {
+    icon: '/assets/sidebar/bughunt.png',
+    label: 'Bug Hunt',
+    href: '/bug-hunt',
+    roles: ['student']
+  },
+  {
     icon: '/assets/sidebar/settings.png',
     label: 'Settings',
     href: '/settings',
@@ -97,6 +98,7 @@ export default function Dashboard() {
   const [createPostClassroomName, setCreatePostClassroomName] = useState<string | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [selectedProjectTitle, setSelectedProjectTitle] = useState<string | null>(null);
+  const [isGameActive, setIsGameActive] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'student') {
@@ -132,10 +134,10 @@ export default function Dashboard() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const classroomsData = await classroomsResponse.json();
-      
+
       if (classroomsResponse.ok && classroomsData.classrooms) {
         const allActivities: any[] = [];
-        
+
         for (const classroom of classroomsData.classrooms) {
           try {
             const activitiesResponse = await fetch(
@@ -144,7 +146,7 @@ export default function Dashboard() {
                 headers: { 'Authorization': `Bearer ${token}` }
               }
             );
-            
+
             if (activitiesResponse.ok) {
               const activitiesData = await activitiesResponse.json();
               if (activitiesData.success && activitiesData.activities) {
@@ -160,7 +162,7 @@ export default function Dashboard() {
               }
             }
           } catch (err) {
-            console.error(`Error fetching activities for classroom ${classroom._id}:`, err);
+            // Error fetching activities for classroom
           }
         }
 
@@ -168,16 +170,16 @@ export default function Dashboard() {
         const upcomingActivities = allActivities
           .filter(activity => {
             if (!activity.dueDate) return false;
-            
+
             const hasSubmitted = activity.submissions?.some(
               (s: any) => s.student === user?.id || s.student?._id === user?.id
             );
             if (hasSubmitted) return false;
-            
+
             const dueDate = new Date(activity.dueDate);
             const diffTime = dueDate.getTime() - now.getTime();
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
+
             return diffDays >= 0 && diffDays <= 7;
           })
           .sort((a, b) => {
@@ -189,7 +191,7 @@ export default function Dashboard() {
             const dueDate = new Date(activity.dueDate);
             const diffTime = dueDate.getTime() - now.getTime();
             const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
+
             return {
               ...activity,
               daysUntilDue
@@ -202,9 +204,9 @@ export default function Dashboard() {
             (s: any) => s.student === user?.id || s.student?._id === user?.id
           );
           if (hasSubmitted) return false;
-          
+
           if (!activity.dueDate) return true;
-          
+
           const dueDate = new Date(activity.dueDate);
           return dueDate >= now || activity.allowLateSubmission;
         }).length;
@@ -225,7 +227,7 @@ export default function Dashboard() {
               (s: any) => s.student === user?.id || s.student?._id === user?.id
             );
             const submittedAt = submission?.submittedAt ? new Date(submission.submittedAt) : null;
-            
+
             return {
               title: `Submitted "${activity.title}"`,
               subtitle: activity.classroom?.name || '',
@@ -255,7 +257,7 @@ export default function Dashboard() {
         ]);
       }
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      // Error fetching dashboard stats
     }
   };
 
@@ -283,7 +285,7 @@ export default function Dashboard() {
     return null;
   }
 
-  const filteredNavigation = navigationItems.filter(item => 
+  const filteredNavigation = navigationItems.filter(item =>
     item.roles.includes(user.role)
   );
 
@@ -336,9 +338,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-center px-4 py-4 border-b border-[#E0E0E0]">
             <div className="flex flex-col items-center gap-0 w-full">
               <div className="w-[100px] h-[100px] bg-white rounded-lg flex items-center justify-center p-2">
-                <img 
-                  src="/assets/badges/graduationhat.png" 
-                  alt="SkillVerse Logo" 
+                <img
+                  src="/assets/badges/graduationhat.png"
+                  alt="SkillVerse Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -350,21 +352,23 @@ export default function Dashboard() {
           <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
             {filteredNavigation.map((item) => {
               const isActive = activeNav === item.href;
-              
+
               return (
                 <button
                   key={item.href}
-                  onClick={() => handleNavigation(item.href)}
+                  onClick={() => !isGameActive && handleNavigation(item.href)}
+                  disabled={isGameActive}
                   className={`
                     w-full flex items-center gap-3 px-3 py-[10px] rounded-lg transition-all
-                    ${isActive 
-                      ? 'bg-white border border-[#1B5E20] text-[#1B5E20]' 
+                    ${isActive
+                      ? 'bg-white border border-[#1B5E20] text-[#1B5E20]'
                       : 'text-[#757575] hover:bg-[#F5F5F5]'
                     }
+                    ${isGameActive ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}
                   `}
                 >
-                  <img 
-                    src={item.icon} 
+                  <img
+                    src={item.icon}
                     alt={item.label}
                     className="w-6 h-6 object-contain"
                   />
@@ -387,14 +391,14 @@ export default function Dashboard() {
                 <p className="text-[11px] text-[#757575] capitalize">{user.role}</p>
               </div>
             </div>
-            
+
             <button
               onClick={logout}
               className="w-full flex items-center justify-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
             >
-              <img 
-                src="/assets/badges/logout.png" 
-                alt="Logout" 
+              <img
+                src="/assets/badges/logout.png"
+                alt="Logout"
                 className="w-6 h-6 object-contain"
               />
               <span className="text-sm font-semibold">Logout</span>
@@ -405,7 +409,7 @@ export default function Dashboard() {
 
       {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-30 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -425,16 +429,16 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <main className={`flex-1 overflow-auto ${activeNav === '/compiler' ? '' : 'p-6'}`}>
+        <main className={`flex-1 overflow-auto ${activeNav === '/compiler' || activeNav === '/bug-hunt' ? '' : 'p-6'}`}>
           {activeNav === '/compiler' ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
           ) : activeNav === '/classrooms' ? (
-            <Classrooms 
+            <Classrooms
               selectedClassroomId={selectedClassroomId}
               onClearSelection={() => setSelectedClassroomId(null)}
             />
           ) : activeNav.startsWith('/mini-projects/') ? (
-            <MiniProjectDetails 
+            <MiniProjectDetails
               ref={miniProjectsRef}
               onHasUnsavedChanges={setHasUnsavedChanges}
               projectTitle={selectedProjectTitle || ''}
@@ -443,8 +447,13 @@ export default function Dashboard() {
                 setSelectedProjectTitle(null);
               }}
             />
+          ) : activeNav === '/bug-hunt' ? (
+            <BugHunt
+              onMenuClick={() => !isGameActive && setSidebarOpen(true)}
+              onGameStatusChange={setIsGameActive}
+            />
           ) : activeNav === '/mini-projects' ? (
-            <MiniProjects 
+            <MiniProjects
               ref={miniProjectsRef}
               onHasUnsavedChanges={setHasUnsavedChanges}
               onNavigateToDetails={(title: string) => {
@@ -461,8 +470,8 @@ export default function Dashboard() {
           ) : activeNav === '/create-assignment' ? (
             <CreateAssignment />
           ) : activeNav === '/create-post' ? (
-            <CreatePost 
-              classroomId={createPostClassroomId || ''} 
+            <CreatePost
+              classroomId={createPostClassroomId || ''}
               classroomName={createPostClassroomName || ''}
               onBack={() => setActiveNav('/dashboard')}
               onNavigateToClassrooms={() => {
@@ -475,8 +484,8 @@ export default function Dashboard() {
               }}
             />
           ) : user.role === 'teacher' ? (
-            <TeacherDashboardContent 
-              user={user} 
+            <TeacherDashboardContent
+              user={user}
               onNavigateToCreatePost={(classroomId: string, classroomName: string) => {
                 setCreatePostClassroomId(classroomId);
                 setCreatePostClassroomName(classroomName);
@@ -484,7 +493,7 @@ export default function Dashboard() {
               }}
             />
           ) : (
-            <StudentDashboardContent 
+            <StudentDashboardContent
               user={user}
               enrolledCoursesCount={enrolledCoursesCount}
               activeAssignmentsCount={activeAssignmentsCount}
@@ -571,12 +580,11 @@ function StudentDashboardContent({
           }
         } catch (err) {
           // If there's an error fetching completed tasks, just show all available projects
-          console.log('Could not fetch completed tasks, showing all projects');
           setProjects(data.availableProjects.slice(0, 4));
         }
       }
     } catch (error) {
-      console.error('Error fetching mini projects:', error);
+      // Error fetching mini projects
     } finally {
       setLoading(false);
     }
@@ -652,10 +660,10 @@ function StudentDashboardContent({
                           </div>
                         )}
                       </div>
-                      <svg 
-                        className="w-5 h-5 text-[#757575] group-hover:text-[#1B5E20] transition-colors flex-shrink-0" 
-                        fill="none" 
-                        stroke="currentColor" 
+                      <svg
+                        className="w-5 h-5 text-[#757575] group-hover:text-[#1B5E20] transition-colors flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -700,7 +708,7 @@ function StudentDashboardContent({
               <Calendar className="w-5 h-5 text-[#FFB300]" />
               <h3 className="text-[15px] font-semibold text-[#212121]">Upcoming</h3>
             </div>
-            
+
             {upcomingAssignments.length === 0 ? (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-[#F5F5F5] rounded-full flex items-center justify-center mx-auto mb-4">
@@ -716,9 +724,9 @@ function StudentDashboardContent({
                     <p className="text-sm font-semibold text-[#212121] mb-1">{assignment.title}</p>
                     <p className="text-xs text-[#757575]">{assignment.classroom?.name}</p>
                     <p className="text-xs text-[#FFB300] font-semibold mt-1">
-                      {assignment.daysUntilDue === 0 ? 'Due today' : 
-                       assignment.daysUntilDue === 1 ? 'Due tomorrow' : 
-                       `Due in ${assignment.daysUntilDue} days`}
+                      {assignment.daysUntilDue === 0 ? 'Due today' :
+                        assignment.daysUntilDue === 1 ? 'Due tomorrow' :
+                          `Due in ${assignment.daysUntilDue} days`}
                     </p>
                   </div>
                 ))}
@@ -794,7 +802,7 @@ function StatCard({ icon: Icon, value, label, progress, color, badge }: StatCard
         <p className="text-[32px] font-semibold text-[#212121] leading-none">{value}</p>
         <p className="text-[13px] font-semibold text-[#757575]">{label}</p>
         <div className="w-full h-0.5 bg-[#F5F5F5] rounded-full overflow-hidden">
-          <div 
+          <div
             className={`h-full ${colorClasses[color]} rounded-full transition-all duration-300`}
             style={{ width: `${progress}%` }}
           />
@@ -828,7 +836,7 @@ function ProgressCard({ title, current, total, color }: ProgressCardProps) {
       </div>
       <div className="space-y-2">
         <div className="w-full h-1 bg-[#F5F5F5] rounded-full overflow-hidden">
-          <div 
+          <div
             className={`h-full ${colorClasses[color].bar} rounded-full transition-all duration-300`}
             style={{ width: `${percentage}%` }}
           />

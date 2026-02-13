@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { 
+import {
   ChevronRight,
   Calendar,
   FileText,
@@ -121,9 +121,9 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
   const isTeacher = user?.role === 'teacher';
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long', 
+      month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -159,7 +159,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
       alert('You have already submitted this activity. You cannot resubmit.');
       return;
     }
-    
+
     if (post?.requiresCompiler) {
       setShowCompiler(true);
     } else {
@@ -175,7 +175,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
 
       const formData = new FormData();
       formData.append('content', submissionContent);
-      
+
       pendingFiles.forEach((file) => {
         formData.append('files', file);
       });
@@ -211,7 +211,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
       setIsGeneratingFeedback(true);
       setShowAIFeedbackModal(true);
       setViewingSubmittedFeedback(true);
-      
+
       const response = await activityAPI.getAIFeedback(postId);
       setAiFeedback(response.feedback);
     } catch (err) {
@@ -224,13 +224,13 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
 
   const handleCompilerSubmit = async () => {
     if (!post) return;
-    
+
     try {
       setSubmitting(true);
       setError('');
       setIsGeneratingFeedback(true);
       setShowAIFeedbackModal(true);
-      
+
       const token = localStorage.getItem('token');
       if (!token) {
         setError('Not authenticated');
@@ -249,12 +249,10 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
       );
 
       const progressData = await progressResponse.json();
-      console.log('Progress data:', progressData);
-      
+
       let codeBase = '';
       if (progressData.found && progressData.task) {
         codeBase = progressData.task.codeBase || progressData.task.code || '';
-        console.log('CodeBase found:', codeBase ? codeBase.substring(0, 100) + '...' : 'EMPTY');
       }
 
       if (!codeBase) {
@@ -264,8 +262,6 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
         alert('No saved code found. Please write your code in the compiler first.');
         return;
       }
-
-      console.log('Submitting codeBase length:', codeBase.length);
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/activities/${post._id}/submit`, {
         method: 'POST',
@@ -315,7 +311,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
         const studentId = typeof sub.student === 'object' ? sub.student._id : sub.student;
         return studentId === selectedStudentId;
       });
-      
+
       if (studentSubmission) {
         if (post.requiresCompiler) {
           setGradingSubmission(studentSubmission);
@@ -332,7 +328,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
     try {
       setLoading(true);
       let response;
-      
+
       if (postType === 'activity') {
         response = await activityAPI.getActivity(postId);
         setPost(response.activity);
@@ -352,13 +348,13 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-gray-500">Loading post details...</div>
       </div>
-    );  
+    );
   }
 
   if (showSubmissionDetails && selectedSubmission) {
     const student = typeof selectedSubmission.student === 'object' ? selectedSubmission.student : null;
     const studentName = student ? student.name : 'Unknown Student';
-    
+
     return (
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
@@ -371,12 +367,12 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
               {post.classroom?.name || 'Classroom'}
             </button>
             <ChevronRight className="w-4 h-4 mx-2" />
-            <button 
+            <button
               onClick={() => {
                 setShowSubmissionDetails(false);
                 setSelectedSubmission(null);
                 setSelectedPreviewIndex(null);
-              }} 
+              }}
               className="hover:text-gray-900 transition-colors"
             >
               {post.title}
@@ -392,8 +388,8 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
               <div className="p-6 border-b border-gray-200">
                 <h1 className="text-2xl font-semibold text-gray-900">{post.title}</h1>
                 <p className="text-sm text-gray-500 mt-2">
-                  Submitted {new Date(selectedSubmission.submittedAt).toLocaleDateString('en-US', { 
-                    month: 'short', 
+                  Submitted {new Date(selectedSubmission.submittedAt).toLocaleDateString('en-US', {
+                    month: 'short',
                     day: 'numeric',
                     year: 'numeric',
                     hour: '2-digit',
@@ -448,7 +444,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                         const isPdf = attachment.fileType?.includes('pdf') || attachment.fileName.endsWith('.pdf');
                         const canPreview = isDocx || isPdf;
                         const isSelected = selectedPreviewIndex === index;
-                        
+
                         return (
                           <div key={index} className="space-y-3">
                             <div className="w-full p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
@@ -464,10 +460,10 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                                     <span>{formatFileSize(attachment.fileSize)}</span>
                                     <span>•</span>
                                     <span>
-                                      {attachment.fileType?.includes('word') ? 'Microsoft Word' : 
-                                       attachment.fileType?.includes('pdf') ? 'PDF Document' :
-                                       attachment.fileType?.includes('image') ? 'Image' : 
-                                       attachment.fileType?.includes('video') ? 'Video' : 'File'}
+                                      {attachment.fileType?.includes('word') ? 'Microsoft Word' :
+                                        attachment.fileType?.includes('pdf') ? 'PDF Document' :
+                                          attachment.fileType?.includes('image') ? 'Image' :
+                                            attachment.fileType?.includes('video') ? 'Video' : 'File'}
                                     </span>
                                   </div>
                                 </div>
@@ -500,7 +496,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                                 </div>
                               </div>
                             </div>
-                            
+
                             {canPreview && isSelected && (
                               <div className="ml-4 pl-4 border-l-2 border-gray-300">
                                 {isPdf ? (
@@ -568,15 +564,6 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
 
   const hasSubmitted = !!mySubmission;
 
-  console.log('Submission check:', {
-    postType,
-    hasSubmissions: !!post.submissions,
-    submissionsLength: post.submissions?.length,
-    userId: user?.id,
-    mySubmission,
-    hasSubmitted
-  });
-
   if (showCompilerGrading && gradingSubmission && post?.requiresCompiler) {
     return (
       <TeacherGradingCompiler
@@ -610,7 +597,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
         <div className="flex-1 overflow-hidden">
           <Compiler
             ref={compilerRef}
-            onMenuClick={() => {}}
+            onMenuClick={() => { }}
             projectDetails={compilerProjectDetails as any}
             onBack={() => {
               setShowCompiler(false);
@@ -620,7 +607,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
             isActivityMode={true}
           />
         </div>
-        
+
         {/* Activity Submit Confirmation Modal for Compiler */}
         {showActivitySubmitModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -761,9 +748,9 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                                 {attachment.fileName}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {attachment.fileType?.includes('word') ? 'Microsoft Word' : 
-                                 attachment.fileType?.includes('video') ? 'Video' :
-                                 attachment.fileType?.includes('image') ? 'Image' : 'File'}
+                                {attachment.fileType?.includes('word') ? 'Microsoft Word' :
+                                  attachment.fileType?.includes('video') ? 'Video' :
+                                    attachment.fileType?.includes('image') ? 'Image' : 'File'}
                               </p>
                             </div>
                           </div>
@@ -782,7 +769,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
           {postType === 'activity' && isStudent && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="text-base font-semibold text-gray-900 mb-4">Your work</h3>
-              
+
               {hasSubmitted && mySubmission ? (
                 <div className="space-y-4">
                   <div className="pb-4 border-b border-gray-200 flex items-center justify-between">
@@ -862,11 +849,10 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                         setShowSubmitModal(true);
                       }}
                       disabled={mySubmission.grade !== undefined}
-                      className={`w-full px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
-                        mySubmission.grade !== undefined
+                      className={`w-full px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${mySubmission.grade !== undefined
                           ? 'bg-green-600 text-white cursor-not-allowed opacity-75'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
+                        }`}
                     >
                       {mySubmission.grade !== undefined ? 'Graded' : 'Unsubmit'}
                     </button>
@@ -1001,17 +987,17 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
           {postType === 'activity' && isTeacher && (
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="text-base font-semibold text-gray-900 mb-4">Submissions</h3>
-              
+
               {post.submissions && post.submissions.length > 0 ? (
                 <div className="space-y-3">
                   <div className="text-sm text-gray-600 mb-4">
                     {post.submissions.length} student{post.submissions.length !== 1 ? 's' : ''} submitted
                   </div>
-                  
+
                   {post.submissions.map((submission, index) => {
                     const student = typeof submission.student === 'object' ? submission.student : null;
                     const studentName = student ? student.name : 'Unknown Student';
-                    
+
                     return (
                       <button
                         key={index}
@@ -1030,8 +1016,8 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                           <div className="flex-1">
                             <p className="text-sm font-medium text-gray-900">{studentName}</p>
                             <p className="text-xs text-gray-500 mt-1">
-                              Submitted {new Date(submission.submittedAt).toLocaleDateString('en-US', { 
-                                month: 'short', 
+                              Submitted {new Date(submission.submittedAt).toLocaleDateString('en-US', {
+                                month: 'short',
                                 day: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -1211,7 +1197,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
               <p className="text-sm text-gray-700 mb-4">
                 Are you sure you want to submit this work? You cannot edit your submission after submitting.
               </p>
-              
+
               {submissionContent.trim() && (
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
                   <p className="text-xs font-semibold text-gray-700 mb-2">Submission Content:</p>
@@ -1298,13 +1284,13 @@ function SubmitModal({ postId, postTitle, isUnsubmit, requiresCompiler, pendingF
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (isUnsubmit) {
       if (requiresCompiler) {
         setError('Cannot unsubmit compiler-based activities');
         return;
       }
-      
+
       try {
         setSubmitting(true);
         setError('');
@@ -1334,7 +1320,7 @@ function SubmitModal({ postId, postTitle, isUnsubmit, requiresCompiler, pendingF
 
       const formData = new FormData();
       formData.append('content', content);
-      
+
       files.forEach((file, index) => {
         console.log(`Appending file ${index}:`, file.name);
         formData.append('files', file);

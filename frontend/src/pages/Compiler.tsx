@@ -60,11 +60,11 @@ const highlightCode = (code: string, language: string, errors: CompilationError[
   if (language === 'java') {
     return highlightJavaCode(code, errors, warningLines);
   }
-  
+
   if (language === 'python') {
     return highlightPythonCode(code, errors);
   }
-  
+
   return code.split('\n').map((line, index) => (
     <div key={index} style={{ height: '24px', minHeight: '24px' }}>
       {line || '\u00A0'}
@@ -117,10 +117,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const [gradingResult, setGradingResult] = useState<any>(null);
   const [showGradingModal, setShowGradingModal] = useState(false);
   const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState(false);
-  const [highlightedBrackets, setHighlightedBrackets] = useState<{start: number, end: number} | null>(null);
+  const [highlightedBrackets, setHighlightedBrackets] = useState<{ start: number, end: number } | null>(null);
   const [typedFeedback, setTypedFeedback] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [aiMessages, setAiMessages] = useState<Array<{type: 'ai' | 'user', text: string}>>([]);
+  const [aiMessages, setAiMessages] = useState<Array<{ type: 'ai' | 'user', text: string }>>([]);
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [lastHintTime, setLastHintTime] = useState<number>(0);
   const [streamingText, setStreamingText] = useState('');
@@ -140,7 +140,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     saveProgress: () => handleSaveProgress(),
     getCode: () => code
   }));
-  
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
@@ -153,14 +153,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   useEffect(() => {
     if (projectDetails && !hasLoadedRef.current) {
       const projectLang = projectDetails.language.toLowerCase();
-      console.log('[Compiler] ========== PROJECT LOADED ==========');
-      console.log('[Compiler] Project title:', projectDetails.title);
-      console.log('[Compiler] Project language from details:', projectDetails.language);
-      console.log('[Compiler] Setting compiler language to:', projectLang);
       setLanguage(projectLang);
       loadSavedProgress(projectLang);
       hasLoadedRef.current = true;
-      console.log('[Compiler] ========================================');
     }
   }, [projectDetails]);
 
@@ -169,7 +164,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       const durationHours = (projectDetails as any).duration?.hours || 0;
       const durationMinutes = (projectDetails as any).duration?.minutes || 0;
       const totalSeconds = (durationHours * 3600) + (durationMinutes * 60);
-      
+
       if (totalSeconds > 0) {
         setTimeRemaining(totalSeconds);
         setTimerStarted(true);
@@ -215,7 +210,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
     // Don't load saved progress for activities - activities should start fresh
     if (isActivityMode) {
-      console.log('[Compiler] Activity mode - setting default code for language:', lang);
       setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
       return;
     }
@@ -223,7 +217,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        console.log('[Compiler] No token - setting default code for language:', lang);
         setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
         return;
       }
@@ -239,14 +232,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
       const data = await response.json();
       if (data.found && data.task.codeBase) {
-        console.log('[Compiler] Found saved progress - loading saved code');
         setCode(data.task.codeBase);
       } else {
-        console.log('[Compiler] No saved progress - setting default code for language:', lang);
         setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
       }
     } catch (error) {
-      console.log('[Compiler] Error loading progress - setting default code for language:', lang);
       setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
     }
   };
@@ -254,7 +244,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   useEffect(() => {
     const lines = code.split('\n').length;
     setLineNumbers(Array.from({ length: lines }, (_, i) => i + 1));
-    
+
     if (language === 'java') {
       const missing = findMissingImports(code);
       setMissingImports(missing);
@@ -269,7 +259,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   useEffect(() => {
     const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000');
-    
+
     newSocket.on('connect', () => {
     });
 
@@ -284,7 +274,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
     newSocket.on('execution-complete', () => {
       setIsRunning(false);
-      
+
       if (projectDetails && !isActivityMode) {
         setTimeout(() => {
           setAiMessages([]);
@@ -307,7 +297,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   useEffect(() => {
     if (!projectDetails || isRunning || isActivityMode) return;
-    
+
     const interval = setInterval(() => {
       const now = Date.now();
       if (now - lastHintTime >= 30000) {
@@ -315,7 +305,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setLastHintTime(now);
       }
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, [projectDetails, isRunning, code, lastHintTime, isActivityMode]);
 
@@ -326,9 +316,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   const analyzeCodeAndGiveHint = async () => {
     if (!projectDetails || isRunning || isAiThinking || isStreaming || isActivityMode) return;
-    
+
     setIsAiThinking(true);
-    
+
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -348,13 +338,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       });
 
       const data = await response.json();
-      
+
       if (response.ok && data.hint) {
         setIsAiThinking(false);
         startStreamingMessage(data.hint);
       }
     } catch (error) {
-      console.error('AI analysis error:', error);
       setIsAiThinking(false);
     }
   };
@@ -363,18 +352,18 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     setIsStreaming(true);
     setStreamingText('');
     setAiMessages([]);
-    
+
     let currentIndex = 0;
-    
+
     if (streamingIntervalRef.current) {
       clearInterval(streamingIntervalRef.current);
     }
-    
+
     streamingIntervalRef.current = setInterval(() => {
       if (currentIndex < message.length) {
         setStreamingText(message.substring(0, currentIndex + 1));
         currentIndex++;
-        
+
         if (consoleRef.current) {
           consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
         }
@@ -382,12 +371,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setIsStreaming(false);
         setAiMessages([{ type: 'ai', text: message }]);
         setStreamingText('');
-        
+
         if (streamingIntervalRef.current) {
           clearInterval(streamingIntervalRef.current);
           streamingIntervalRef.current = null;
         }
-        
+
         setTimeout(() => {
           if (consoleRef.current) {
             consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
@@ -438,14 +427,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     // If there's a project, this code should not run anyway
     // because the dropdown is disabled
     if (!user?.id) {
-      console.error('User ID not found');
       return;
     }
 
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('Authentication token not found');
         return;
       }
 
@@ -459,7 +446,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       );
 
       if (!response.ok) {
-        console.error('Failed to check survey status:', response.statusText);
         setPendingLanguage(newLanguage);
         setShowSurveyModal(true);
         return;
@@ -480,7 +466,6 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setShowConfirmationModal(true);
       }
     } catch (error) {
-      console.error('Error checking survey status:', error);
       setPendingLanguage(newLanguage);
       setShowConfirmationModal(true);
     }
@@ -513,7 +498,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     setCurrentInput('');
     setCompilationErrors([]);
     setIsRunning(true);
-    
+
     if (projectDetails && !isActivityMode) {
       if (streamingIntervalRef.current) {
         clearInterval(streamingIntervalRef.current);
@@ -523,7 +508,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       setIsStreaming(false);
       setStreamingText('');
     }
-    
+
     if (language === 'java') {
       socket.emit('compile-and-run', { code, sessionId });
     } else if (language === 'python') {
@@ -539,7 +524,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         socket.emit('kill-process-python', { sessionId });
       }
       setIsRunning(false);
-      
+
       if (projectDetails && !isActivityMode) {
         setTimeout(() => {
           setAiMessages([]);
@@ -584,12 +569,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const getSuggestions = (text: string, cursorPos: number): Suggestion[] => {
     const beforeCursor = text.substring(0, cursorPos);
     const currentLine = beforeCursor.split('\n').pop() || '';
-    
+
     const allSuggestions: Suggestion[] = [];
     const suggestions = language === 'java' ? JAVA_SUGGESTIONS : PYTHON_SUGGESTIONS;
 
     if (currentLine.trim().startsWith('import ') || currentLine.includes('import ') || currentLine.includes('from ')) {
-      const importText = currentLine.includes('import ') 
+      const importText = currentLine.includes('import ')
         ? currentLine.substring(currentLine.lastIndexOf('import ') + 7)
         : currentLine.substring(currentLine.lastIndexOf('from ') + 5);
       suggestions.imports.forEach(imp => {
@@ -604,7 +589,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }
 
     const lastWord = currentLine.split(/[\s\(\)\{\}\[\];,:]/).pop() || '';
-    
+
     if (lastWord.length >= 2) {
       suggestions.keywords.forEach(keyword => {
         if (keyword.toLowerCase().startsWith(lastWord.toLowerCase())) {
@@ -632,20 +617,20 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   const updateCursorPosition = () => {
     if (!textareaRef.current) return;
-    
+
     const textarea = textareaRef.current;
     const cursorPos = textarea.selectionStart;
     const textBeforeCursor = textarea.value.substring(0, cursorPos);
     const lines = textBeforeCursor.split('\n');
     const currentLineNumber = lines.length;
     const currentLineText = lines[lines.length - 1];
-    
+
     const lineHeight = 24;
     const charWidth = 8;
-    
+
     const top = (currentLineNumber - 1) * lineHeight + 30;
     const left = currentLineText.length * charWidth + 70;
-    
+
     setCursorPosition({ top, left });
     setCurrentLine(currentLineNumber);
   };
@@ -653,25 +638,25 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newCode = e.target.value;
     setCode(newCode);
-    
+
     if (projectDetails) {
       setHasUnsavedChanges(true);
       if (onHasUnsavedChanges) {
         onHasUnsavedChanges(true);
       }
     }
-    
+
     setHighlightedBrackets(null);
-    
+
     const cursorPos = e.target.selectionStart;
     const textBeforeCursor = newCode.substring(0, cursorPos);
     const lines = textBeforeCursor.split('\n');
     const newLineNumber = lines.length;
-    
+
     if (newLineNumber !== currentLine) {
       setShowSuggestions(false);
       setCurrentLine(newLineNumber);
-      
+
       const cachedData = lineSuggestions.get(newLineNumber);
       if (cachedData && cachedData.suggestions.length > 0) {
         setSuggestions(cachedData.suggestions);
@@ -681,9 +666,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       }
       return;
     }
-    
+
     const newSuggestions = getSuggestions(newCode, cursorPos);
-    
+
     if (newSuggestions.length > 0) {
       updateCursorPosition();
       const pos = { top: 0, left: 0 };
@@ -693,18 +678,18 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         const lines = textBeforeCursor.split('\n');
         const currentLineNumber = lines.length;
         const currentLineText = lines[lines.length - 1];
-        
+
         const lineHeight = 24;
         const charWidth = 8;
-        
+
         pos.top = (currentLineNumber - 1) * lineHeight + 30;
         pos.left = currentLineText.length * charWidth + 70;
       }
-      
+
       const newLineSuggestions = new Map(lineSuggestions);
       newLineSuggestions.set(newLineNumber, { suggestions: newSuggestions, cursorPos: pos });
       setLineSuggestions(newLineSuggestions);
-      
+
       setSuggestions(newSuggestions);
       setShowSuggestions(true);
       setSelectedSuggestion(0);
@@ -733,29 +718,29 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
     if ((e.ctrlKey || e.metaKey) && e.key === '/') {
       e.preventDefault();
-      
+
       const commentPrefix = language === 'python' ? '#' : '//';
       const commentRegex = language === 'python' ? /^(\s*)?#\s?/ : /^(\s*)?\/\/\s?/;
-      const commentCheck = language === 'python' 
+      const commentCheck = language === 'python'
         ? (line: string) => line.trim().startsWith('#')
         : (line: string) => line.trim().startsWith('//');
-      
+
       const hasSelection = cursorPos !== selectionEnd;
       const selectedText = code.substring(cursorPos, selectionEnd);
-      
+
       if (hasSelection) {
         const beforeSelection = code.substring(0, cursorPos);
         const afterSelection = code.substring(selectionEnd);
-        
+
         const lines = selectedText.split('\n');
         const nonEmptyLines = lines.filter(line => line.trim().length > 0);
         const allCommented = nonEmptyLines.length > 0 && nonEmptyLines.every(commentCheck);
-        
+
         const newLines = lines.map(line => {
           if (line.trim().length === 0) {
             return line;
           }
-          
+
           if (allCommented) {
             return line.replace(commentRegex, '$1');
           } else {
@@ -765,11 +750,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
             return indent + commentPrefix + ' ' + restOfLine;
           }
         });
-        
+
         const newSelectedText = newLines.join('\n');
         const newCode = beforeSelection + newSelectedText + afterSelection;
         setCode(newCode);
-        
+
         setTimeout(() => {
           textarea.setSelectionRange(cursorPos, cursorPos + newSelectedText.length);
         }, 0);
@@ -778,9 +763,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         const beforeCursor = code.substring(0, cursorPos);
         const currentLineIndex = beforeCursor.split('\n').length - 1;
         const currentLine = lines[currentLineIndex];
-        
+
         const isCommented = commentCheck(currentLine);
-        
+
         let newLine;
         if (isCommented) {
           newLine = currentLine.replace(commentRegex, '$1');
@@ -790,11 +775,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
           const restOfLine = currentLine.substring(indent.length);
           newLine = indent + commentPrefix + ' ' + restOfLine;
         }
-        
+
         lines[currentLineIndex] = newLine;
         const newCode = lines.join('\n');
         setCode(newCode);
-        
+
         setTimeout(() => {
           const linesBefore = lines.slice(0, currentLineIndex).join('\n');
           const newCursorPos = linesBefore.length + (linesBefore ? 1 : 0) + newLine.length;
@@ -806,18 +791,18 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
     if (e.key === 'Tab') {
       e.preventDefault();
-      
+
       if (e.shiftKey) {
         const lines = textBefore.split('\n');
         const currentLine = lines[lines.length - 1];
         const beforeCurrentLine = textBefore.substring(0, textBefore.length - currentLine.length);
-        
+
         const spacesToRemove = currentLine.match(/^( {1,2})/);
         if (spacesToRemove) {
           const newCurrentLine = currentLine.substring(spacesToRemove[1].length);
           const newCode = beforeCurrentLine + newCurrentLine + textAfter;
           setCode(newCode);
-          
+
           setTimeout(() => {
             const newPos = cursorPos - spacesToRemove[1].length;
             textarea.setSelectionRange(newPos, newPos);
@@ -829,7 +814,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         const spaces = '  ';
         const newCode = textBefore + spaces + textAfter;
         setCode(newCode);
-        
+
         setTimeout(() => {
           textarea.setSelectionRange(cursorPos + spaces.length, cursorPos + spaces.length);
         }, 0);
@@ -853,7 +838,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
       const closing = closingPairs[e.key];
       const newCode = textBefore + e.key + closing + textAfter;
       setCode(newCode);
-      
+
       setTimeout(() => {
         textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
       }, 0);
@@ -889,7 +874,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     const cursorPos = textarea.selectionStart;
     const textBefore = code.substring(0, cursorPos);
     const textAfter = code.substring(cursorPos);
-    
+
     let newText = '';
     let newCursorPos = cursorPos;
 
@@ -902,10 +887,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     } else {
       const lastWord = textBefore.split(/[\s\(\)\{\}\[\];,]/).pop() || '';
       const beforeWord = textBefore.substring(0, textBefore.length - lastWord.length);
-      
+
       const suggestionLower = suggestion.text.toLowerCase();
       const lastWordLower = lastWord.toLowerCase();
-      
+
       if (suggestionLower.startsWith(lastWordLower)) {
         newText = beforeWord + suggestion.text + textAfter;
         newCursorPos = beforeWord.length + suggestion.text.length;
@@ -917,7 +902,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
     setCode(newText);
     setShowSuggestions(false);
-    
+
     const newLineSuggestions = new Map(lineSuggestions);
     newLineSuggestions.delete(currentLine);
     setLineSuggestions(newLineSuggestions);
@@ -931,7 +916,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   const addMissingImport = (importStatement: string) => {
     const lines = code.split('\n');
     let insertIndex = 0;
-    
+
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].trim().startsWith('package ')) {
         insertIndex = i + 1;
@@ -941,11 +926,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         break;
       }
     }
-    
+
     lines.splice(insertIndex, 0, importStatement);
     const newCode = lines.join('\n');
     setCode(newCode);
-    
+
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
@@ -953,17 +938,17 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
   const handleCursorMove = () => {
     if (!textareaRef.current) return;
-    
+
     const textarea = textareaRef.current;
     const cursorPos = textarea.selectionStart;
     const textBeforeCursor = code.substring(0, cursorPos);
     const lines = textBeforeCursor.split('\n');
     const newLineNumber = lines.length;
-    
+
     if (newLineNumber !== currentLine) {
       setShowSuggestions(false);
       setCurrentLine(newLineNumber);
-      
+
       const cachedData = lineSuggestions.get(newLineNumber);
       if (cachedData && cachedData.suggestions.length > 0) {
         setSuggestions(cachedData.suggestions);
@@ -978,11 +963,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     if (textareaRef.current && lineNumbersRef.current && highlightRef.current) {
       const scrollTop = textareaRef.current.scrollTop;
       const scrollLeft = textareaRef.current.scrollLeft;
-      
+
       lineNumbersRef.current.scrollTop = scrollTop;
       highlightRef.current.scrollTop = scrollTop;
       highlightRef.current.scrollLeft = scrollLeft;
-      
+
       if (bracketHighlightRef.current) {
         bracketHighlightRef.current.scrollTop = scrollTop;
         bracketHighlightRef.current.scrollLeft = scrollLeft;
@@ -990,7 +975,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }
   };
 
-  const findMatchingBracket = (text: string, clickPos: number): {start: number, end: number} | null => {
+  const findMatchingBracket = (text: string, clickPos: number): { start: number, end: number } | null => {
     const char = text[clickPos];
     const bracketPairs: Record<string, string> = {
       '{': '}',
@@ -1011,18 +996,18 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
     while (pos >= 0 && pos < text.length) {
       const currentChar = text[pos];
-      
+
       if (currentChar === char) {
         count++;
       } else if (currentChar === matchChar) {
         count--;
         if (count === 0) {
-          return isOpening 
-            ? {start: clickPos, end: pos}
-            : {start: pos, end: clickPos};
+          return isOpening
+            ? { start: clickPos, end: pos }
+            : { start: pos, end: clickPos };
         }
       }
-      
+
       pos += direction;
     }
 
@@ -1034,7 +1019,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
     const clickPos = textareaRef.current.selectionStart;
     const matched = findMatchingBracket(code, clickPos);
-    
+
     setHighlightedBrackets(matched);
   };
 
@@ -1092,7 +1077,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
@@ -1128,9 +1113,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Network error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Network error occurred'
       };
     }
   };
@@ -1172,12 +1157,12 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setGradingResult(data.gradingResult);
         setShowGradingModal(true);
         setSaveMessage('');
-        
+
         setTypedFeedback('');
         setIsTyping(true);
         const fullText = data.gradingResult.feedback || '';
         let currentIndex = 0;
-        
+
         const typingInterval = setInterval(() => {
           if (currentIndex < fullText.length) {
             setTypedFeedback(fullText.substring(0, currentIndex + 1));
@@ -1270,11 +1255,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                   </div>
                 )}
                 {saveMessage && (
-                  <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                    saveMessage.includes('Error') 
-                      ? 'bg-red-100 text-red-700' 
+                  <div className={`px-4 py-2 rounded-lg text-sm font-medium ${saveMessage.includes('Error')
+                      ? 'bg-red-100 text-red-700'
                       : 'bg-green-100 text-green-700'
-                  }`}>
+                    }`}>
                     {saveMessage}
                   </div>
                 )}
@@ -1310,11 +1294,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
           {/* Right side - Timer and Action Buttons */}
           <div className="flex items-center space-x-2">
             {isActivityMode && timeRemaining !== null && (
-              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg font-mono text-sm font-semibold ${
-                timeRemaining <= 300 ? 'bg-red-100 text-red-700' :
-                timeRemaining <= 600 ? 'bg-yellow-100 text-yellow-700' :
-                'bg-blue-100 text-blue-700'
-              }`}>
+              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg font-mono text-sm font-semibold ${timeRemaining <= 300 ? 'bg-red-100 text-red-700' :
+                  timeRemaining <= 600 ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-blue-100 text-blue-700'
+                }`}>
                 <Clock className="w-4 h-4" />
                 <span>{formatTime(timeRemaining)}</span>
               </div>
@@ -1450,35 +1433,34 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 {(() => {
                   const linesWithMissingImports = findLinesWithMissingImports(code, missingImports);
                   const unusedImports = findUnusedImports(code);
-                  
+
                   return lineNumbers.map((num) => {
                     const hasError = compilationErrors.some(err => err.line === num);
                     const error = compilationErrors.find(err => err.line === num);
                     const hasMissingImport = !hasError && linesWithMissingImports.has(num);
                     const hasUnusedImport = !hasError && !hasMissingImport && unusedImports.has(num);
                     const hasWarning = hasMissingImport || hasUnusedImport;
-                    
+
                     return (
-                    <div
-                      key={num}
-                      className={`text-xs font-mono flex items-center justify-end space-x-1 ${
-                        hasError ? 'text-red-600 font-bold' : 
-                        hasWarning ? 'text-yellow-600 font-bold' : 
-                        'text-gray-400'
-                      }`}
-                      style={{ height: '24px', minHeight: '24px', lineHeight: '24px' }}
-                      title={
-                        hasError ? error?.message : 
-                        hasMissingImport ? 'Missing import - click the lightbulb icon above to add' :
-                        hasUnusedImport ? 'Unused import' :
-                        ''
-                      }
-                    >
-                      <span>{num}</span>
-                    </div>
-                  );
-                });
-              })()}
+                      <div
+                        key={num}
+                        className={`text-xs font-mono flex items-center justify-end space-x-1 ${hasError ? 'text-red-600 font-bold' :
+                            hasWarning ? 'text-yellow-600 font-bold' :
+                              'text-gray-400'
+                          }`}
+                        style={{ height: '24px', minHeight: '24px', lineHeight: '24px' }}
+                        title={
+                          hasError ? error?.message :
+                            hasMissingImport ? 'Missing import - click the lightbulb icon above to add' :
+                              hasUnusedImport ? 'Unused import' :
+                                ''
+                        }
+                      >
+                        <span>{num}</span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
             {/* Code Area */}
@@ -1490,13 +1472,13 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 style={{ lineHeight: '24px' }}
               >
                 {highlightCode(
-                  code, 
-                  language, 
-                  compilationErrors, 
+                  code,
+                  language,
+                  compilationErrors,
                   new Set([...findLinesWithMissingImports(code, missingImports), ...findUnusedImports(code)])
                 )}
               </div>
-              
+
               {/* Bracket Matching Highlights */}
               {highlightedBrackets && (
                 <div
@@ -1510,7 +1492,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                     const betweenBrackets = code.substring(highlightedBrackets.start + 1, highlightedBrackets.end);
                     const endChar = code[highlightedBrackets.end];
                     const afterEnd = code.substring(highlightedBrackets.end + 1);
-                    
+
                     return (
                       <>
                         <span style={{ color: 'transparent' }}>{beforeStart}</span>
@@ -1539,7 +1521,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                   })()}
                 </div>
               )}
-              
+
               {/* Input Textarea */}
               <textarea
                 ref={textareaRef}
@@ -1555,7 +1537,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                   setShowSuggestions(false);
                 }}
                 className="absolute inset-0 px-4 py-3 bg-transparent text-sm font-mono text-transparent caret-black resize-none focus:outline-none overflow-auto whitespace-pre"
-                style={{ 
+                style={{
                   lineHeight: '24px',
                   caretColor: '#000000'
                 }}
@@ -1563,7 +1545,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 placeholder="Write your code here..."
                 disabled={isRunning}
               />
-              
+
               {/* Suggestions Dropdown */}
               {showSuggestions && suggestions.length > 0 && (
                 <div
@@ -1578,20 +1560,18 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                   {suggestions.map((suggestion, index) => (
                     <div
                       key={index}
-                      className={`px-3 py-2 cursor-pointer flex items-center justify-between ${
-                        index === selectedSuggestion ? 'bg-blue-100' : 'hover:bg-gray-100'
-                      }`}
+                      className={`px-3 py-2 cursor-pointer flex items-center justify-between ${index === selectedSuggestion ? 'bg-blue-100' : 'hover:bg-gray-100'
+                        }`}
                       onClick={() => insertSuggestion(suggestion)}
                     >
                       <div className="flex flex-col">
                         <span className="text-sm font-mono text-gray-900">{suggestion.text}</span>
                         <span className="text-xs text-gray-500">{suggestion.description}</span>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        suggestion.type === 'import' ? 'bg-purple-100 text-purple-700' :
-                        suggestion.type === 'keyword' ? 'bg-blue-100 text-blue-700' :
-                        'bg-green-100 text-green-700'
-                      }`}>
+                      <span className={`text-xs px-2 py-1 rounded ${suggestion.type === 'import' ? 'bg-purple-100 text-purple-700' :
+                          suggestion.type === 'keyword' ? 'bg-blue-100 text-blue-700' :
+                            'bg-green-100 text-green-700'
+                        }`}>
                         {suggestion.type}
                       </span>
                     </div>
@@ -1612,9 +1592,9 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
               {projectDetails && !isRunning ? 'SkillVerse Coding Assistant' : 'Interactive Console'}
             </h3>
           </div>
-          
+
           {/* Console Area */}
-          <div 
+          <div
             ref={consoleRef}
             className="flex-1 overflow-auto min-h-0 focus:outline-none"
             tabIndex={0}
@@ -1845,7 +1825,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                   setIsSubmittingActivity(true);
                   const result = await handleAutoSubmit();
                   setIsSubmittingActivity(false);
-                  
+
                   if (result.success) {
                     setSubmitSuccess(true);
                   } else {
@@ -1970,7 +1950,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Switch Programming Language</h2>
             </div>
-            
+
             <div className="px-6 py-6 space-y-4">
               <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
                 <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: language === 'java' ? '#DBEAFE' : '#FEF3C7' }}>

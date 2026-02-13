@@ -1,24 +1,25 @@
-import { generateWithRetry, MODEL_NAME } from './ollamaService.js';
+import { generateWithRetry } from './ollamaService.js';
+import OLLAMA_CONFIG from '../config/ollamaConfig.js';
 import Survey from '../models/User.js';
 
 console.log(`Project Generation Service using shared AI service`);
-console.log(`Model: ${MODEL_NAME}`);
+console.log(`Model: ${OLLAMA_CONFIG.model}`);
 
 export const generateWeeklyProjects = async (userId) => {
   try {
     const User = (await import('../models/User.js')).default;
     const user = await User.findById(userId);
-    
+
     if (!user || !user.primaryLanguage) {
       throw new Error(`No user or primaryLanguage found for user ${userId}`);
     }
 
     const projects = await generateProjectsForLanguage(userId, user.primaryLanguage);
-    
+
     if (!projects || projects.length === 0) {
       throw new Error('AI failed to generate projects');
     }
-    
+
     return projects;
   } catch (error) {
     console.error('[GenerateWeeklyProjects] Error:', error);
@@ -30,32 +31,32 @@ export const generateProjectsForBothLanguages = async (userId) => {
   try {
     const User = (await import('../models/User.js')).default;
     const user = await User.findById(userId);
-    
+
     if (!user) {
       throw new Error(`No user found for user ${userId}`);
     }
 
     console.log(`[ProjectGen] ========== GENERATING PROJECTS FOR BOTH LANGUAGES ==========`);
     console.log(`[ProjectGen] User ID: ${userId}`);
-    
+
     console.log(`[ProjectGen] Calling generateProjectsForLanguage for JAVA...`);
     const javaProjects = await generateProjectsForLanguage(userId, 'java');
     console.log(`[ProjectGen] Java projects generated:`, javaProjects.length);
     if (javaProjects.length > 0) {
       console.log(`[ProjectGen] Sample Java project:`, { title: javaProjects[0].title, language: javaProjects[0].language });
     }
-    
+
     console.log(`[ProjectGen] Calling generateProjectsForLanguage for PYTHON...`);
     const pythonProjects = await generateProjectsForLanguage(userId, 'python');
     console.log(`[ProjectGen] Python projects generated:`, pythonProjects.length);
     if (pythonProjects.length > 0) {
       console.log(`[ProjectGen] Sample Python project:`, { title: pythonProjects[0].title, language: pythonProjects[0].language });
     }
-    
+
     const allProjects = [...javaProjects, ...pythonProjects];
     console.log(`[ProjectGen] Generated ${javaProjects.length} Java + ${pythonProjects.length} Python = ${allProjects.length} total projects`);
     console.log(`[ProjectGen] ================================================================`);
-    
+
     return allProjects;
   } catch (error) {
     console.error('[GenerateProjectsForBothLanguages] Error:', error);
@@ -67,20 +68,20 @@ export const generateProjectsForLanguage = async (userId, language) => {
   try {
     const User = (await import('../models/User.js')).default;
     const user = await User.findById(userId);
-    
+
     if (!user) {
       throw new Error(`No user found for user ${userId}`);
     }
 
     const Survey = (await import('../models/Survey.js')).default;
     const survey = await Survey.findOne({ userId, primaryLanguage: language }).sort({ createdAt: -1 });
-    
+
     if (!survey) {
       throw new Error(`No survey found for user ${userId} and language ${language}`);
     }
 
-    const hasLanguageData = 
-      (language.toLowerCase() === 'java' && survey.javaExpertise) || 
+    const hasLanguageData =
+      (language.toLowerCase() === 'java' && survey.javaExpertise) ||
       (language.toLowerCase() === 'python' && survey.pythonExpertise);
 
     if (!hasLanguageData) {
@@ -94,7 +95,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
     const skillLevel = language.toLowerCase() === 'java'
       ? determineSkillLevel(survey.javaExpertise, null, survey.javaQuestions?.score, null)
       : determineSkillLevel(null, survey.pythonExpertise, null, survey.pythonQuestions?.score);
-    
+
     console.log(`[ProjectGen] ========== GENERATING ROADMAP-BASED PROJECTS ==========`);
     console.log(`[ProjectGen] User ID: ${userId}`);
     console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
@@ -103,23 +104,23 @@ export const generateProjectsForLanguage = async (userId, language) => {
     console.log(`[ProjectGen] Roadmap Phase 2: ${survey.learningRoadmap.phase2.join(', ')}`);
     console.log(`[ProjectGen] Roadmap Phase 3: ${survey.learningRoadmap.phase3.join(', ')}`);
     console.log(`[ProjectGen] ===========================================`);
-    
+
     const languageSpecificSurvey = {
       ...survey.toObject(),
       primaryLanguage: language
     };
-    
+
     const prompt = constructRoadmapBasedPrompt(languageSpecificSurvey);
-    
+
     console.log(`[ProjectGen] Prompt length: ${prompt.length} characters`);
     console.log(`[ProjectGen] Has AI Analysis: ${!!languageSpecificSurvey.aiAnalysis}`);
     if (languageSpecificSurvey.aiAnalysis) {
       console.log(`[ProjectGen] AI Analysis preview:`, languageSpecificSurvey.aiAnalysis.substring(0, 200));
     }
-    
+
     console.log(`[ProjectGen] Calling AI API with retry logic...`);
     const startTime = Date.now();
-    
+
     const response = await generateWithRetry(prompt, {
       temperature: 0.9,
       num_predict: 1500,
@@ -133,14 +134,14 @@ export const generateProjectsForLanguage = async (userId, language) => {
     const projectsText = response.message.content;
     console.log(`[ProjectGen] AI Response length: ${projectsText.length} characters`);
     console.log(`[ProjectGen] AI Response preview (first 500 chars):`, projectsText.substring(0, 500));
-    
+
     const projects = parseProjectsFromAI(projectsText);
     console.log(`[ProjectGen] Parsed ${projects.length} projects from AI response`);
-    
+
     if (projects.length > 0) {
       console.log(`[ProjectGen] First parsed project:`, JSON.stringify(projects[0], null, 2));
     }
-    
+
     const correctedProjects = projects.map(project => ({
       ...project,
       language: language
@@ -161,20 +162,20 @@ export const generateProjectsForLanguage = async (userId, language) => {
 
 const constructRoadmapBasedPrompt = (survey) => {
   const { primaryLanguage, learningRoadmap, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions, aiAnalysis } = survey;
-  
-  const language = primaryLanguage 
+
+  const language = primaryLanguage
     ? primaryLanguage.charAt(0).toUpperCase() + primaryLanguage.slice(1)
     : 'Java';
-  
+
   const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, javaQuestions?.score, pythonQuestions?.score);
-  
+
   const phase1Items = learningRoadmap.phase1 || [];
-  
+
   if (phase1Items.length < 3) {
     throw new Error(`Phase 1 must have at least 3 items, found ${phase1Items.length}`);
   }
 
-  const aiAnalysisSection = aiAnalysis 
+  const aiAnalysisSection = aiAnalysis
     ? `\n\nAI ANALYSIS:\n${aiAnalysis}\n\nUse this to tailor difficulty, explanations, focus. Address strengths/weaknesses.`
     : '';
 
@@ -243,13 +244,13 @@ Generate 3 projects, ONE for EACH of the first 3 Phase 1 roadmap items in order:
 
 const determineSkillLevel = (javaExpertise, pythonExpertise, javaScore, pythonScore) => {
   const scores = [];
-  
+
   if (javaScore?.percentage) scores.push(javaScore.percentage);
   if (pythonScore?.percentage) scores.push(pythonScore.percentage);
-  
+
   console.log(`[SkillLevel] Java expertise: ${javaExpertise}, Python expertise: ${pythonExpertise}`);
   console.log(`[SkillLevel] Java score: ${javaScore?.percentage}%, Python score: ${pythonScore?.percentage}%`);
-  
+
   if (scores.length === 0) {
     if (javaExpertise === 'expert' || pythonExpertise === 'expert') {
       console.log(`[SkillLevel] Determined: Advanced (based on self-assessment)`);
@@ -262,10 +263,10 @@ const determineSkillLevel = (javaExpertise, pythonExpertise, javaScore, pythonSc
     console.log(`[SkillLevel] Determined: Beginner (based on self-assessment)`);
     return 'Beginner';
   }
-  
+
   const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
   console.log(`[SkillLevel] Average quiz score: ${avgScore.toFixed(1)}%`);
-  
+
   if (avgScore >= 70) {
     console.log(`[SkillLevel] Determined: Advanced (quiz score >= 70%)`);
     return 'Advanced';
@@ -287,7 +288,7 @@ const getSkillLevelGuidance = (level) => {
 - No complex algorithms
 - Foundational concepts`;
   }
-  
+
   if (level === 'Intermediate') {
     return `INTERMEDIATE:
 - Inheritance, interfaces
@@ -296,7 +297,7 @@ const getSkillLevelGuidance = (level) => {
 - Exception handling
 - Practical OOP`;
   }
-  
+
   return `ADVANCED:
 - Design patterns
 - Advanced data structures
@@ -307,46 +308,46 @@ const getSkillLevelGuidance = (level) => {
 
 const parseProjectsFromAI = (text) => {
   const projects = [];
-  
+
   let projectMatches = text.split(/###\s*Project\s*\d+:/i).filter(p => p.trim());
-  
+
   if (projectMatches.length <= 1) {
     projectMatches = text.split(/PROJECT\s*\d+:/i).filter(p => p.trim());
   }
-  
+
   console.log(`[ProjectGen-Parse] Found ${projectMatches.length} potential project blocks`);
-  
+
   for (const projectText of projectMatches) {
     try {
       const titleMatch = projectText.match(/\*\*Title:\*\*\s*(.+?)(?=\n|$)/i);
       const descMatch = projectText.match(/\*\*Description:\*\*\s*(.+?)(?=\*\*Language)/is);
-      const langMatch = projectText.match(/\*\*Language:\s*\*\*?\s*(.+?)(?=\n|$)/i) || 
-                        projectText.match(/Language:\s*(.+?)(?=\n|$)/i);
+      const langMatch = projectText.match(/\*\*Language:\s*\*\*?\s*(.+?)(?=\n|$)/i) ||
+        projectText.match(/Language:\s*(.+?)(?=\n|$)/i);
       const reqMatch = projectText.match(/\*\*Requirements:\*\*\s*([\s\S]+?)(?=\*\*Rubrics:|$)/i);
       const rubricsMatch = projectText.match(/\*\*Rubrics:\*\*\s*([\s\S]+?)(?=\n\n|###|PROJECT|$)/i);
-      
+
       if (titleMatch && descMatch && langMatch) {
         let title = titleMatch[1].trim();
         title = title.replace(/^\*\*|\*\*$/g, '');
         title = title.replace(/^["']|["']$/g, '');
         title = title.trim();
-        
+
         let language = langMatch[1].trim();
         language = language.replace(/^\*\*|\*\*$/g, '');
         language = language.trim();
-        
-        const requirements = reqMatch 
+
+        const requirements = reqMatch
           ? reqMatch[1].split('\n').filter(r => r.trim() && (r.trim().startsWith('-') || r.trim().match(/^\d+\./)))
-              .map(r => r.trim()).join('\n')
+            .map(r => r.trim()).join('\n')
           : '';
-        
+
         const rubrics = rubricsMatch
           ? rubricsMatch[1].split('\n').filter(r => r.trim() && (r.trim().startsWith('-') || r.trim().match(/^\d+\./)))
-              .map(r => r.trim()).join('\n')
+            .map(r => r.trim()).join('\n')
           : '';
-        
+
         console.log(`[ProjectGen-Parse] Project "${title}" fields: Req=${!!reqMatch}, Rubrics=${!!rubricsMatch}`);
-        
+
         projects.push({
           title: title,
           description: descMatch[1].trim().replace(/\n/g, ' '),
@@ -360,6 +361,6 @@ const parseProjectsFromAI = (text) => {
       console.error('[ProjectGen-Parse] Error parsing project:', error.message);
     }
   }
-  
+
   return projects;
 };

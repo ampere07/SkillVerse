@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   Search,
   Filter,
   Clock,
@@ -64,12 +64,12 @@ export default function Submissions() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      
+
       if (response.ok && data.classrooms) {
         setClassrooms(data.classrooms);
       }
     } catch (error) {
-      console.error('Error fetching classrooms:', error);
+      // Error fetching classrooms
     }
   };
 
@@ -83,17 +83,17 @@ export default function Submissions() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const classroomsData = await classroomsResponse.json();
-      
+
       if (classroomsResponse.ok && classroomsData.classrooms) {
         const allSubmissions: Submission[] = [];
-        
+
         for (const classroom of classroomsData.classrooms) {
           try {
             const activitiesResponse = await fetch(
               `${import.meta.env.VITE_API_URL}/activities/classroom/${classroom._id}`,
               { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            
+
             if (activitiesResponse.ok) {
               const activitiesData = await activitiesResponse.json();
               if (activitiesData.success && activitiesData.activities) {
@@ -123,18 +123,18 @@ export default function Submissions() {
               }
             }
           } catch (err) {
-            console.error(`Error fetching activities for classroom ${classroom._id}:`, err);
+            // Error fetching activities for classroom
           }
         }
 
-        allSubmissions.sort((a, b) => 
+        allSubmissions.sort((a, b) =>
           new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
         );
-        
+
         setSubmissions(allSubmissions);
       }
     } catch (error) {
-      console.error('Error fetching submissions:', error);
+      // Error fetching submissions
     } finally {
       setLoading(false);
     }
@@ -144,7 +144,7 @@ export default function Submissions() {
     let filtered = [...submissions];
 
     if (searchQuery) {
-      filtered = filtered.filter(sub => 
+      filtered = filtered.filter(sub =>
         sub.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         sub.activity.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         sub.classroom.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -401,7 +401,7 @@ function SubmissionCard({ submission, onView }: SubmissionCardProps) {
           </div>
         </div>
 
-        <button 
+        <button
           onClick={() => onView(submission.activity._id, submission.student._id)}
           className="ml-4 px-4 py-2 text-sm font-medium text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
         >

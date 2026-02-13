@@ -31,7 +31,7 @@ export default function Settings() {
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -85,7 +85,7 @@ export default function Settings() {
         setSelectedLanguage(data.user.primaryLanguage || 'java');
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      // Error fetching user data
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ export default function Settings() {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setMessage(`Language switched to ${selectedLanguage.toUpperCase()} successfully!`);
         setUserData({ ...userData, primaryLanguage: selectedLanguage });
@@ -170,7 +170,7 @@ export default function Settings() {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         setCodeSent(true);
         setCountdown(120);
@@ -199,7 +199,7 @@ export default function Settings() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
+
     setFormData({
       ...formData,
       [name]: value
@@ -212,7 +212,7 @@ export default function Settings() {
         hasNumber: /[0-9]/.test(value),
         hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(value)
       });
-      
+
       if (formData.confirmPassword) {
         setPasswordsMatch(value === formData.confirmPassword);
       }
@@ -251,7 +251,7 @@ export default function Settings() {
 
       const data = await response.json();
       setOperationLoading({ show: false, message: '' });
-      
+
       if (response.ok) {
         setOperationResult({
           show: true,
@@ -329,7 +329,7 @@ export default function Settings() {
 
       const data = await response.json();
       setOperationLoading({ show: false, message: '' });
-      
+
       if (response.ok) {
         setOperationResult({
           show: true,
@@ -494,12 +494,12 @@ export default function Settings() {
             {isEditing && (
               <div className="mt-4 sm:mt-6 flex justify-end gap-3">
                 <button
-                onClick={handleSaveProfile}
-                className="flex items-center gap-2 px-4 sm:px-6 py-2.5 text-white rounded-lg transition-all hover:shadow-md text-sm font-medium"
-                style={{ backgroundColor: '#1B5E20' }}
+                  onClick={handleSaveProfile}
+                  className="flex items-center gap-2 px-4 sm:px-6 py-2.5 text-white rounded-lg transition-all hover:shadow-md text-sm font-medium"
+                  style={{ backgroundColor: '#1B5E20' }}
                 >
                   <Save className="w-4 h-4" strokeWidth={1.5} />
-                Save Changes
+                  Save Changes
                 </button>
               </div>
             )}
@@ -508,7 +508,7 @@ export default function Settings() {
           {userData.role === 'student' && (
             <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
               <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6" style={{ color: '#212121' }}>Programming Language Preference</h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-3" style={{ color: '#212121' }}>
@@ -517,7 +517,7 @@ export default function Settings() {
                       Select Primary Language
                     </div>
                   </label>
-                  
+
                   <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <button
                       onClick={() => setSelectedLanguage('java')}
@@ -588,7 +588,7 @@ export default function Settings() {
                 </button>
               )}
             </div>
-            
+
             {showPasswordChange ? (
               <div className="space-y-4">
                 <div>
@@ -652,66 +652,58 @@ export default function Settings() {
                   {formData.newPassword && (
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                          passwordValidation.minLength ? 'bg-green-100' : 'bg-gray-100'
-                        }`}>
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${passwordValidation.minLength ? 'bg-green-100' : 'bg-gray-100'
+                          }`}>
                           {passwordValidation.minLength ? (
                             <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
                           ) : (
                             <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
                           )}
                         </div>
-                        <span className={`text-xs ${
-                          passwordValidation.minLength ? 'text-green-600' : 'text-gray-500'
-                        }`}>
+                        <span className={`text-xs ${passwordValidation.minLength ? 'text-green-600' : 'text-gray-500'
+                          }`}>
                           At least 6 characters
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                          passwordValidation.hasUpperCase ? 'bg-green-100' : 'bg-gray-100'
-                        }`}>
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${passwordValidation.hasUpperCase ? 'bg-green-100' : 'bg-gray-100'
+                          }`}>
                           {passwordValidation.hasUpperCase ? (
                             <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
                           ) : (
                             <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
                           )}
                         </div>
-                        <span className={`text-xs ${
-                          passwordValidation.hasUpperCase ? 'text-green-600' : 'text-gray-500'
-                        }`}>
+                        <span className={`text-xs ${passwordValidation.hasUpperCase ? 'text-green-600' : 'text-gray-500'
+                          }`}>
                           At least one uppercase letter
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                          passwordValidation.hasNumber ? 'bg-green-100' : 'bg-gray-100'
-                        }`}>
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${passwordValidation.hasNumber ? 'bg-green-100' : 'bg-gray-100'
+                          }`}>
                           {passwordValidation.hasNumber ? (
                             <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
                           ) : (
                             <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
                           )}
                         </div>
-                        <span className={`text-xs ${
-                          passwordValidation.hasNumber ? 'text-green-600' : 'text-gray-500'
-                        }`}>
+                        <span className={`text-xs ${passwordValidation.hasNumber ? 'text-green-600' : 'text-gray-500'
+                          }`}>
                           At least one number
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                          passwordValidation.hasSpecialChar ? 'bg-green-100' : 'bg-gray-100'
-                        }`}>
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center ${passwordValidation.hasSpecialChar ? 'bg-green-100' : 'bg-gray-100'
+                          }`}>
                           {passwordValidation.hasSpecialChar ? (
                             <CheckCircle className="w-3 h-3 text-green-600" strokeWidth={2} />
                           ) : (
                             <XCircle className="w-3 h-3 text-gray-400" strokeWidth={2} />
                           )}
                         </div>
-                        <span className={`text-xs ${
-                          passwordValidation.hasSpecialChar ? 'text-green-600' : 'text-gray-500'
-                        }`}>
+                        <span className={`text-xs ${passwordValidation.hasSpecialChar ? 'text-green-600' : 'text-gray-500'
+                          }`}>
                           At least one special character
                         </span>
                       </div>
@@ -790,7 +782,7 @@ export default function Settings() {
 
           <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
             <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6" style={{ color: '#212121' }}>Account Information</h2>
-            
+
             <div className="space-y-3 text-xs sm:text-sm">
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0 py-3 border-b border-gray-100">
                 <span style={{ color: '#757575' }}>User ID</span>

@@ -21,6 +21,7 @@ import ollamaTestRoutes from './routes/ollamaTest.js';
 import demoRoutes from './routes/demo.js';
 import progressRoutes from './routes/progress.js';
 import healthRoutes from './routes/health.js';
+import bugHuntRoutes from './routes/bugHunt.js';
 import { setupCompilerSocket } from './routes/compilerSocket.js';
 import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
 import { initializeCronJobs } from './services/cronService.js';
@@ -53,12 +54,13 @@ app.use('/api/ollama', ollamaTestRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/bug-hunt', bugHuntRoutes);
 
 setupCompilerSocket(io);
 setupPythonCompilerSocket(io);
 
 app.get('/api/health', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'Server is running',
     timestamp: new Date().toISOString(),
     database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
@@ -68,7 +70,7 @@ app.get('/api/health', (req, res) => {
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(500).json({ 
+  res.status(500).json({
     message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
@@ -80,14 +82,14 @@ httpServer.listen(PORT, async () => {
   console.log(`API Health: http://localhost:${PORT}/api/health`);
   console.log(`AI Status: http://localhost:${PORT}/api/health/ai-status`);
   console.log(`WebSocket server running`);
-  
+
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
     console.log('Created uploads directory');
   }
-  
+
   await connectDB();
-  
+
   initializeCronJobs();
 });
