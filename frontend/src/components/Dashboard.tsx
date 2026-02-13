@@ -10,6 +10,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { io, Socket } from 'socket.io-client';
 import Compiler from '../pages/Compiler';
 import Classrooms from '../pages/Classrooms';
 import MiniProjects from '../pages/MiniProjects';
@@ -99,6 +100,67 @@ export default function Dashboard() {
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [selectedProjectTitle, setSelectedProjectTitle] = useState<string | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+
+  // Initialize socket connection for real-time updates
+  useEffect(() => {
+    if (user?.role === 'student') {
+      const socket = io(`${import.meta.env.VITE_API_URL}/dashboard`, {
+        transports: ['websocket', 'polling']
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('Dashboard socket connected');
+        const token = localStorage.getItem('token');
+        if (token) {
+          socket.emit('authenticate', token);
+        }
+      });
+
+      socket.on('authenticated', () => {
+        console.log('Dashboard socket authenticated');
+      });
+
+      socket.on('mini-project-update', (data) => {
+        console.log('Mini project update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('assignment-update', (data) => {
+        console.log('Assignment update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('course-update', (data) => {
+        console.log('Course update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('activity-update', (data) => {
+        console.log('Activity update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('dashboard-update', (data) => {
+        console.log('Dashboard update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('error', (error) => {
+        console.error('Dashboard socket error:', error);
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Dashboard socket disconnected');
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user?.role === 'student') {
