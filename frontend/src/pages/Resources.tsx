@@ -836,9 +836,9 @@ export default function Resources({ onNavigate }: ResourcesProps) {
             </div>
 
             <div className="relative flex-1 overflow-y-auto py-2">
-              {/* Sliding Topic Pill */}
+              {/* Sliding Topic Pill - Desktop only */}
               <div 
-                className="absolute left-0 right-0 bg-[#E8F5E9] border-r-2 border-[#1B5E20] transition-all duration-300 ease-in-out z-0"
+                className="absolute left-0 right-0 bg-[#E8F5E9] border-r-2 border-[#1B5E20] transition-all duration-300 ease-in-out z-0 hidden lg:block"
                 style={{ 
                   top: pillStyle.top,
                   height: pillStyle.height,
@@ -865,7 +865,7 @@ export default function Resources({ onNavigate }: ResourcesProps) {
                         }}
                         className={`relative z-10 w-full text-left px-4 py-[7px] text-[13px] transition-colors
                           ${isActive
-                            ? 'text-[#1B5E20] font-semibold'
+                            ? 'text-[#1B5E20] font-semibold lg:bg-transparent lg:border-r-0 bg-[#E8F5E9] border-r-2 border-[#1B5E20]'
                             : 'text-[#424242] hover:bg-[#F5F5F5] hover:text-[#212121]'
                           }`}
                       >
