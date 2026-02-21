@@ -21,6 +21,7 @@ import Assignments from '../pages/Assignments';
 import CreateAssignment from '../pages/CreateAssignment';
 import CreatePost from '../pages/CreatePost';
 import Submissions from '../pages/Submissions';
+import Resources from '../pages/Resources';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import TeacherDashboardContent from './TeacherDashboardContent';
 
@@ -72,6 +73,12 @@ const navigationItems: NavItem[] = [
     icon: '/assets/sidebar/bughunt.png',
     label: 'Bug Hunt',
     href: '/bug-hunt',
+    roles: ['student']
+  },
+  {
+    icon: '/assets/sidebar/classroom.png', // Temporary fallback icon
+    label: 'Resources',
+    href: '/resources',
     roles: ['student']
   },
   {
@@ -358,6 +365,8 @@ export default function Dashboard() {
     } else {
       setActiveNav(href);
       setHasUnsavedChanges(false);
+      // Close sidebar on mobile after navigation
+      setSidebarOpen(false);
     }
   };
 
@@ -387,6 +396,12 @@ export default function Dashboard() {
     setPendingNavigation(null);
   };
 
+  const activeIndex = filteredNavigation.findIndex(item => {
+    if (activeNav === item.href) return true;
+    if (activeNav.startsWith(item.href) && item.href !== '/dashboard') return true;
+    return false;
+  });
+
   return (
     <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
       {/* Sidebar */}
@@ -411,9 +426,9 @@ export default function Dashboard() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+          <nav className="relative flex-1 px-3 py-3 space-y-1 overflow-y-auto">
             {filteredNavigation.map((item) => {
-              const isActive = activeNav === item.href;
+              const isActive = activeNav === item.href || (activeNav.startsWith(item.href) && item.href !== '/dashboard');
 
               return (
                 <button
@@ -421,10 +436,10 @@ export default function Dashboard() {
                   onClick={() => !isGameActive && handleNavigation(item.href)}
                   disabled={isGameActive}
                   className={`
-                    w-full flex items-center gap-3 px-3 py-[10px] rounded-lg transition-all
+                    relative z-10 w-full flex items-center gap-3 px-3 py-[10px] rounded-lg transition-all border
                     ${isActive
-                      ? 'bg-white border border-[#1B5E20] text-[#1B5E20]'
-                      : 'text-[#757575] hover:bg-[#F5F5F5]'
+                      ? 'text-[#1B5E20] lg:bg-transparent lg:border-transparent bg-white border-[#1B5E20]'
+                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent border-transparent'
                     }
                     ${isGameActive ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}
                   `}
@@ -438,6 +453,16 @@ export default function Dashboard() {
                 </button>
               );
             })}
+
+            {/* Sliding selection pill - Desktop only */}
+            <div 
+              className="absolute left-3 right-3 h-[46px] bg-white border border-[#1B5E20] rounded-lg transition-all duration-300 ease-in-out pointer-events-none hidden lg:block z-0"
+              style={{ 
+                transform: `translateY(${activeIndex * 50}px)`,
+                top: '10px',
+                opacity: activeIndex === -1 ? 0 : 1
+              }}
+            />
           </nav>
 
           {/* User Profile & Logout */}
@@ -491,7 +516,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <main className={`flex-1 overflow-auto ${activeNav === '/compiler' || activeNav === '/bug-hunt' ? '' : 'p-6'}`}>
+        <main className={`flex-1 overflow-auto ${activeNav === '/compiler' || activeNav === '/bug-hunt' || activeNav === '/resources' ? '' : 'p-6'}`}>
           {activeNav === '/compiler' ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
           ) : activeNav === '/classrooms' ? (
@@ -525,6 +550,8 @@ export default function Dashboard() {
             />
           ) : activeNav === '/settings' ? (
             <Settings />
+          ) : activeNav === '/resources' ? (
+            <Resources onNavigate={handleNavigation} />
           ) : activeNav === '/assignments' ? (
             <Assignments />
           ) : activeNav === '/submissions' ? (
@@ -599,7 +626,6 @@ function StudentDashboardContent({
   onMiniProjectsClick
 }: StudentDashboardContentProps) {
   const [projects, setProjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchMiniProjects();
@@ -647,8 +673,6 @@ function StudentDashboardContent({
       }
     } catch (error) {
       // Error fetching mini projects
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -874,42 +898,3 @@ function StatCard({ icon: Icon, value, label, progress, color, badge }: StatCard
   );
 }
 
-interface ProgressCardProps {
-  title: string;
-  current: number;
-  total: number;
-  color: 'green' | 'gray';
-}
-
-function ProgressCard({ title, current, total, color }: ProgressCardProps) {
-  const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
-  const colorClasses = {
-    green: { bar: 'bg-[#1B5E20]', text: 'text-[#1B5E20]' },
-    gray: { bar: 'bg-[#757575]', text: 'text-[#757575]' }
-  };
-
-  return (
-    <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[#212121]">{title}</h3>
-        <span className="text-[13px] font-semibold text-[#757575]">
-          {current}/{total}
-        </span>
-      </div>
-      <div className="space-y-2">
-        <div className="w-full h-1 bg-[#F5F5F5] rounded-full overflow-hidden">
-          <div
-            className={`h-full ${colorClasses[color].bar} rounded-full transition-all duration-300`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-        <div className="flex items-end gap-2">
-          <span className={`text-[20px] font-semibold ${colorClasses[color].text} leading-none`}>
-            {percentage}%
-          </span>
-          <span className="text-[12px] text-[#757575] pb-0.5">Complete</span>
-        </div>
-      </div>
-    </div>
-  );
-}
