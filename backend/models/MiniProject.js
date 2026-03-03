@@ -148,15 +148,15 @@ const miniProjectSchema = new mongoose.Schema({
 
 miniProjectSchema.index({ userId: 1 });
 
-miniProjectSchema.methods.enableGeneration = function() {
+miniProjectSchema.methods.enableGeneration = function () {
   this.generationEnabled = true;
   this.lastGenerationDate = new Date();
 };
 
-miniProjectSchema.methods.addWeeklyGeneratedProjects = function(projects, weekNumber, weekStartDate, weekEndDate) {
+miniProjectSchema.methods.addWeeklyGeneratedProjects = function (projects, weekNumber, weekStartDate, weekEndDate) {
   const javaProjects = [];
   const pythonProjects = [];
-  
+
   // Separate projects by language
   projects.forEach(project => {
     const projectData = {
@@ -171,21 +171,21 @@ miniProjectSchema.methods.addWeeklyGeneratedProjects = function(projects, weekNu
       weekNumber: weekNumber || this.currentWeekNumber + 1,
       createdAt: new Date()
     };
-    
+
     if (project.language.toLowerCase() === 'java') {
       javaProjects.push(projectData);
     } else if (project.language.toLowerCase() === 'python') {
       pythonProjects.push(projectData);
     }
   });
-  
+
   const targetWeekNumber = weekNumber || this.currentWeekNumber || 1;
-  
+
   // Check if week already exists
   const existingWeek = this.weeklyProjectHistory.find(
     week => week.weekNumber === targetWeekNumber
   );
-  
+
   if (existingWeek) {
     // Add to existing week
     console.log(`[Model] Adding projects to existing week ${targetWeekNumber}`);
@@ -206,38 +206,38 @@ miniProjectSchema.methods.addWeeklyGeneratedProjects = function(projects, weekNu
       pythonProjects: pythonProjects,
       generatedAt: new Date()
     };
-    
+
     this.weeklyProjectHistory.push(weekHistory);
     this.currentWeekNumber = targetWeekNumber;
   }
-  
+
   this.lastGenerationDate = new Date();
 };
 
-miniProjectSchema.methods.getCurrentWeekProjects = function(language) {
+miniProjectSchema.methods.getCurrentWeekProjects = function (language) {
   const currentWeek = this.weeklyProjectHistory.find(
     week => week.weekNumber === this.currentWeekNumber
   );
-  
+
   if (!currentWeek) return [];
-  
+
   if (language.toLowerCase() === 'java') {
     return currentWeek.javaProjects || [];
   } else if (language.toLowerCase() === 'python') {
     return currentWeek.pythonProjects || [];
   }
-  
+
   return [];
 };
 
-miniProjectSchema.methods.getProjectsByLanguage = function(language) {
+miniProjectSchema.methods.getProjectsByLanguage = function (language) {
   // Get projects from current week only
   const currentWeek = this.weeklyProjectHistory.find(
     week => week.weekNumber === this.currentWeekNumber
   );
-  
+
   if (!currentWeek) return [];
-  
+
   if (language.toLowerCase() === 'java') {
     return currentWeek.javaProjects || [];
   } else if (language.toLowerCase() === 'python') {
@@ -246,13 +246,13 @@ miniProjectSchema.methods.getProjectsByLanguage = function(language) {
   return [];
 };
 
-miniProjectSchema.methods.clearProjectsByLanguage = function(language) {
+miniProjectSchema.methods.clearProjectsByLanguage = function (language) {
   const currentWeek = this.weeklyProjectHistory.find(
     week => week.weekNumber === this.currentWeekNumber
   );
-  
+
   if (!currentWeek) return;
-  
+
   if (language.toLowerCase() === 'java') {
     currentWeek.javaProjects = [];
   } else if (language.toLowerCase() === 'python') {
@@ -260,13 +260,13 @@ miniProjectSchema.methods.clearProjectsByLanguage = function(language) {
   }
 };
 
-miniProjectSchema.methods.getProjectsByWeek = function(weekNumber, language) {
+miniProjectSchema.methods.getProjectsByWeek = function (weekNumber, language) {
   const history = this.weeklyProjectHistory.find(
     week => week.weekNumber === weekNumber
   );
-  
+
   if (!history) return [];
-  
+
   if (language) {
     if (language.toLowerCase() === 'java') {
       return history.javaProjects || [];
@@ -274,7 +274,7 @@ miniProjectSchema.methods.getProjectsByWeek = function(weekNumber, language) {
       return history.pythonProjects || [];
     }
   }
-  
+
   // Return all projects if no language specified
   return [...(history.javaProjects || []), ...(history.pythonProjects || [])];
 };

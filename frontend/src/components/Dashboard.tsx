@@ -1,34 +1,34 @@
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  GraduationCap,
-  LayoutDashboard,
+import {
   BookOpen,
   FileText,
   Code,
-  FolderKanban,
-  Settings as SettingsIcon,
-  LogOut,
   Trophy,
   TrendingUp,
   Clock,
   Calendar,
-  Sparkles,
-  CheckCircle
+  Sparkles
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { io, Socket } from 'socket.io-client';
 import Compiler from '../pages/Compiler';
 import Classrooms from '../pages/Classrooms';
 import MiniProjects from '../pages/MiniProjects';
+import MiniProjectDetails from '../pages/MiniProjectDetails';
+import BugHunt from '../pages/BugHunt';
 import Settings from '../pages/Settings';
 import Assignments from '../pages/Assignments';
 import CreateAssignment from '../pages/CreateAssignment';
 import CreatePost from '../pages/CreatePost';
 import Submissions from '../pages/Submissions';
+import Resources from '../pages/Resources';
+import ProgressTracking from '../pages/ProgressTracking';
+import StudentTracking from '../pages/teacher/StudentTracking';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import TeacherDashboardContent from './TeacherDashboardContent';
 
 interface NavItem {
-  icon: any;
+  icon: string; // Changed to string for image path
   label: string;
   href: string;
   roles: ('student' | 'teacher')[];
@@ -36,43 +36,61 @@ interface NavItem {
 
 const navigationItems: NavItem[] = [
   {
-    icon: LayoutDashboard,
+    icon: '/assets/sidebar/dashboard.png',
     label: 'Dashboard',
     href: '/dashboard',
     roles: ['student', 'teacher']
   },
   {
-    icon: BookOpen,
+    icon: '/assets/sidebar/classroom.png',
     label: 'My Classrooms',
     href: '/classrooms',
     roles: ['student', 'teacher']
   },
   {
-    icon: FileText,
+    icon: '/assets/sidebar/assignment.png',
     label: 'Assignments',
     href: '/assignments',
     roles: ['student']
   },
   {
-    icon: CheckCircle,
+    icon: '/assets/sidebar/assignment.png', // Using assignment icon as fallback for submissions
     label: 'Submissions',
     href: '/submissions',
     roles: ['teacher']
   },
   {
-    icon: Code,
+    icon: '/assets/sidebar/compiler.png',
     label: 'Compiler',
     href: '/compiler',
     roles: ['student']
   },
   {
-    icon: FolderKanban,
+    icon: '/assets/sidebar/miniprojects.png',
     label: 'Mini Projects',
     href: '/mini-projects',
     roles: ['student']
   },
   {
-    icon: SettingsIcon,
+    icon: '/assets/sidebar/bughunt.png',
+    label: 'Bug Hunt',
+    href: '/bug-hunt',
+    roles: ['student']
+  },
+  {
+    icon: '/assets/sidebar/classroom.png', // Temporary fallback icon
+    label: 'Resources',
+    href: '/resources',
+    roles: ['student']
+  },
+  {
+    icon: '/assets/sidebar/dashboard.png', // Using dashboard icon as placeholder for progress tracking
+    label: 'Progress Tracking',
+    href: '/progress-tracking',
+    roles: ['student', 'teacher']
+  },
+  {
+    icon: '/assets/sidebar/settings.png',
     label: 'Settings',
     href: '/settings',
     roles: ['student', 'teacher']
@@ -83,6 +101,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('/dashboard');
+  const [viewingStudent, setViewingStudent] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showNavigationWarning, setShowNavigationWarning] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
@@ -95,6 +114,69 @@ export default function Dashboard() {
   const [createPostClassroomId, setCreatePostClassroomId] = useState<string | null>(null);
   const [createPostClassroomName, setCreatePostClassroomName] = useState<string | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [selectedProjectTitle, setSelectedProjectTitle] = useState<string | null>(null);
+  const [isGameActive, setIsGameActive] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+
+  // Initialize socket connection for real-time updates
+  useEffect(() => {
+    if (user?.role === 'student') {
+      const socket = io(`${import.meta.env.VITE_API_URL}/dashboard`, {
+        transports: ['websocket', 'polling']
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('Dashboard socket connected');
+        const token = localStorage.getItem('token');
+        if (token) {
+          socket.emit('authenticate', token);
+        }
+      });
+
+      socket.on('authenticated', () => {
+        console.log('Dashboard socket authenticated');
+      });
+
+      socket.on('mini-project-update', (data) => {
+        console.log('Mini project update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('assignment-update', (data) => {
+        console.log('Assignment update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('course-update', (data) => {
+        console.log('Course update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('activity-update', (data) => {
+        console.log('Activity update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('dashboard-update', (data) => {
+        console.log('Dashboard update received:', data);
+        fetchDashboardStats();
+      });
+
+      socket.on('error', (error) => {
+        console.error('Dashboard socket error:', error);
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Dashboard socket disconnected');
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user?.role === 'student') {
@@ -130,10 +212,10 @@ export default function Dashboard() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const classroomsData = await classroomsResponse.json();
-      
+
       if (classroomsResponse.ok && classroomsData.classrooms) {
         const allActivities: any[] = [];
-        
+
         for (const classroom of classroomsData.classrooms) {
           try {
             const activitiesResponse = await fetch(
@@ -142,7 +224,7 @@ export default function Dashboard() {
                 headers: { 'Authorization': `Bearer ${token}` }
               }
             );
-            
+
             if (activitiesResponse.ok) {
               const activitiesData = await activitiesResponse.json();
               if (activitiesData.success && activitiesData.activities) {
@@ -158,7 +240,7 @@ export default function Dashboard() {
               }
             }
           } catch (err) {
-            console.error(`Error fetching activities for classroom ${classroom._id}:`, err);
+            // Error fetching activities for classroom
           }
         }
 
@@ -166,16 +248,16 @@ export default function Dashboard() {
         const upcomingActivities = allActivities
           .filter(activity => {
             if (!activity.dueDate) return false;
-            
+
             const hasSubmitted = activity.submissions?.some(
               (s: any) => s.student === user?.id || s.student?._id === user?.id
             );
             if (hasSubmitted) return false;
-            
+
             const dueDate = new Date(activity.dueDate);
             const diffTime = dueDate.getTime() - now.getTime();
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
+
             return diffDays >= 0 && diffDays <= 7;
           })
           .sort((a, b) => {
@@ -187,7 +269,7 @@ export default function Dashboard() {
             const dueDate = new Date(activity.dueDate);
             const diffTime = dueDate.getTime() - now.getTime();
             const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
+
             return {
               ...activity,
               daysUntilDue
@@ -200,9 +282,9 @@ export default function Dashboard() {
             (s: any) => s.student === user?.id || s.student?._id === user?.id
           );
           if (hasSubmitted) return false;
-          
+
           if (!activity.dueDate) return true;
-          
+
           const dueDate = new Date(activity.dueDate);
           return dueDate >= now || activity.allowLateSubmission;
         }).length;
@@ -223,7 +305,7 @@ export default function Dashboard() {
               (s: any) => s.student === user?.id || s.student?._id === user?.id
             );
             const submittedAt = submission?.submittedAt ? new Date(submission.submittedAt) : null;
-            
+
             return {
               title: `Submitted "${activity.title}"`,
               subtitle: activity.classroom?.name || '',
@@ -253,7 +335,7 @@ export default function Dashboard() {
         ]);
       }
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      // Error fetching dashboard stats
     }
   };
 
@@ -281,17 +363,38 @@ export default function Dashboard() {
     return null;
   }
 
-  const filteredNavigation = navigationItems.filter(item => 
+  const filteredNavigation = navigationItems.filter(item =>
     item.roles.includes(user.role)
   );
 
   const handleNavigation = (href: string) => {
+    // Clear viewing student data when navigating away from progress-tracking
+    if (activeNav === '/progress-tracking' && href !== '/progress-tracking') {
+      setViewingStudent(false);
+      // Call the clear function if it exists
+      if ((window as any).clearViewingStudent) {
+        (window as any).clearViewingStudent();
+      }
+    }
+    
     if (hasUnsavedChanges && activeNav === '/mini-projects') {
       setPendingNavigation(href);
       setShowNavigationWarning(true);
     } else {
+      // Don't reset viewingStudent when navigating to progress-tracking
+      if (href === '/progress-tracking' && activeNav !== '/progress-tracking') {
+        // Keep current viewingStudent state
+      } else if (href !== '/progress-tracking') {
+        setViewingStudent(false);
+        // Call the clear function if it exists
+        if ((window as any).clearViewingStudent) {
+          (window as any).clearViewingStudent();
+        }
+      }
       setActiveNav(href);
       setHasUnsavedChanges(false);
+      // Close sidebar on mobile after navigation
+      setSidebarOpen(false);
     }
   };
 
@@ -321,6 +424,12 @@ export default function Dashboard() {
     setPendingNavigation(null);
   };
 
+  const activeIndex = filteredNavigation.findIndex(item => {
+    if (activeNav === item.href) return true;
+    if (activeNav.startsWith(item.href) && item.href !== '/dashboard') return true;
+    return false;
+  });
+
   return (
     <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
       {/* Sidebar */}
@@ -331,38 +440,61 @@ export default function Dashboard() {
       `}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center px-4 h-16 border-b border-[#E0E0E0]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white border-2 border-[#1B5E20] rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-[#1B5E20]" />
+          <div className="flex items-center justify-center px-4 py-4 border-b border-[#E0E0E0]">
+            <div className="flex flex-col items-center gap-0 w-full">
+              <div className="w-[100px] h-[100px] bg-white rounded-lg flex items-center justify-center p-2">
+                <img
+                  src="/assets/badges/graduationhat.png"
+                  alt="SkillVerse Logo"
+                  className="w-full h-full object-contain"
+                />
               </div>
-              <span className="text-[15px] font-semibold text-[#212121]">SkillVerse</span>
+              <span className="text-xl font-bold text-[#212121]">SkillVerse</span>
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+          <nav className="relative flex-1 px-3 py-3 space-y-1 overflow-y-auto">
             {filteredNavigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeNav === item.href;
-              
+              const isActive = activeNav === item.href || (activeNav.startsWith(item.href) && item.href !== '/dashboard');
+
               return (
                 <button
                   key={item.href}
-                  onClick={() => handleNavigation(item.href)}
+                  onClick={() => !isGameActive && handleNavigation(item.href)}
+                  disabled={isGameActive}
                   className={`
-                    w-full flex items-center gap-3 px-3 py-[10px] rounded-lg transition-all
-                    ${isActive 
-                      ? 'bg-white border border-[#1B5E20] text-[#1B5E20]' 
-                      : 'text-[#757575] hover:bg-[#F5F5F5]'
+                    relative z-10 w-full flex items-center gap-3 px-3 py-[10px] rounded-lg transition-all border
+                    ${isActive
+                      ? 'text-[#1B5E20] lg:bg-transparent lg:border-transparent bg-white border-[#1B5E20]'
+                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent border-transparent'
                     }
+                    ${isGameActive ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}
                   `}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
+                  <img
+                    src={item.icon}
+                    alt={item.label}
+                    className="w-6 h-6 object-contain"
+                  />
+                  <span className="text-sm font-semibold flex-1 text-left">
+                    {item.label === 'Progress Tracking' && user?.role === 'teacher' 
+                      ? 'Student Tracking' 
+                      : item.label}
+                  </span>
                 </button>
               );
             })}
+
+            {/* Sliding selection pill - Desktop only */}
+            <div 
+              className="absolute left-3 right-3 h-[46px] bg-white border border-[#1B5E20] rounded-lg transition-all duration-300 ease-in-out pointer-events-none hidden lg:block z-0"
+              style={{ 
+                transform: `translateY(${activeIndex * 50}px)`,
+                top: '10px',
+                opacity: activeIndex === -1 ? 0 : 1
+              }}
+            />
           </nav>
 
           {/* User Profile & Logout */}
@@ -378,13 +510,17 @@ export default function Dashboard() {
                 <p className="text-[11px] text-[#757575] capitalize">{user.role}</p>
               </div>
             </div>
-            
+
             <button
               onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
+              className="w-full flex items-center justify-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
             >
-              <LogOut className="w-5 h-5" />
-              <span className="text-sm font-semibold text-center">Logout</span>
+              <img
+                src="/assets/badges/logout.png"
+                alt="Logout"
+                className="w-6 h-6 object-contain"
+              />
+              <span className="text-sm font-semibold">Logout</span>
             </button>
           </div>
         </div>
@@ -392,7 +528,7 @@ export default function Dashboard() {
 
       {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-30 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -412,21 +548,44 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <main className={`flex-1 overflow-auto ${activeNav === '/compiler' ? '' : 'p-6'}`}>
+        <main className={`flex-1 overflow-auto ${activeNav === '/compiler' || activeNav === '/bug-hunt' || activeNav === '/resources' ? '' : 'p-6'}`}>
           {activeNav === '/compiler' ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
           ) : activeNav === '/classrooms' ? (
-            <Classrooms 
+            <Classrooms
               selectedClassroomId={selectedClassroomId}
               onClearSelection={() => setSelectedClassroomId(null)}
             />
-          ) : activeNav === '/mini-projects' ? (
-            <MiniProjects 
+          ) : activeNav.startsWith('/mini-projects/') ? (
+            <MiniProjectDetails
               ref={miniProjectsRef}
               onHasUnsavedChanges={setHasUnsavedChanges}
+              projectTitle={selectedProjectTitle || ''}
+              onBack={() => {
+                setActiveNav('/mini-projects');
+                setSelectedProjectTitle(null);
+              }}
+            />
+          ) : activeNav === '/bug-hunt' ? (
+            <BugHunt
+              onMenuClick={() => !isGameActive && setSidebarOpen(true)}
+              onGameStatusChange={setIsGameActive}
+            />
+          ) : activeNav === '/mini-projects' ? (
+            <MiniProjects
+              ref={miniProjectsRef}
+              onHasUnsavedChanges={setHasUnsavedChanges}
+              onNavigateToDetails={(title: string) => {
+                setSelectedProjectTitle(title);
+                setActiveNav(`/mini-projects/${encodeURIComponent(title)}`);
+              }}
             />
           ) : activeNav === '/settings' ? (
             <Settings />
+          ) : activeNav === '/resources' ? (
+            <Resources onNavigate={handleNavigation} />
+          ) : activeNav === '/progress-tracking' ? (
+            user?.role === 'teacher' && !viewingStudent ? <StudentTracking onNavigate={handleNavigation} setViewingStudent={setViewingStudent} /> : <ProgressTracking />
           ) : activeNav === '/assignments' ? (
             <Assignments />
           ) : activeNav === '/submissions' ? (
@@ -434,8 +593,8 @@ export default function Dashboard() {
           ) : activeNav === '/create-assignment' ? (
             <CreateAssignment />
           ) : activeNav === '/create-post' ? (
-            <CreatePost 
-              classroomId={createPostClassroomId || ''} 
+            <CreatePost
+              classroomId={createPostClassroomId || ''}
               classroomName={createPostClassroomName || ''}
               onBack={() => setActiveNav('/dashboard')}
               onNavigateToClassrooms={() => {
@@ -448,8 +607,8 @@ export default function Dashboard() {
               }}
             />
           ) : user.role === 'teacher' ? (
-            <TeacherDashboardContent 
-              user={user} 
+            <TeacherDashboardContent
+              user={user}
               onNavigateToCreatePost={(classroomId: string, classroomName: string) => {
                 setCreatePostClassroomId(classroomId);
                 setCreatePostClassroomName(classroomName);
@@ -457,7 +616,7 @@ export default function Dashboard() {
               }}
             />
           ) : (
-            <StudentDashboardContent 
+            <StudentDashboardContent
               user={user}
               enrolledCoursesCount={enrolledCoursesCount}
               activeAssignmentsCount={activeAssignmentsCount}
@@ -501,7 +660,6 @@ function StudentDashboardContent({
   onMiniProjectsClick
 }: StudentDashboardContentProps) {
   const [projects, setProjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchMiniProjects();
@@ -544,14 +702,11 @@ function StudentDashboardContent({
           }
         } catch (err) {
           // If there's an error fetching completed tasks, just show all available projects
-          console.log('Could not fetch completed tasks, showing all projects');
           setProjects(data.availableProjects.slice(0, 4));
         }
       }
     } catch (error) {
-      console.error('Error fetching mini projects:', error);
-    } finally {
-      setLoading(false);
+      // Error fetching mini projects
     }
   };
 
@@ -625,10 +780,10 @@ function StudentDashboardContent({
                           </div>
                         )}
                       </div>
-                      <svg 
-                        className="w-5 h-5 text-[#757575] group-hover:text-[#1B5E20] transition-colors flex-shrink-0" 
-                        fill="none" 
-                        stroke="currentColor" 
+                      <svg
+                        className="w-5 h-5 text-[#757575] group-hover:text-[#1B5E20] transition-colors flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -673,7 +828,7 @@ function StudentDashboardContent({
               <Calendar className="w-5 h-5 text-[#FFB300]" />
               <h3 className="text-[15px] font-semibold text-[#212121]">Upcoming</h3>
             </div>
-            
+
             {upcomingAssignments.length === 0 ? (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-[#F5F5F5] rounded-full flex items-center justify-center mx-auto mb-4">
@@ -689,9 +844,9 @@ function StudentDashboardContent({
                     <p className="text-sm font-semibold text-[#212121] mb-1">{assignment.title}</p>
                     <p className="text-xs text-[#757575]">{assignment.classroom?.name}</p>
                     <p className="text-xs text-[#FFB300] font-semibold mt-1">
-                      {assignment.daysUntilDue === 0 ? 'Due today' : 
-                       assignment.daysUntilDue === 1 ? 'Due tomorrow' : 
-                       `Due in ${assignment.daysUntilDue} days`}
+                      {assignment.daysUntilDue === 0 ? 'Due today' :
+                        assignment.daysUntilDue === 1 ? 'Due tomorrow' :
+                          `Due in ${assignment.daysUntilDue} days`}
                     </p>
                   </div>
                 ))}
@@ -767,7 +922,7 @@ function StatCard({ icon: Icon, value, label, progress, color, badge }: StatCard
         <p className="text-[32px] font-semibold text-[#212121] leading-none">{value}</p>
         <p className="text-[13px] font-semibold text-[#757575]">{label}</p>
         <div className="w-full h-0.5 bg-[#F5F5F5] rounded-full overflow-hidden">
-          <div 
+          <div
             className={`h-full ${colorClasses[color]} rounded-full transition-all duration-300`}
             style={{ width: `${progress}%` }}
           />
@@ -777,42 +932,3 @@ function StatCard({ icon: Icon, value, label, progress, color, badge }: StatCard
   );
 }
 
-interface ProgressCardProps {
-  title: string;
-  current: number;
-  total: number;
-  color: 'green' | 'gray';
-}
-
-function ProgressCard({ title, current, total, color }: ProgressCardProps) {
-  const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
-  const colorClasses = {
-    green: { bar: 'bg-[#1B5E20]', text: 'text-[#1B5E20]' },
-    gray: { bar: 'bg-[#757575]', text: 'text-[#757575]' }
-  };
-
-  return (
-    <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[#212121]">{title}</h3>
-        <span className="text-[13px] font-semibold text-[#757575]">
-          {current}/{total}
-        </span>
-      </div>
-      <div className="space-y-2">
-        <div className="w-full h-1 bg-[#F5F5F5] rounded-full overflow-hidden">
-          <div 
-            className={`h-full ${colorClasses[color].bar} rounded-full transition-all duration-300`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-        <div className="flex items-end gap-2">
-          <span className={`text-[20px] font-semibold ${colorClasses[color].text} leading-none`}>
-            {percentage}%
-          </span>
-          <span className="text-[12px] text-[#757575] pb-0.5">Complete</span>
-        </div>
-      </div>
-    </div>
-  );
-}

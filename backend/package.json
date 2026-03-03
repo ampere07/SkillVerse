@@ -7,7 +7,10 @@
     "dev": "node --watch server.js",
     "test-ollama": "node testOllama.js",
     "test-integration": "node testIntegration.js",
-    "check-config": "node checkConfig.js"
+    "check-config": "node checkConfig.js",
+    "analyze-students": "node scripts/runAnalysis.js",
+    "cron-analyze": "node scripts/cronRunner.js",
+    "cron-standalone": "node scripts/studentProgressCronStandalone.js"
   },
   "dependencies": {
     "axios": "^1.13.2",
@@ -25,7 +28,7 @@
     "ollama": "^0.6.3",
     "pdfjs-dist": "^5.4.394",
     "react-pdf": "^10.2.0",
-    "socket.io": "^4.8.1",
+    "socket.io": "^4.8.3",
     "transformers": "^3.1.0"
   }
 }

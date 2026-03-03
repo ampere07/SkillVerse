@@ -1,7 +1,9 @@
 import express from 'express';
 import Assignment from '../models/Assignment.js';
 import Classroom from '../models/Classroom.js';
+import Progress from '../models/Progress.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
+import axios from 'axios';
 
 const router = express.Router();
 
@@ -426,6 +428,65 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), async (r
 
     await assignment.submitAssignment(req.user.userId, content, attachments);
 
+    // Update progress tracking
+    try {
+      const isOnTime = assignment.dueDate ? new Date() <= new Date(assignment.dueDate) : true;
+      
+      // Find or create progress record
+      let progress = await Progress.findOne({
+        student: req.user.userId,
+        classroom: assignment.classroom._id
+      });
+      
+      if (!progress) {
+        progress = new Progress({
+          student: req.user.userId,
+          classroom: assignment.classroom._id
+        });
+      }
+
+      // Update assignment progress
+      progress.activities.assignments.totalSubmitted++;
+      if (isOnTime) progress.activities.assignments.onTime++;
+      else progress.activities.assignments.late++;
+      progress.activities.assignments.lastSubmission = new Date();
+
+      // Update language-specific progress if assignment has language tag
+      if (assignment.language) {
+        progress.skills[assignment.language].exercisesCompleted++;
+        progress.skills[assignment.language].lastActivity = new Date();
+      }
+
+      // Update streaks
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (!progress.streaks.lastActiveDate || progress.streaks.lastActiveDate < today) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (progress.streaks.lastActiveDate && progress.streaks.lastActiveDate >= yesterday) {
+          progress.streaks.currentStreak++;
+        } else {
+          progress.streaks.currentStreak = 1;
+        }
+        
+        progress.streaks.lastActiveDate = today;
+        progress.streaks.totalActiveDays++;
+        
+        if (progress.streaks.currentStreak > progress.streaks.longestStreak) {
+          progress.streaks.longestStreak = progress.streaks.currentStreak;
+        }
+      }
+
+      // Recalculate job readiness
+      progress.jobReadiness = Progress.calculateJobReadiness(progress);
+      await progress.save();
+    } catch (progressError) {
+      console.error('Error updating progress:', progressError);
+      // Don't fail the submission if progress update fails
+    }
+
     console.log(`Assignment submitted: ${assignment.title} by ${req.user.email}`);
 
     res.json({
@@ -456,24 +517,63 @@ router.post('/:id/grade/:studentId', authenticateToken, authorizeRole('teacher')
       });
     }
 
-    // Check if teacher owns this assignment
+    // Verify teacher owns this assignment
     if (assignment.teacher.toString() !== req.user.userId) {
       return res.status(403).json({ 
         success: false,
-        message: 'You can only grade assignments in your own classrooms' 
+        message: 'Access denied' 
       });
     }
 
-    if (grade === undefined || grade < 0) {
-      return res.status(400).json({ 
+    const success = await assignment.gradeSubmission(req.params.studentId, grade, feedback);
+
+    if (!success) {
+      return res.status(404).json({ 
         success: false,
-        message: 'Valid grade is required' 
+        message: 'Submission not found' 
       });
     }
 
-    await assignment.gradeSubmission(req.params.studentId, grade, feedback);
+    // Update progress tracking with grade
+    try {
+      const progress = await Progress.findOne({
+        student: req.params.studentId,
+        classroom: assignment.classroom
+      });
+      
+      if (progress) {
+        // Update average score
+        const total = progress.activities.assignments.averageScore * (progress.activities.assignments.totalSubmitted - 1);
+        progress.activities.assignments.averageScore = (total + grade) / progress.activities.assignments.totalSubmitted;
+        
+        // Update language-specific score
+        if (assignment.language) {
+          const langTotal = progress.skills[assignment.language].averageScore * (progress.skills[assignment.language].exercisesCompleted - 1);
+          progress.skills[assignment.language].averageScore = (langTotal + grade) / progress.skills[assignment.language].exercisesCompleted;
+        }
+        
+        // Recalculate job readiness
+        progress.jobReadiness = Progress.calculateJobReadiness(progress);
+        await progress.save();
+      }
+      
+      // Award XP to student for graded assignment
+      const { awardXp } = await import('../services/xpService.js');
+      const xpResult = await awardXp(
+        req.params.studentId,
+        Math.round(grade * 5), // 5 XP per point, so max 500 XP for assignments
+        `Assignment grade: ${assignment.title}`,
+        'assignments'
+      );
+      
+      if (xpResult.awarded) {
+        console.log(`Awarded XP for assignment ${assignment.title} to student ${req.params.studentId}`);
+      }
+    } catch (progressError) {
+      console.error('Error updating progress after grading:', progressError);
+    }
 
-    console.log(`Assignment graded: ${assignment.title} - Student: ${req.params.studentId} by ${req.user.email}`);
+    console.log(`Assignment graded: ${assignment.title} - Student: ${req.params.studentId} - Grade: ${grade}`);
 
     res.json({
       success: true,

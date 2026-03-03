@@ -1,46 +1,35 @@
-import { Ollama } from 'ollama';
+import { generateWithRetry } from './ollamaService.js';
 import OLLAMA_CONFIG from '../config/ollamaConfig.js';
 
-const MODEL_NAME = OLLAMA_CONFIG.model;
-const OLLAMA_URL = OLLAMA_CONFIG.url;
-
-const ollama = new Ollama({ host: OLLAMA_URL });
-
-console.log(`Project Grading Service using Ollama`);
-console.log(`Model: ${MODEL_NAME}`);
-console.log(`URL: ${OLLAMA_URL}`);
+console.log(`Project Grading Service using centralized Ollama service`);
 
 export const gradeProject = async (projectDetails, submittedCode) => {
   try {
     console.log(`[Grading] Evaluating project: ${projectDetails.title}`);
     console.log(`[Grading] Code length: ${submittedCode.length} characters`);
     console.log(`[Grading] Language: ${projectDetails.language}`);
-    console.log(`[Grading] Model: ${MODEL_NAME}`);
-    
+    console.log(`[Grading] Model: ${OLLAMA_CONFIG.model}`);
+
     const prompt = constructGradingPrompt(projectDetails, submittedCode);
-    
+
     console.log('[Grading] Sending code analysis request to AI...');
-    
-    const response = await ollama.chat({
-      model: MODEL_NAME,
-      messages: [{ role: 'user', content: prompt }],
-      options: {
-        temperature: 0.3,
-        num_predict: 2000,
-        num_thread: 10
-      }
+
+    const response = await generateWithRetry(prompt, {
+      temperature: 0.3,
+      num_predict: 2000,
+      num_thread: 10
     });
 
     console.log('[Grading] AI analysis completed');
     const gradingText = response.message.content;
     console.log('[Grading] AI Response length:', gradingText.length);
     console.log('[Grading] AI Response preview:', gradingText.substring(0, 200) + '...');
-    
+
     const result = parseGradingResponse(gradingText);
 
     console.log(`[Grading] Final Score: ${result.score}/100`);
     console.log(`[Grading] Passed: ${result.passed}`);
-    
+
     return result;
   } catch (error) {
     console.error('[Grading] Error occurred:', error.message);
@@ -105,27 +94,27 @@ Analyze the code now:`;
 const parseGradingResponse = (text) => {
   try {
     console.log('[Grading] Parsing AI response...');
-    
+
     const scoreMatch = text.match(/Score:\s*(\d+)\/100/i) || text.match(/Grade:\s*(\d+)\/100/i);
     const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
     const passed = score >= 70;
-    
+
     console.log(`[Grading] Extracted score: ${score}`);
-    
+
     const feedbackMatch = text.match(/Feedback:([\s\S]*?)(?:$)/i);
     const feedback = feedbackMatch ? feedbackMatch[1].trim() : text;
-    
+
     const congratsMatch = feedback.match(/(Congratulations[^!.]*[!.])/i);
     const congratsMessage = congratsMatch ? congratsMatch[0].trim() : 'Congratulations on completing your project!';
-    
+
     const strengthsMatch = feedback.match(/What you did well:([\s\S]*?)(?=What needs improvement:|Status:|$)/i);
     const strengths = strengthsMatch ? strengthsMatch[1].trim() : 'You completed the project successfully.';
-    
+
     const improvementsMatch = feedback.match(/What needs improvement:([\s\S]*?)(?=Status:|$)/i);
     const improvements = improvementsMatch ? improvementsMatch[1].trim() : 'Continue practicing to improve your skills.';
-    
+
     const cleanFeedback = `${congratsMessage}\n\n${strengths}\n\n${improvements}\n\nGrade: ${score}/100 - ${passed ? 'You passed!' : 'Keep practicing!'}`;
-    
+
     return {
       score,
       passed,

@@ -76,6 +76,14 @@ export async function generateTokenFromCode(code) {
 export async function sendEmail(to, subject, htmlBody) {
   try {
     const client = getOAuth2Client();
+    
+    const tokenPath = join(__dirname, '../config/gmail-token.json');
+    if (!existsSync(tokenPath)) {
+      throw new Error(
+        'Gmail token not found. Run: node scripts/setupGmail.js'
+      );
+    }
+    
     const gmail = google.gmail({ version: 'v1', auth: client });
     
     const message = [

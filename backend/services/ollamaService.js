@@ -1,54 +1,129 @@
 import { Ollama } from 'ollama';
 import OLLAMA_CONFIG from '../config/ollamaConfig.js';
+import axios from 'axios';
 
 const MODEL_NAME = OLLAMA_CONFIG.model;
 const OLLAMA_URL = OLLAMA_CONFIG.url;
+const MAX_RETRIES = OLLAMA_CONFIG.maxRetries || 3;
+const TIMEOUT = OLLAMA_CONFIG.timeout || 180000;
 
-const ollama = new Ollama({ host: OLLAMA_URL });
+const isKaggleMode = OLLAMA_URL.includes('ngrok');
+
+let ollama;
+
+if (!isKaggleMode) {
+  ollama = new Ollama({ host: OLLAMA_URL });
+}
 
 console.log('Ollama Service Initialized');
+console.log('Mode:', isKaggleMode ? 'Kaggle (ngrok)' : 'Direct');
 console.log('Model:', MODEL_NAME);
 console.log('URL:', OLLAMA_URL);
+
+const generateWithKaggle = async (prompt, options = {}) => {
+  const requestData = {
+    prompt: prompt,
+    max_tokens: options.num_predict || 1000
+  };
+
+  const response = await axios.post(
+    `${OLLAMA_URL}/api/generate`,
+    requestData,
+    {
+      timeout: TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        'User-Agent': 'SkillVerse-Backend'
+      }
+    }
+  );
+
+  if (!response.data.success) {
+    throw new Error(response.data.error || 'Kaggle generation failed');
+  }
+
+  return {
+    message: {
+      content: response.data.response
+    }
+  };
+};
+
+export const generateWithRetry = async (prompt, options = {}) => {
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`AI Generation attempt ${attempt}/${MAX_RETRIES}`);
+      const startTime = Date.now();
+
+      let response;
+      if (isKaggleMode) {
+        response = await generateWithKaggle(prompt, options);
+      } else {
+        response = await ollama.chat({
+          model: MODEL_NAME,
+          messages: [{ role: 'user', content: prompt }],
+          options: options
+        });
+      }
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`Generation completed in ${duration} seconds`);
+
+      return response;
+
+    } catch (error) {
+      lastError = error;
+      console.error(`Attempt ${attempt} failed:`, error.message);
+
+      if (attempt < MAX_RETRIES) {
+        const delay = 2000 * attempt;
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw new Error(`AI generation failed after ${MAX_RETRIES} attempts: ${lastError.message}`);
+};
 
 export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => {
   try {
     console.log('[Survey] Starting AI analysis for student skills...');
     const startTime = Date.now();
-    
+
     const prompt = constructPrompt(surveyData, fullName);
-    
-    const response = await ollama.chat({
-      model: MODEL_NAME,
-      messages: [{ role: 'user', content: prompt }],
-      options: {
-        temperature: 0.7,
-        top_p: 0.95,
-        num_predict: 1000,
-        num_thread: 10
-      }
+
+    const response = await generateWithRetry(prompt, {
+      temperature: 0.7,
+      top_p: 0.95,
+      num_predict: 1000,
+      num_thread: 10
     });
-    
+
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     console.log(`[Survey] ✓ AI analysis completed in ${duration} seconds`);
 
     const analysis = response.message.content;
-    
+
     if (!analysis || analysis.trim().length === 0) {
-      throw new Error('Empty analysis received from Ollama');
+      throw new Error('Empty analysis received from AI');
     }
 
     console.log('[Survey] AI analysis completed successfully');
-    
+
     const roadmap = parseRoadmap(analysis);
-    
+
     return {
       success: true,
       analysis: analysis.trim(),
       roadmap: roadmap
     };
   } catch (error) {
-    console.error('Ollama API Error:', error.message);
+    console.error('AI Service Error:', error.message);
     console.error('Error stack:', error.stack);
     return {
       success: false,
@@ -65,32 +140,32 @@ const parseRoadmap = (analysisText) => {
     phase2: [],
     phase3: []
   };
-  
+
   const phase1Match = analysisText.match(/Phase 1[:\s-]*(.+?)(?=Phase 2|$)/is);
   const phase2Match = analysisText.match(/Phase 2[:\s-]*(.+?)(?=Phase 3|$)/is);
   const phase3Match = analysisText.match(/Phase 3[:\s-]*(.+?)(?=$)/is);
-  
+
   if (phase1Match) {
     const items = phase1Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
     if (items) roadmap.phase1 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
   }
-  
+
   if (phase2Match) {
     const items = phase2Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
     if (items) roadmap.phase2 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
   }
-  
+
   if (phase3Match) {
     const items = phase3Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
     if (items) roadmap.phase3 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
   }
-  
+
   return roadmap;
 };
 
 const constructPrompt = (surveyData, fullName = 'Student') => {
   const { primaryLanguage, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = surveyData;
-  
+
   const language = primaryLanguage;
   const currentLevel = primaryLanguage === 'java' ? (javaExpertise || 'not specified') : (pythonExpertise || 'not specified');
 
@@ -107,13 +182,13 @@ Self-Assessment Level: ${currentLevel}
 
   if (primaryLanguage === 'java' && javaQuestions?.score) {
     const score = javaQuestions.score;
-    
+
     if (score.easy >= 2) strengths.push('basic Java syntax and fundamentals');
     else weaknesses.push('basic Java syntax');
-    
+
     if (score.medium >= 2) strengths.push('intermediate concepts like collections and OOP');
     else weaknesses.push('object-oriented programming concepts');
-    
+
     if (score.hard >= 2) strengths.push('advanced Java features and algorithms');
     else weaknesses.push('advanced programming concepts');
 
@@ -126,13 +201,13 @@ Areas that need improvement: ${weaknesses.length > 0 ? weaknesses.join(', ') : '
 
   if (primaryLanguage === 'python' && pythonQuestions?.score) {
     const score = pythonQuestions.score;
-    
+
     if (score.easy >= 2) strengths.push('basic Python syntax and fundamentals');
     else weaknesses.push('basic Python syntax');
-    
+
     if (score.medium >= 2) strengths.push('intermediate concepts like data structures');
     else weaknesses.push('data structures and algorithms');
-    
+
     if (score.hard >= 2) strengths.push('advanced Python features');
     else weaknesses.push('advanced programming concepts');
 
@@ -159,40 +234,31 @@ Phase 1 - Foundation
 - [Concept 1 - something they know]
 - [Concept 2 - basic new skill]
 - [Concept 3 - basic new skill]
-- [Concept 4 - basic new skill]
-- [Concept 5 - basic new skill]
-- [Concept 6 - basic new skill]
 
 Phase 2 - Building Skills
-- [Concept 7 - intermediate skill]
-- [Concept 8 - intermediate skill]
-- [Concept 9 - intermediate skill]
-- [Concept 10 - intermediate skill]
-- [Concept 11 - intermediate skill]
-- [Concept 12 - intermediate skill]
+- [Concept 4 - intermediate skill]
+- [Concept 5 - intermediate skill]
+- [Concept 6 - intermediate skill]
 
 Phase 3 - Advanced Practice
-- [Concept 13 - advanced skill]
-- [Concept 14 - advanced skill]
-- [Concept 15 - advanced skill]
-- [Concept 16 - advanced skill]
-- [Concept 17 - advanced skill]
-- [Concept 18 - advanced skill]
+- [Concept 7 - advanced skill]
+- [Concept 8 - advanced skill]
+- [Concept 9 - advanced skill]
 
 CRITICAL REQUIREMENTS FOR ROADMAP:
 
-1. PHASE 1 must include EXACTLY 6 concepts:
+1. PHASE 1 must include EXACTLY 3 concepts:
    - First concept: Something they already know (from strengths) to build confidence
-   - Next 5 concepts: Foundation concepts they need to master
+   - Next 2 concepts: Foundation concepts they need to master
    - All should be basic/fundamental concepts
    - Examples: variables, data types, loops, conditionals, arrays, functions
 
-2. PHASE 2 must include EXACTLY 6 concepts:
+2. PHASE 2 must include EXACTLY 3 concepts:
    - All should be intermediate concepts addressing their weaknesses
    - Build directly on Phase 1 concepts
    - Examples: OOP basics, classes and objects, inheritance, collections, exception handling, file I/O
 
-3. PHASE 3 must include EXACTLY 6 concepts:
+3. PHASE 3 must include EXACTLY 3 concepts:
    - All should be advanced concepts that combine previous learning
    - Prepare them for real-world applications
    - Examples: design patterns, algorithms, data structures, API integration, testing, project architecture
@@ -225,25 +291,16 @@ Phase 1 - Foundation
 - ${strengths.length > 0 ? strengths[0] : 'Basic syntax and variables'} (practice what you know)
 - ${weaknesses.length > 0 ? weaknesses[0] : 'Understanding conditional statements'} (new skill)
 - Working with loops and iteration (new skill)
-- Understanding data types and type conversion (new skill)
-- Creating and using functions (new skill)
-- Working with arrays and lists (new skill)
 
 Phase 2 - Building Skills
 - ${weaknesses.length > 1 ? weaknesses[1] : 'Object-oriented programming basics'} (intermediate)
 - Working with collections and data structures (intermediate)
 - Understanding inheritance and polymorphism (intermediate)
-- Exception handling and error management (intermediate)
-- File input and output operations (intermediate)
-- Working with interfaces and abstract classes (intermediate)
 
 Phase 3 - Advanced Practice
 - ${weaknesses.length > 2 ? weaknesses[2] : 'Algorithm design and problem solving'} (advanced)
 - Implementing common data structures (advanced)
 - Understanding design patterns (advanced)
-- Building complete applications with multiple components (advanced)
-- Code optimization and performance tuning (advanced)
-- Testing and debugging strategies (advanced)
 
 WRITING STYLE:
 - Write like talking to a friend, not a textbook
@@ -273,12 +330,81 @@ Now create the analysis and roadmap for this ${currentLevel} level ${language} s
   return prompt;
 };
 
+export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
+  const language = primaryLanguage.toLowerCase();
+
+  if (language === 'java') {
+    return {
+      phase1: [
+        'Variables and data types',
+        'Conditional statements (if/else)',
+        'Loops and iteration'
+      ],
+      phase2: [
+        'Object-oriented programming basics',
+        'Classes and objects',
+        'Inheritance and polymorphism'
+      ],
+      phase3: [
+        'Abstract classes and interfaces',
+        'Generic types and methods',
+        'Lambda expressions and streams'
+      ]
+    };
+  } else if (language === 'python') {
+    return {
+      phase1: [
+        'Variables and data types',
+        'Conditional statements (if/elif/else)',
+        'Loops (for/while)'
+      ],
+      phase2: [
+        'Dictionaries and sets',
+        'List comprehensions',
+        'File handling'
+      ],
+      phase3: [
+        'Decorators and generators',
+        'Working with APIs',
+        'Data processing with pandas'
+      ]
+    };
+  }
+
+  return {
+    phase1: ['Basic syntax', 'Variables', 'Conditionals'],
+    phase2: ['OOP basics', 'Classes', 'Inheritance'],
+    phase3: ['Advanced OOP', 'Algorithms', 'Design patterns']
+  };
+};
+
 export const checkOllamaConnection = async () => {
   try {
-    await ollama.list();
-    return { connected: true, model: MODEL_NAME };
+    if (isKaggleMode) {
+      const response = await axios.get(`${OLLAMA_URL}/health`, { timeout: 5000 });
+      return {
+        connected: true,
+        model: MODEL_NAME,
+        mode: 'Kaggle',
+        status: response.data.status
+      };
+    } else {
+      await ollama.list();
+      return {
+        connected: true,
+        model: MODEL_NAME,
+        mode: 'Direct'
+      };
+    }
   } catch (error) {
-    console.error('Ollama connection failed:', error.message);
-    return { connected: false, error: error.message };
+    console.error('AI connection failed:', error.message);
+    return {
+      connected: false,
+      error: error.message,
+      mode: isKaggleMode ? 'Kaggle' : 'Direct'
+    };
   }
 };
+
+// Export Ollama config for other services
+export { MODEL_NAME, OLLAMA_URL, isKaggleMode };
