@@ -165,12 +165,17 @@ router.post('/backfill-xp', authenticateToken, async (req, res) => {
 // Get student's overall progress (not tied to specific classroom)
 router.get('/student/overall', authenticateToken, async (req, res) => {
   try {
-    const studentId = req.user.userId;
+    let studentId = req.user.userId;
     const userRole = req.user.role;
+    
+    // If teacher is requesting, allow passing a studentId parameter
+    if (userRole === 'teacher' && req.query.studentId) {
+      studentId = req.query.studentId;
+    }
 
     // Allow both students and teachers to access this route
     // Students can only view their own progress
-    // Teachers can view their own progress (if they want to see their learning stats)
+    // Teachers can view their own progress or their students' progress
     
     // Import MiniProject model to read real mini-project data
     const MiniProject = (await import('../models/MiniProject.js')).default;

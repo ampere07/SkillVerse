@@ -146,26 +146,67 @@ export default function ProgressTracking() {
   const { user, loading: authLoading } = useAuth();
   const [progressData, setProgressData] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'skills' | 'activities' | 'skills-assessment'>('overview');
+  
+  // Check if viewing another student's progress from sessionStorage
+  const isViewingStudent = sessionStorage.getItem('viewingStudent') === 'true';
+  const viewingStudentId = sessionStorage.getItem('studentId');
+  const viewingStudentName = sessionStorage.getItem('studentName');
   
   // Instructor-only states
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [instructorData] = useState<any>(null);
 
+  console.log('ProgressTracking mounted');
+  console.log('isViewingStudent:', isViewingStudent);
+  console.log('viewingStudentId:', viewingStudentId);
+  console.log('viewingStudentName:', viewingStudentName);
+  console.log('user role:', user?.role);
+  console.log('progressData:', progressData);
+  console.log('loading:', loading);
+  console.log('error:', error);
+  
   useEffect(() => {
     if (authLoading) return;
-    if (user?.role === 'student') {
+    console.log('useEffect triggered, authLoading:', authLoading);
+    if (isViewingStudent && viewingStudentId) {
+      console.log('Fetching student progress for ID:', viewingStudentId);
+      setLoading(true);
+      fetchStudentProgress(viewingStudentId);
+    } else if (user?.role === 'student') {
+      console.log('Fetching own progress as student');
       setLoading(true);
       fetchStudentProgress();
     } else if (user?.role === 'teacher') {
+      console.log('Fetching teacher classrooms');
       setLoading(true);
       fetchTeacherClassrooms();
     }
-  }, [user?.role, authLoading]);
+  }, [user?.role, authLoading, isViewingStudent, viewingStudentId]);
 
-  const fetchStudentProgress = async () => {
+  // Clear sessionStorage only when explicitly leaving student view
+  const clearViewingStudent = () => {
+    if (isViewingStudent) {
+      sessionStorage.removeItem('viewingStudent');
+      sessionStorage.removeItem('studentId');
+      sessionStorage.removeItem('studentName');
+    }
+  };
+
+  // Expose clear function to parent component
+  useEffect(() => {
+    // Store clear function in window for parent to call
+    (window as any).clearViewingStudent = clearViewingStudent;
+    return () => {
+      delete (window as any).clearViewingStudent;
+    };
+  }, [isViewingStudent]);
+
+  const fetchStudentProgress = async (studentId?: string) => {
     try {
+      console.log('fetchStudentProgress called with studentId:', studentId);
       const token = localStorage.getItem('token');
       
       console.log('Fetching progress with token:', token ? 'Token exists' : 'No token');
@@ -179,51 +220,63 @@ export default function ProgressTracking() {
       ).catch(() => {}); // silent - non-blocking
 
       // Fetch overall progress, not classroom-specific
+      const url = studentId 
+        ? `${import.meta.env.VITE_API_URL}/progress/student/overall?studentId=${studentId}`
+        : `${import.meta.env.VITE_API_URL}/progress/student/overall`;
+      
+      console.log('Making request to:', url);
+      
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/progress/student/overall`,
+        url,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      console.log('Response received:', response.data);
+
       if (response.data.success) {
-        setProgressData(response.data.progress);
+        console.log('Setting progress data...');
+        setProgressData(response.data.progress || response.data);
+        console.log('Progress data set successfully');
         
         // Only generate AI insights/recommendations for students
         if (user?.role === 'student') {
           // If no AI insights exist, generate them
-          if (!response.data.progress.aiInsights) {
-            await generateAIInsights(response.data.progress._id);
+          if (!response.data.progress?.aiInsights && !response.data.aiInsights) {
+            await generateAIInsights();
           }
           
           // If no AI recommendations exist, generate them
-          if (!response.data.progress.aiRecommendations) {
-            await generateAIRecommendations(response.data.progress._id);
+          if (!response.data.progress?.aiRecommendations && !response.data.aiRecommendations) {
+            await generateAIRecommendations();
           }
         }
       }
     } catch (error) {
       console.error('Error fetching progress data:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
       
-      // If teacher has no progress data, show a message
-      if (error.response?.status === 403) {
-        console.log('Access denied - might be trying to access student-only route');
-        // Try to decode token to see what's inside
-        try {
-          const token = localStorage.getItem('token');
-          if (token) {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            console.log('Token payload:', payload);
-          }
-        } catch (e) {
-          console.error('Failed to decode token:', e);
+      // Type guard for axios error
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any;
+        console.error('Error response:', axiosError.response?.data);
+        console.error('Error status:', axiosError.response?.status);
+        
+        // If teacher has no progress data, show a message
+        if (axiosError.response?.status === 403) {
+          setError('You do not have any progress data to view. Start learning to see your progress!');
+        } else if (axiosError.response?.status === 404) {
+          setError('No progress data found for this student.');
+        } else {
+          setError('Failed to load progress data. Please try again.');
         }
+      } else {
+        console.error('Unexpected error:', error);
+        setError('An unexpected error occurred. Please try again.');
       }
     }
     setLoading(false);
   };
 
-  const generateAIInsights = async (progressId: string) => {
+  const generateAIInsights = async () => {
     try {
       const token = localStorage.getItem('token');
       const classroomId = progressData?.classroom?._id || selectedClassroom;
@@ -238,19 +291,21 @@ export default function ProgressTracking() {
       
       // Refetch progress to get AI insights
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/progress/student/overall`,
+        viewingStudentId 
+          ? `${import.meta.env.VITE_API_URL}/progress/student/overall?studentId=${viewingStudentId}`
+          : `${import.meta.env.VITE_API_URL}/progress/student/overall`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
       if (response.data.success) {
-        setProgressData(response.data.progress);
+        setProgressData(response.data.progress || response.data);
       }
     } catch (error) {
       console.error('Error generating AI insights:', error);
     }
   };
 
-  const generateAIRecommendations = async (progressId: string) => {
+  const generateAIRecommendations = async () => {
     try {
       const token = localStorage.getItem('token');
       const classroomId = progressData?.classroom?._id || selectedClassroom;
@@ -265,12 +320,14 @@ export default function ProgressTracking() {
       
       // Refetch progress to get AI recommendations
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/progress/student/overall`,
+        viewingStudentId 
+          ? `${import.meta.env.VITE_API_URL}/progress/student/overall?studentId=${viewingStudentId}`
+          : `${import.meta.env.VITE_API_URL}/progress/student/overall`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
       if (response.data.success) {
-        setProgressData(response.data.progress);
+        setProgressData(response.data.progress || response.data);
       }
     } catch (error) {
       console.error('Error generating AI recommendations:', error);
@@ -282,7 +339,7 @@ export default function ProgressTracking() {
     
     try {
       setLoading(true);
-      await generateAIInsights(progressData._id);
+      await generateAIInsights();
     } finally {
       setLoading(false);
     }
@@ -293,7 +350,7 @@ export default function ProgressTracking() {
     
     try {
       setLoading(true);
-      await generateAIRecommendations(progressData._id);
+      await generateAIRecommendations();
     } finally {
       setLoading(false);
     }
@@ -335,8 +392,8 @@ export default function ProgressTracking() {
     );
   }
 
-  // Instructor View
-  if (user?.role === 'teacher') {
+  // Instructor View - Show when teacher is NOT viewing a student
+  if (user?.role === 'teacher' && !isViewingStudent) {
     return (
       <InstructorView
         classrooms={classrooms}
@@ -363,8 +420,15 @@ export default function ProgressTracking() {
     <>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-[28px] font-semibold text-[#212121]">Progress Tracking</h1>
-        <p className="text-[15px] text-[#757575]">Monitor your learning journey and job readiness</p>
+        <h1 className="text-[28px] font-semibold text-[#212121]">
+          {isViewingStudent ? `${viewingStudentName}'s Progress` : 'Progress Tracking'}
+        </h1>
+        <p className="text-[15px] text-[#757575]">
+          {isViewingStudent 
+            ? `Monitoring ${viewingStudentName}'s learning journey and job readiness` 
+            : 'Monitor your learning journey and job readiness'
+          }
+        </p>
       </div>
 
       {/* 2-Column Layout */}

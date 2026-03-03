@@ -23,6 +23,7 @@ import CreatePost from '../pages/CreatePost';
 import Submissions from '../pages/Submissions';
 import Resources from '../pages/Resources';
 import ProgressTracking from '../pages/ProgressTracking';
+import StudentTracking from '../pages/teacher/StudentTracking';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import TeacherDashboardContent from './TeacherDashboardContent';
 
@@ -100,6 +101,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('/dashboard');
+  const [viewingStudent, setViewingStudent] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showNavigationWarning, setShowNavigationWarning] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
@@ -366,10 +368,29 @@ export default function Dashboard() {
   );
 
   const handleNavigation = (href: string) => {
+    // Clear viewing student data when navigating away from progress-tracking
+    if (activeNav === '/progress-tracking' && href !== '/progress-tracking') {
+      setViewingStudent(false);
+      // Call the clear function if it exists
+      if ((window as any).clearViewingStudent) {
+        (window as any).clearViewingStudent();
+      }
+    }
+    
     if (hasUnsavedChanges && activeNav === '/mini-projects') {
       setPendingNavigation(href);
       setShowNavigationWarning(true);
     } else {
+      // Don't reset viewingStudent when navigating to progress-tracking
+      if (href === '/progress-tracking' && activeNav !== '/progress-tracking') {
+        // Keep current viewingStudent state
+      } else if (href !== '/progress-tracking') {
+        setViewingStudent(false);
+        // Call the clear function if it exists
+        if ((window as any).clearViewingStudent) {
+          (window as any).clearViewingStudent();
+        }
+      }
       setActiveNav(href);
       setHasUnsavedChanges(false);
       // Close sidebar on mobile after navigation
@@ -456,7 +477,11 @@ export default function Dashboard() {
                     alt={item.label}
                     className="w-6 h-6 object-contain"
                   />
-                  <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
+                  <span className="text-sm font-semibold flex-1 text-left">
+                    {item.label === 'Progress Tracking' && user?.role === 'teacher' 
+                      ? 'Student Tracking' 
+                      : item.label}
+                  </span>
                 </button>
               );
             })}
@@ -560,7 +585,7 @@ export default function Dashboard() {
           ) : activeNav === '/resources' ? (
             <Resources onNavigate={handleNavigation} />
           ) : activeNav === '/progress-tracking' ? (
-            <ProgressTracking />
+            user?.role === 'teacher' && !viewingStudent ? <StudentTracking onNavigate={handleNavigation} setViewingStudent={setViewingStudent} /> : <ProgressTracking />
           ) : activeNav === '/assignments' ? (
             <Assignments />
           ) : activeNav === '/submissions' ? (

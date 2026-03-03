@@ -57,6 +57,10 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/bug-hunt', bugHuntRoutes);
 
+// Import and use classroom students routes
+import classroomStudentsRoutes from './routes/classroomStudents.js';
+app.use('/api/progress', classroomStudentsRoutes);
+
 setupCompilerSocket(io);
 setupPythonCompilerSocket(io);
 setupDashboardSocket(io);

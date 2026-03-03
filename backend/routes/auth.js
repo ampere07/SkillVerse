@@ -787,4 +787,40 @@ router.put('/update-language', authenticateToken, async (req, res) => {
   }
 });
 
+// Get user by ID
+router.get('/users/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id).select('name email profilePicture level xp role');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profilePicture: user.profilePicture,
+        level: user.level,
+        xp: user.xp,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+});
+
 export default router;
