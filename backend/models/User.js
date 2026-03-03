@@ -22,9 +22,20 @@ const userSchema = new mongoose.Schema({
     },
     required: [true, 'Role is required']
   },
-  name: {
+  firstName: {
     type: String,
-    required: [true, 'Name is required'],
+    required: [true, 'First name is required'],
+    trim: true
+  },
+  middleInitial: {
+    type: String,
+    trim: true,
+    maxlength: 1,
+    uppercase: true
+  },
+  lastName: {
+    type: String,
+    required: [true, 'Last name is required'],
     trim: true
   },
   onboardingSurvey: {

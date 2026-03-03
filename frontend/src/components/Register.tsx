@@ -32,7 +32,9 @@ const passwordRequirements: PasswordRequirement[] = [
 ];
 
 export default function Register({ onToggle }: RegisterProps) {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [middleInitial, setMiddleInitial] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -119,8 +121,10 @@ export default function Register({ onToggle }: RegisterProps) {
 
     setLoading(true);
 
+    const fullName = `${firstName}${middleInitial ? ' ' + middleInitial + '.' : ''} ${lastName}`.trim();
+
     try {
-      await register(email, password, name, role, verificationCode);
+      await register(email, password, fullName, role, verificationCode);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
@@ -129,8 +133,9 @@ export default function Register({ onToggle }: RegisterProps) {
   };
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="fixed inset-0 bg-white overflow-y-auto">
+      <div className="min-h-full py-8 px-4">
+      <div className="w-full max-w-sm mx-auto">
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 mb-4">
             <UserPlus className="w-6 h-6 text-white" />
@@ -147,20 +152,44 @@ export default function Register({ onToggle }: RegisterProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="name" className="block text-xs font-medium text-slate-700">
-              Full name
+            <label className="block text-xs font-medium text-slate-700">
+              Name
             </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                placeholder="John Doe"
-              />
+            <div className="grid grid-cols-12 gap-2">
+              <div className="col-span-5 relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  id="firstName"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
+                  placeholder="First"
+                />
+              </div>
+              <div className="col-span-2">
+                <input
+                  id="middleInitial"
+                  type="text"
+                  value={middleInitial}
+                  onChange={(e) => setMiddleInitial(e.target.value.toUpperCase())}
+                  maxLength={1}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all text-center"
+                  placeholder="M.I."
+                />
+              </div>
+              <div className="col-span-5">
+                <input
+                  id="lastName"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
+                  placeholder="Last"
+                />
+              </div>
             </div>
           </div>
 
@@ -369,6 +398,7 @@ export default function Register({ onToggle }: RegisterProps) {
             </button>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

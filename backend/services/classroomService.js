@@ -3,7 +3,7 @@ import Classroom from '../models/Classroom.js';
 export const classroomService = {
   async getAllActiveClassrooms() {
     return await Classroom.find({ isActive: true })
-      .populate('teacher', 'name email')
+      .populate('teacher', 'firstName middleInitial lastName email')
       .lean()
       .sort({ createdAt: -1 });
   },
@@ -13,8 +13,8 @@ export const classroomService = {
       teacher: teacherId,
       isActive: true 
     })
-    .populate('teacher', 'name email')
-    .populate('students.studentId', 'name email')
+    .populate('teacher', 'firstName middleInitial lastName email')
+    .populate('students.studentId', 'firstName middleInitial lastName email')
     .sort({ createdAt: -1 });
   },
 
@@ -23,7 +23,7 @@ export const classroomService = {
       'students.studentId': studentId,
       isActive: true 
     })
-    .populate('teacher', 'name email')
+    .populate('teacher', 'firstName middleInitial lastName email')
     .sort({ createdAt: -1 });
 
     console.log('Student classrooms:', classrooms.length);
@@ -36,8 +36,8 @@ export const classroomService = {
 
   async getClassroomById(classroomId) {
     return await Classroom.findById(classroomId)
-      .populate('teacher', 'name email')
-      .populate('students.studentId', 'name email');
+      .populate('teacher', 'firstName middleInitial lastName email')
+      .populate('students.studentId', 'firstName middleInitial lastName email');
   },
 
   async createClassroom(data) {
@@ -58,7 +58,7 @@ export const classroomService = {
     });
 
     await classroom.save();
-    await classroom.populate('teacher', 'name email');
+    await classroom.populate('teacher', 'firstName middleInitial lastName email');
     return classroom;
   },
 
@@ -108,8 +108,8 @@ export const classroomService = {
     const savedClassroom = await Classroom.findById(classroomId);
     console.log('Verified saved yearLevelSection:', savedClassroom.yearLevelSection);
     
-    await classroom.populate('teacher', 'name email');
-    await classroom.populate('students.studentId', 'name email');
+    await classroom.populate('teacher', 'firstName middleInitial lastName email');
+    await classroom.populate('students.studentId', 'firstName middleInitial lastName email');
     
     console.log('Returning updated classroom:', {
       name: classroom.name,
@@ -146,7 +146,7 @@ export const classroomService = {
     }
 
     await classroom.addStudent(studentId);
-    await classroom.populate('teacher', 'name email');
+    await classroom.populate('teacher', 'firstName middleInitial lastName email');
     return classroom;
   },
 
