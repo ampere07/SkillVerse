@@ -1,0 +1,44 @@
+# Crontab configuration for Student Progress Analyzer
+# 
+# Format: Minute Hour DayOfMonth Month DayOfWeek Command
+#
+# Examples:
+
+# Run every day at midnight (00:00)
+# 0 0 * * * cd /path/to/SkillVerse/backend && node scripts/cronRunner.js
+
+# Run every 6 hours
+# 0 */6 * * * cd /path/to/SkillVerse/backend && node scripts/cronRunner.js
+
+# Run every Monday at 2 AM
+# 0 2 * * 1 cd /path/to/SkillVerse/backend && node scripts/cronRunner.js
+
+# Run every weekday at 11:59 PM (before daily reset)
+# 59 23 * * 1-5 cd /path/to/SkillVerse/backend && node scripts/cronRunner.js
+
+# --- Recommended Configuration ---
+# Run every day at 11:30 PM (30 minutes before midnight)
+30 23 * * * cd /path/to/SkillVerse/backend && node scripts/cronRunner.js >> /var/log/skillverse/cron.log 2>&1
+
+# --- With Logging ---
+# To log output to a file:
+# 30 23 * * * cd /path/to/SkillVerse/backend && node scripts/cronRunner.js >> /var/log/skillverse/progress-analysis.log 2>&1
+
+# --- With Email Notifications ---
+# To receive email on errors:
+# 30 23 * * * cd /path/to/SkillVerse/backend && node scripts/cronRunner.js 2>&1 | mail -s "SkillVerse Progress Analysis" admin@example.com
+
+# --- Environment Variables ---
+# The cronRunner.js automatically loads .env file from multiple locations:
+# 1. backend/.env
+# 2. SkillVerse/.env
+# 3. Current working directory/.env
+#
+# If using custom .env location, set ENV_FILE variable:
+# ENV_FILE=/custom/path/.env
+# 30 23 * * * cd /path/to/SkillVerse/backend && node scripts/cronRunner.js
+
+# --- Testing ---
+# To test before scheduling:
+# cd /path/to/SkillVerse/backend
+# node scripts/cronRunner.js

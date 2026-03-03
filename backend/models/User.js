@@ -79,6 +79,16 @@ const userSchema = new mongoose.Schema({
   badges: [{
     type: String
   }],
+  // Daily XP tracking to prevent abuse
+  dailyXp: {
+    type: Map,
+    of: {
+      codeExecutions: { type: Number, default: 0 },
+      assignments: { type: Number, default: 0 },
+      projects: { type: Number, default: 0 }
+    },
+    default: new Map()
+  },
   // Demo/Presentation fields (separate from real progress)
   demoXP: {
     type: Number,

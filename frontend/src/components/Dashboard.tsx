@@ -22,6 +22,7 @@ import CreateAssignment from '../pages/CreateAssignment';
 import CreatePost from '../pages/CreatePost';
 import Submissions from '../pages/Submissions';
 import Resources from '../pages/Resources';
+import ProgressTracking from '../pages/ProgressTracking';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import TeacherDashboardContent from './TeacherDashboardContent';
 
@@ -80,6 +81,12 @@ const navigationItems: NavItem[] = [
     label: 'Resources',
     href: '/resources',
     roles: ['student']
+  },
+  {
+    icon: '/assets/sidebar/dashboard.png', // Using dashboard icon as placeholder for progress tracking
+    label: 'Progress Tracking',
+    href: '/progress-tracking',
+    roles: ['student', 'teacher']
   },
   {
     icon: '/assets/sidebar/settings.png',
@@ -552,6 +559,8 @@ export default function Dashboard() {
             <Settings />
           ) : activeNav === '/resources' ? (
             <Resources onNavigate={handleNavigation} />
+          ) : activeNav === '/progress-tracking' ? (
+            <ProgressTracking />
           ) : activeNav === '/assignments' ? (
             <Assignments />
           ) : activeNav === '/submissions' ? (

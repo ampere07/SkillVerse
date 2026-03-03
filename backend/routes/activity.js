@@ -477,6 +477,24 @@ router.post('/:id/submit', authenticateToken, authorizeRole('student'), upload.a
 
     console.log(`Activity submitted: ${activity.title} by ${req.user.email}`);
 
+    // Track AI feedback in progress if AI feedback was generated
+    if (aiFeedback) {
+      try {
+        const Progress = (await import('../models/Progress.js')).default;
+        const progressRecords = await Progress.find({ student: req.user.userId });
+        for (const progress of progressRecords) {
+          if (!progress.aiInteractions) {
+            progress.aiInteractions = { hintsRequested: 0, feedbackReceived: 0, lastHintAt: null, lastFeedbackAt: null };
+          }
+          progress.aiInteractions.feedbackReceived = (progress.aiInteractions.feedbackReceived || 0) + 1;
+          progress.aiInteractions.lastFeedbackAt = new Date();
+          await progress.save();
+        }
+      } catch (trackErr) {
+        console.error('[Activity] Error tracking AI feedback:', trackErr);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Activity submitted successfully',

@@ -2,6 +2,8 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import jwt from 'jsonwebtoken';
+import Progress from '../models/Progress.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,7 +71,18 @@ export function setupPythonCompilerSocket(io) {
   io.on('connection', (socket) => {
 
     socket.on('compile-and-run-python', async (data) => {
-      const { code, sessionId } = data;
+      const { code, sessionId, token, language } = data;
+
+      // Authenticate user and get userId
+      let userId = null;
+      try {
+        if (token) {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          userId = decoded.userId;
+        }
+      } catch (error) {
+        console.error('Authentication error in Python compiler socket:', error);
+      }
 
       if (activePythonSessions.has(sessionId)) {
         const existingSession = activePythonSessions.get(sessionId);
@@ -79,6 +92,46 @@ export function setupPythonCompilerSocket(io) {
       }
 
       try {
+        // Track code execution in progress
+        if (userId && language === 'python') {
+          try {
+            // Find all progress records for this student
+            const progressRecords = await Progress.find({ student: userId });
+            
+            // Update each progress record
+            for (const progress of progressRecords) {
+              progress.activities.codeExecutions.total += 1;
+              progress.activities.codeExecutions.python += 1;
+              progress.activities.codeExecutions.lastExecution = new Date();
+              
+              // Update time spent (estimate 5 minutes per execution)
+              progress.timeSpent.totalMinutes += 5;
+              progress.timeSpent.thisWeek += 5;
+              progress.timeSpent.thisMonth += 5;
+              progress.timeSpent.lastUpdated = new Date();
+              
+              // Update Python skills
+              progress.skills.python.lastActivity = new Date();
+              
+              // Recalculate job readiness
+              progress.jobReadiness = Progress.calculateJobReadiness(progress);
+              
+              await progress.save();
+            }
+            
+            // Award small XP for code execution (1 XP per execution, max 20 per day)
+            const { awardXp } = await import('../services/xpService.js');
+            await awardXp(
+              userId,
+              1,
+              'Python code execution',
+              'codeExecutions'
+            );
+          } catch (progressError) {
+            console.error('Error updating progress:', progressError);
+          }
+        }
+
         const timestamp = Date.now();
         const userDir = path.join(TEMP_DIR, `python_session_${sessionId}_${timestamp}`);
         const pythonFilePath = path.join(userDir, 'main.py');

@@ -1,8 +1,10 @@
 import express from 'express';
 import MiniProject from '../models/MiniProject.js';
-import { authenticateToken } from '../middleware/auth.js';
-import { checkAndGenerateProjects } from '../services/cronService.js';
+import User from '../models/User.js';
+import Progress from '../models/Progress.js';
+import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 import { gradeProject } from '../services/projectGradingService.js';
+import { checkAndGenerateProjects } from '../services/cronService.js';
 
 const router = express.Router();
 
@@ -342,12 +344,25 @@ router.post('/complete-task', authenticateToken, async (req, res) => {
 
     await miniProject.save();
 
+    // Award XP based on score
+    const { awardXp } = await import('../services/xpService.js');
+    const xpResult = await awardXp(
+      req.user.userId,
+      Math.round(score * 10), // 10 XP per point, so max 1000 XP
+      `Mini project completion: ${projectTitle}`,
+      'projects'
+    );
+
     const newCompletedCount = completedThisWeek.length + 1;
 
     res.status(201).json({
       message: 'Task completed successfully',
       completedThisWeek: newCompletedCount,
       allCompleted: newCompletedCount >= 6,
+      xpAwarded: xpResult.awarded ? Math.round(score * 10) : 0,
+      newTotalXp: xpResult.newXp,
+      newLevel: xpResult.newLevel,
+      leveledUp: xpResult.leveledUp,
       miniProject
     });
   } catch (error) {
@@ -753,6 +768,100 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
     }
 
     await miniProject.save();
+
+    // Update progress tracking
+    try {
+      // Get user's enrolled classrooms
+      const User = (await import('../models/User.js')).default;
+      const user = await User.findById(req.user.userId);
+      const Classroom = (await import('../models/Classroom.js')).default;
+      const classrooms = await Classroom.find({
+        'students.studentId': req.user.userId
+      });
+
+      // Update progress for each classroom
+      for (const classroom of classrooms) {
+        let progress = await Progress.findOne({
+          student: req.user.userId,
+          classroom: classroom._id
+        });
+        
+        if (!progress) {
+          progress = new Progress({
+            student: req.user.userId,
+            classroom: classroom._id
+          });
+        }
+
+        // Update mini-project progress
+        progress.activities.miniProjects.completed++;
+        const total = progress.activities.miniProjects.averageScore * (progress.activities.miniProjects.completed - 1);
+        progress.activities.miniProjects.averageScore = (total + gradingResult.score) / progress.activities.miniProjects.completed;
+        progress.activities.miniProjects.lastCompleted = new Date();
+
+        // Update language-specific progress
+        const language = user?.primaryLanguage || 'java';
+        progress.skills[language].projectsCompleted++;
+        progress.skills[language].lastActivity = new Date();
+
+        // Update streaks
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (!progress.streaks.lastActiveDate || progress.streaks.lastActiveDate < today) {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          
+          if (progress.streaks.lastActiveDate && progress.streaks.lastActiveDate >= yesterday) {
+            progress.streaks.currentStreak++;
+          } else {
+            progress.streaks.currentStreak = 1;
+          }
+          
+          progress.streaks.lastActiveDate = today;
+          progress.streaks.totalActiveDays++;
+          
+          if (progress.streaks.currentStreak > progress.streaks.longestStreak) {
+            progress.streaks.longestStreak = progress.streaks.currentStreak;
+          }
+        }
+
+        // Recalculate job readiness
+        progress.jobReadiness = Progress.calculateJobReadiness(progress);
+        await progress.save();
+      }
+    } catch (progressError) {
+      console.error('Error updating progress after mini-project submission:', progressError);
+      // Don't fail the submission if progress update fails
+    }
+
+    // Track AI grading in progress (AI grades every mini project submission)
+    try {
+      const progressRecords = await Progress.find({ student: req.user.userId });
+      for (const progress of progressRecords) {
+        if (!progress.aiInteractions) {
+          progress.aiInteractions = { hintsRequested: 0, feedbackReceived: 0, lastHintAt: null, lastFeedbackAt: null };
+        }
+        progress.aiInteractions.feedbackReceived = (progress.aiInteractions.feedbackReceived || 0) + 1;
+        progress.aiInteractions.lastFeedbackAt = new Date();
+        await progress.save();
+      }
+    } catch (trackErr) {
+      console.error('[MiniProject] Error tracking AI feedback:', trackErr);
+    }
+
+    // Award XP based on score (even if not in a classroom)
+    try {
+      const { awardXp } = await import('../services/xpService.js');
+      await awardXp(
+        req.user.userId,
+        Math.round(gradingResult.score * 10),
+        `Mini project submission: ${projectTitle}`,
+        'projects'
+      );
+    } catch (xpError) {
+      console.error('Error awarding XP for mini-project submission:', xpError);
+    }
 
     res.json({
       message: 'Project submitted and graded successfully',

@@ -8,6 +8,9 @@ interface User {
   surveyCompleted?: boolean;
   surveyCompletedLanguages?: string[];
   primaryLanguage?: string;
+  level?: number;
+  xp?: number;
+  badges?: string[];
 }
 
 interface AuthContextType {

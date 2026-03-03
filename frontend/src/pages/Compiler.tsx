@@ -510,9 +510,11 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
     }
 
     if (language === 'java') {
-      socket.emit('compile-and-run', { code, sessionId });
+      const token = localStorage.getItem('token');
+      socket.emit('compile-and-run', { code, sessionId, token, language });
     } else if (language === 'python') {
-      socket.emit('compile-and-run-python', { code, sessionId });
+      const token = localStorage.getItem('token');
+      socket.emit('compile-and-run-python', { code, sessionId, token, language });
     }
   };
 

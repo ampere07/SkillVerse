@@ -298,6 +298,23 @@ IMPORTANT: Write ONLY one paragraph. Don't show any analysis, lists, or code. Us
     }
 
     console.log('[AI Hint] Generated hint successfully');
+
+    // Track AI hint usage in progress
+    try {
+      const Progress = (await import('../models/Progress.js')).default;
+      const progressRecords = await Progress.find({ student: req.user.userId });
+      for (const progress of progressRecords) {
+        if (!progress.aiInteractions) {
+          progress.aiInteractions = { hintsRequested: 0, feedbackReceived: 0, lastHintAt: null, lastFeedbackAt: null };
+        }
+        progress.aiInteractions.hintsRequested = (progress.aiInteractions.hintsRequested || 0) + 1;
+        progress.aiInteractions.lastHintAt = new Date();
+        await progress.save();
+      }
+    } catch (trackErr) {
+      console.error('[AI Hint] Error tracking hint usage:', trackErr);
+    }
+
     res.json({ hint });
   } catch (error) {
     console.error('[AI Hint] Error:', error);
