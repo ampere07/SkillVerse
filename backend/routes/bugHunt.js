@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import { generateBugHuntChallenge, validateBugHuntFix, generateSubtleHint } from '../services/bugHuntService.js';
 import BugHuntSession from '../models/BugHuntSession.js';
+import BugHuntLeaderboard from '../models/BugHuntLeaderboard.js';
 import User from '../models/User.js';
 
 const router = express.Router();
@@ -105,6 +106,31 @@ router.post('/validate', authenticateToken, async (req, res) => {
                     user.level = Math.floor(user.xp / 500) + 1;
                     await user.save();
                 }
+
+                // Update BugHuntLeaderboard
+                const bugsFixed = session.challenges.filter(c => c.isFixed).length;
+                await BugHuntLeaderboard.findOneAndUpdate(
+                    { userId: req.user.userId },
+                    {
+                        $inc: {
+                            totalScore: session.totalScore,
+                            totalTime: session.totalTime,
+                            sessionsCompleted: 1,
+                            totalBugsFixed: bugsFixed,
+                            totalHintsUsed: session.hintsUsed || 0
+                        },
+                        $max: {
+                            bestScore: session.totalScore
+                        },
+                        $min: {
+                            bestTime: session.totalTime
+                        },
+                        $set: {
+                            lastPlayedAt: new Date()
+                        }
+                    },
+                    { upsert: true, new: true }
+                );
             }
 
             await session.save();
@@ -194,6 +220,31 @@ router.post('/surrender', authenticateToken, async (req, res) => {
 
         await session.save();
 
+        // Save to BugHuntLeaderboard
+        const bugsFixed = session.challenges.filter(c => c.isFixed).length;
+        const finalScore = totalScore || session.totalScore || 0;
+        const finalTime = totalTime || session.totalTime || 0;
+
+        await BugHuntLeaderboard.findOneAndUpdate(
+            { userId: req.user.userId },
+            {
+                $inc: {
+                    totalScore: finalScore,
+                    totalTime: finalTime,
+                    sessionsSurrendered: 1,
+                    totalBugsFixed: bugsFixed,
+                    totalHintsUsed: session.hintsUsed || 0
+                },
+                $max: {
+                    bestScore: finalScore
+                },
+                $set: {
+                    lastPlayedAt: new Date()
+                }
+            },
+            { upsert: true, new: true }
+        );
+
         res.json({ success: true, message: 'Mission surrendered. Intel recorded.' });
     } catch (error) {
         console.error('[BugHunt Surrender Route] Error:', error);
@@ -201,39 +252,27 @@ router.post('/surrender', authenticateToken, async (req, res) => {
     }
 });
 
-// Get global leaderboard
+// Get global leaderboard (from BugHuntLeaderboard model)
 router.get('/leaderboard', authenticateToken, async (req, res) => {
     try {
-        const leaderboard = await BugHuntSession.aggregate([
-            { $match: { status: 'completed' } },
-            {
-                $group: {
-                    _id: '$userId',
-                    totalScore: { $sum: '$totalScore' },
-                    sessionsCompleted: { $sum: 1 }
-                }
-            },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'user'
-                }
-            },
-            { $unwind: '$user' },
-            {
-                $project: {
-                    name: '$user.name',
-                    totalScore: 1,
-                    sessionsCompleted: 1
-                }
-            },
-            { $sort: { totalScore: -1 } },
-            { $limit: 10 }
-        ]);
+        const leaderboard = await BugHuntLeaderboard.find()
+            .sort({ totalScore: -1 })
+            .limit(10)
+            .populate('userId', 'name firstName lastName')
+            .lean();
 
-        res.json({ success: true, leaderboard });
+        // Format the response to match what the frontend expects
+        const formattedLeaderboard = leaderboard.map(entry => ({
+            _id: entry.userId?._id,
+            name: entry.userId?.name || `${entry.userId?.firstName || ''} ${entry.userId?.lastName || ''}`.trim(),
+            totalScore: entry.totalScore,
+            sessionsCompleted: entry.sessionsCompleted,
+            sessionsSurrendered: entry.sessionsSurrendered,
+            totalBugsFixed: entry.totalBugsFixed,
+            bestScore: entry.bestScore
+        }));
+
+        res.json({ success: true, leaderboard: formattedLeaderboard });
     } catch (error) {
         console.error('[BugHunt Leaderboard Route] Error:', error);
         res.status(500).json({ success: false, error: error.message });

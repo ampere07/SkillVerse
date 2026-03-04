@@ -22,6 +22,10 @@ const userSchema = new mongoose.Schema({
     },
     required: [true, 'Role is required']
   },
+  name: {
+    type: String,
+    trim: true
+  },
   firstName: {
     type: String,
     required: [true, 'First name is required'],
@@ -113,7 +117,9 @@ const userSchema = new mongoose.Schema({
     type: String
   }]
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 userSchema.index({ email: 1 });

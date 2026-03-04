@@ -115,7 +115,7 @@ const prepareProgressData = (progress, survey) => {
     classroomName: progress.classroom?.name || 'Class',
     currentLevel: calculateLevel(progress.totalXp || 0),
     totalXp: progress.totalXp || 0,
-    
+
     // Skills data
     skills: {
       java: {
@@ -139,7 +139,7 @@ const prepareProgressData = (progress, survey) => {
         }))
       }
     },
-    
+
     // Activity data
     activities: {
       codeExecutions: {
@@ -161,7 +161,7 @@ const prepareProgressData = (progress, survey) => {
         bugsFound: progress.activities.bugHunt.bugsFound
       }
     },
-    
+
     // Streaks and time
     streaks: {
       current: progress.streaks.currentStreak,
@@ -173,20 +173,20 @@ const prepareProgressData = (progress, survey) => {
       thisWeek: progress.timeSpent.thisWeek,
       averagePerDay: progress.timeSpent.averagePerDay
     },
-    
+
     // Job readiness metrics
     jobReadiness: progress.jobReadiness,
-    
+
     // AI interactions
     aiInteractions: progress.aiInteractions,
-    
+
     // Survey/roadmap data if available
     learningRoadmap: survey?.learningRoadmap || null,
     expertise: {
       java: survey?.javaExpertise,
       python: survey?.pythonExpertise
     },
-    
+
     // Version for tracking updates
     version: Date.now()
   };
@@ -199,7 +199,7 @@ const prepareProgressData = (progress, survey) => {
  */
 const generateAIInsights = async (progressData) => {
   const prompt = constructInsightsPrompt(progressData);
-  
+
   const response = await generateWithRetry(prompt, {
     temperature: 0.7,
     num_predict: 1200,
@@ -215,7 +215,7 @@ const generateAIInsights = async (progressData) => {
  */
 const generateAIRecommendations = async (progressData) => {
   const prompt = constructRecommendationsPrompt(progressData);
-  
+
   const response = await generateWithRetry(prompt, {
     temperature: 0.8,
     num_predict: 1500,
@@ -231,7 +231,7 @@ const generateAIRecommendations = async (progressData) => {
  */
 const generateAISkillGapAnalysis = async (progressData) => {
   const prompt = constructSkillGapPrompt(progressData);
-  
+
   const response = await generateWithRetry(prompt, {
     temperature: 0.6,
     num_predict: 1000,
@@ -373,7 +373,7 @@ Focus on foundational gaps that would most impact their learning progress.`;
 const parseInsightsResponse = (text) => {
   const insights = [];
   const matches = text.match(/INSIGHT\s+\d+:\s*([\s\S]*?)(?=INSIGHT\s+\d+:|$)/gi);
-  
+
   if (matches) {
     matches.forEach(match => {
       const insight = match.replace(/INSIGHT\s+\d+:\s*/i, '').trim();
@@ -382,7 +382,7 @@ const parseInsightsResponse = (text) => {
       }
     });
   }
-  
+
   return {
     insights: insights.slice(0, 5), // Limit to 5 insights
     generatedAt: new Date()
@@ -395,7 +395,7 @@ const parseInsightsResponse = (text) => {
 const parseRecommendationsResponse = (text) => {
   const recommendations = [];
   const recBlocks = text.split(/RECOMMENDATION\s+\d+:/i).filter(block => block.trim());
-  
+
   recBlocks.forEach(block => {
     const rec = {
       title: '',
@@ -404,27 +404,27 @@ const parseRecommendationsResponse = (text) => {
       time: '',
       type: 'Exercise'
     };
-    
+
     const titleMatch = block.match(/Title:\s*(.+?)(?=\n|$)/i);
     if (titleMatch) rec.title = titleMatch[1].trim();
-    
+
     const descMatch = block.match(/Description:\s*([\s\S]*?)(?=\nDifficulty:|$)/i);
     if (descMatch) rec.description = descMatch[1].trim();
-    
+
     const diffMatch = block.match(/Difficulty:\s*(.+?)(?=\n|$)/i);
     if (diffMatch) rec.difficulty = diffMatch[1].trim();
-    
+
     const timeMatch = block.match(/Time:\s*(.+?)(?=\n|$)/i);
     if (timeMatch) rec.time = timeMatch[1].trim();
-    
+
     const typeMatch = block.match(/Type:\s*(.+?)(?=\n|$)/i);
     if (typeMatch) rec.type = typeMatch[1].trim();
-    
+
     if (rec.title && rec.description) {
       recommendations.push(rec);
     }
   });
-  
+
   return recommendations.slice(0, 5); // Limit to 5 recommendations
 };
 
@@ -436,7 +436,7 @@ const parseSkillGapResponse = (text) => {
     java: [],
     python: []
   };
-  
+
   // Parse Java gaps
   const javaSection = text.match(/JAVA GAPS:\s*([\s\S]*?)(?=PYTHON GAPS:|$)/i);
   if (javaSection) {
@@ -455,7 +455,7 @@ const parseSkillGapResponse = (text) => {
       });
     }
   }
-  
+
   // Parse Python gaps
   const pythonSection = text.match(/PYTHON GAPS:\s*([\s\S]*?)(?=$)/i);
   if (pythonSection) {
@@ -474,7 +474,7 @@ const parseSkillGapResponse = (text) => {
       });
     }
   }
-  
+
   return analysis;
 };
 

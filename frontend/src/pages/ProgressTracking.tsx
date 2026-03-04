@@ -6,14 +6,15 @@ import {
   Code,
   BookOpen,
   Clock,
-  Calendar,
   Award,
   AlertCircle,
   CheckCircle,
   BarChart3,
-  Activity,
   Zap,
-  Flame
+  Flame,
+  RefreshCw,
+  ShieldAlert,
+  Lightbulb
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -148,12 +149,16 @@ export default function ProgressTracking() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'skills' | 'activities' | 'skills-assessment'>('overview');
-  
+
   // Check if viewing another student's progress from sessionStorage
   const isViewingStudent = sessionStorage.getItem('viewingStudent') === 'true';
   const viewingStudentId = sessionStorage.getItem('studentId');
   const viewingStudentName = sessionStorage.getItem('studentName');
-  
+
+  // AI Weakness Analysis state
+  const [weaknessAnalysis, setWeaknessAnalysis] = useState<any>(null);
+  const [weaknessLoading, setWeaknessLoading] = useState(false);
+
   // Instructor-only states
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -167,7 +172,7 @@ export default function ProgressTracking() {
   console.log('progressData:', progressData);
   console.log('loading:', loading);
   console.log('error:', error);
-  
+
   useEffect(() => {
     if (authLoading) return;
     console.log('useEffect triggered, authLoading:', authLoading);
@@ -208,7 +213,7 @@ export default function ProgressTracking() {
     try {
       console.log('fetchStudentProgress called with studentId:', studentId);
       const token = localStorage.getItem('token');
-      
+
       console.log('Fetching progress with token:', token ? 'Token exists' : 'No token');
       console.log('User role:', user?.role);
 
@@ -217,15 +222,15 @@ export default function ProgressTracking() {
         `${import.meta.env.VITE_API_URL}/progress/backfill-xp`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
-      ).catch(() => {}); // silent - non-blocking
+      ).catch(() => { }); // silent - non-blocking
 
       // Fetch overall progress, not classroom-specific
-      const url = studentId 
+      const url = studentId
         ? `${import.meta.env.VITE_API_URL}/progress/student/overall?studentId=${studentId}`
         : `${import.meta.env.VITE_API_URL}/progress/student/overall`;
-      
+
       console.log('Making request to:', url);
-      
+
       const response = await axios.get(
         url,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -237,14 +242,14 @@ export default function ProgressTracking() {
         console.log('Setting progress data...');
         setProgressData(response.data.progress || response.data);
         console.log('Progress data set successfully');
-        
+
         // Only generate AI insights/recommendations for students
         if (user?.role === 'student') {
           // If no AI insights exist, generate them
           if (!response.data.progress?.aiInsights && !response.data.aiInsights) {
             await generateAIInsights();
           }
-          
+
           // If no AI recommendations exist, generate them
           if (!response.data.progress?.aiRecommendations && !response.data.aiRecommendations) {
             await generateAIRecommendations();
@@ -253,13 +258,13 @@ export default function ProgressTracking() {
       }
     } catch (error) {
       console.error('Error fetching progress data:', error);
-      
+
       // Type guard for axios error
       if (error && typeof error === 'object' && 'response' in error) {
         const axiosError = error as any;
         console.error('Error response:', axiosError.response?.data);
         console.error('Error status:', axiosError.response?.status);
-        
+
         // If teacher has no progress data, show a message
         if (axiosError.response?.status === 403) {
           setError('You do not have any progress data to view. Start learning to see your progress!');
@@ -280,23 +285,23 @@ export default function ProgressTracking() {
     try {
       const token = localStorage.getItem('token');
       const classroomId = progressData?.classroom?._id || selectedClassroom;
-      
+
       if (!classroomId) return;
-      
+
       await axios.post(
         `${import.meta.env.VITE_API_URL}/progress/ai-insights/${classroomId}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       // Refetch progress to get AI insights
       const response = await axios.get(
-        viewingStudentId 
+        viewingStudentId
           ? `${import.meta.env.VITE_API_URL}/progress/student/overall?studentId=${viewingStudentId}`
           : `${import.meta.env.VITE_API_URL}/progress/student/overall`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       if (response.data.success) {
         setProgressData(response.data.progress || response.data);
       }
@@ -309,23 +314,23 @@ export default function ProgressTracking() {
     try {
       const token = localStorage.getItem('token');
       const classroomId = progressData?.classroom?._id || selectedClassroom;
-      
+
       if (!classroomId) return;
-      
+
       await axios.post(
         `${import.meta.env.VITE_API_URL}/progress/ai-recommendations/${classroomId}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       // Refetch progress to get AI recommendations
       const response = await axios.get(
-        viewingStudentId 
+        viewingStudentId
           ? `${import.meta.env.VITE_API_URL}/progress/student/overall?studentId=${viewingStudentId}`
           : `${import.meta.env.VITE_API_URL}/progress/student/overall`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       if (response.data.success) {
         setProgressData(response.data.progress || response.data);
       }
@@ -336,7 +341,7 @@ export default function ProgressTracking() {
 
   const regenerateAIInsights = async () => {
     if (!progressData?.classroom?._id) return;
-    
+
     try {
       setLoading(true);
       await generateAIInsights();
@@ -347,12 +352,31 @@ export default function ProgressTracking() {
 
   const regenerateRecommendations = async () => {
     if (!progressData?.classroom?._id) return;
-    
+
     try {
       setLoading(true);
       await generateAIRecommendations();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWeaknessAnalysis = async () => {
+    setWeaknessLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/progress/skill-weakness-analysis`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setWeaknessAnalysis(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching weakness analysis:', error);
+    } finally {
+      setWeaknessLoading(false);
     }
   };
 
@@ -419,42 +443,43 @@ export default function ProgressTracking() {
   return (
     <>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-[28px] font-semibold text-[#212121]">
+      <div className="mb-6 px-4 lg:px-0">
+        <h1 className="text-[24px] lg:text-[28px] font-semibold text-[#212121]">
           {isViewingStudent ? `${viewingStudentName}'s Progress` : 'Progress Tracking'}
         </h1>
-        <p className="text-[15px] text-[#757575]">
-          {isViewingStudent 
-            ? `Monitoring ${viewingStudentName}'s learning journey and job readiness` 
+        <p className="text-[14px] lg:text-[15px] text-[#757575]">
+          {isViewingStudent
+            ? `Monitoring ${viewingStudentName}'s learning journey and job readiness`
             : 'Monitor your learning journey and job readiness'
           }
         </p>
       </div>
 
-      {/* 2-Column Layout */}
-      <div className="flex gap-6 items-start">
+      {/* Responsive Layout Wrapper */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Left Column: Hexagon */}
-        <div className="shrink-0 w-[420px] sticky top-4">
-          <LevelHexagon
-            level={progressData.level || user?.level || 1}
-            jobReadiness={progressData.jobReadiness.overallScore}
-            progressData={progressData}
-          />
+        <div className="w-full lg:w-[420px] lg:sticky lg:top-4 order-1 lg:order-none">
+          <div className="bg-white border border-[#E0E0E0] lg:rounded-xl p-4 lg:p-6 shadow-sm rounded-none border-x-0 lg:border-x">
+            <LevelHexagon
+              level={progressData.level || user?.level || 1}
+              jobReadiness={progressData.jobReadiness.overallScore}
+              progressData={progressData}
+            />
+          </div>
         </div>
 
         {/* Right Column: Tabs + Content */}
-        <div className="flex-1 min-w-0">
-          {/* Tabs */}
-          <div className="flex gap-1 border-b border-[#E0E0E0] mb-6">
+        <div className="flex-1 min-w-0 w-full order-2 lg:order-none px-4 lg:px-0">
+          {/* Tabs - Scrollable on mobile */}
+          <div className="flex gap-1 border-b border-[#E0E0E0] mb-6 overflow-x-auto whitespace-nowrap scrollbar-hide">
             {(['overview', 'skills', 'activities', 'skills-assessment'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab
-                    ? 'text-[#1B5E20] border-[#1B5E20]'
-                    : 'text-[#757575] border-transparent hover:text-[#212121]'
-                }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex-shrink-0 ${activeTab === tab
+                  ? 'text-[#1B5E20] border-[#1B5E20]'
+                  : 'text-[#757575] border-transparent hover:text-[#212121]'
+                  }`}
               >
                 {tab === 'skills-assessment' ? 'Skills Assessment' : tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')}
               </button>
@@ -463,298 +488,413 @@ export default function ProgressTracking() {
 
           {progressData && (
             <>
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Key Metrics Row */}
-              <div className="grid grid-cols-3 gap-4">
-                <MetricCard
-                  icon={Flame}
-                  label="Current Streak"
-                  value={`${progressData.streaks.currentStreak} days`}
-                  color="text-orange-600"
-                  bgColor="bg-orange-100"
-                />
-                <MetricCard
-                  icon={Clock}
-                  label="Time This Week"
-                  value={formatTime(progressData.timeSpent.thisWeek)}
-                  color="text-blue-600"
-                  bgColor="bg-blue-100"
-                />
-                <MetricCard
-                  icon={Award}
-                  label="Total XP"
-                  value={progressData.totalXp ?? user?.xp ?? 0}
-                  color="text-purple-600"
-                  bgColor="bg-purple-100"
-                />
-              </div>
-
-              {/* AI Insights */}
-              {progressData.aiInsights?.insights?.length > 0 && (
-                <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-[#1B5E20]" />
-                      <h3 className="text-[16px] font-semibold text-[#212121]">AI Insights</h3>
-                      <span className="text-xs text-[#757575]">
-                        Generated {new Date(progressData.aiInsights.generatedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <button
-                      onClick={regenerateAIInsights}
-                      disabled={loading}
-                      className="text-xs text-[#1B5E20] hover:text-[#2E7D32] font-medium disabled:opacity-50"
-                    >
-                      Refresh
-                    </button>
+              {/* Overview Tab */}
+              {activeTab === 'overview' && (
+                <div className="space-y-6">
+                  {/* Key Metrics Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <MetricCard
+                      icon={Flame}
+                      label="Current Streak"
+                      value={`${progressData.streaks.currentStreak} days`}
+                      color="text-orange-600"
+                      bgColor="bg-orange-100"
+                    />
+                    <MetricCard
+                      icon={Clock}
+                      label="Time This Week"
+                      value={formatTime(progressData.timeSpent.thisWeek)}
+                      color="text-blue-600"
+                      bgColor="bg-blue-100"
+                    />
+                    <MetricCard
+                      icon={Award}
+                      label="Total XP"
+                      value={progressData.totalXp ?? user?.xp ?? 0}
+                      color="text-purple-600"
+                      bgColor="bg-purple-100"
+                    />
                   </div>
-                  <div className="space-y-3">
-                    {progressData.aiInsights.insights.map((insight: string, index: number) => (
-                      <div key={index} className="flex items-start gap-3 p-3 bg-[#F9FAFB] rounded-lg">
-                        <div className="w-2 h-2 bg-[#1B5E20] rounded-full mt-2 flex-shrink-0"></div>
-                        <p className="text-sm text-[#212121] leading-relaxed">{insight}</p>
+
+                  {/* AI Insights */}
+                  {progressData.aiInsights?.insights && progressData.aiInsights.insights.length > 0 && (
+                    <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-5 h-5 text-[#1B5E20]" />
+                          <h3 className="text-[16px] font-semibold text-[#212121]">AI Insights</h3>
+                          <span className="text-xs text-[#757575]">
+                            Generated {new Date(progressData.aiInsights.generatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <button
+                          onClick={regenerateAIInsights}
+                          disabled={loading}
+                          className="text-xs text-[#1B5E20] hover:text-[#2E7D32] font-medium disabled:opacity-50"
+                        >
+                          Refresh
+                        </button>
                       </div>
-                    ))}
+                      <div className="space-y-3">
+                        {progressData.aiInsights.insights.map((insight: string, index: number) => (
+                          <div key={index} className="flex items-start gap-3 p-3 bg-[#F9FAFB] rounded-lg">
+                            <div className="w-2 h-2 bg-[#1B5E20] rounded-full mt-2 flex-shrink-0"></div>
+                            <p className="text-sm text-[#212121] leading-relaxed">{insight}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Activity Summary + Language Progress */}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div className="bg-white border border-[#E0E0E0] rounded-xl p-4 lg:p-6 shadow-sm">
+                      <h3 className="text-[16px] font-semibold text-[#212121] mb-4">Activity Summary</h3>
+                      <div className="space-y-3">
+                        <ActivityRow
+                          icon={Code}
+                          label="Code Executions"
+                          value={progressData.activities.codeExecutions.total}
+                          detail={`${progressData.activities.codeExecutions.java} Java, ${progressData.activities.codeExecutions.python} Python`}
+                        />
+                        <ActivityRow
+                          icon={BookOpen}
+                          label="Assignments"
+                          value={progressData.activities.assignments.totalSubmitted}
+                          detail={`${progressData.activities.assignments.onTime} on time`}
+                        />
+                        <ActivityRow
+                          icon={Target}
+                          label="Mini Projects"
+                          value={progressData.activities.miniProjects.completed}
+                          detail={`Avg score: ${Math.round(progressData.activities.miniProjects.averageScore)}%`}
+                        />
+                        <ActivityRow
+                          icon={Zap}
+                          label="Bug Hunt"
+                          value={progressData.activities.bugHunt.participated}
+                          detail={`${progressData.activities.bugHunt.bugsFound} bugs found`}
+                        />
+                        <ActivityRow
+                          icon={TrendingUp}
+                          label="AI Interactions"
+                          value={(progressData.aiInteractions?.hintsRequested || 0) + (progressData.aiInteractions?.feedbackReceived || 0)}
+                          detail={`${progressData.aiInteractions?.hintsRequested || 0} hints, ${progressData.aiInteractions?.feedbackReceived || 0} feedback`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-[#E0E0E0] rounded-xl p-4 lg:p-6 shadow-sm">
+                      <h3 className="text-[16px] font-semibold text-[#212121] mb-4">Language Progress</h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        <LanguageProgress
+                          language="Java"
+                          exercises={progressData.skills.java.exercisesCompleted}
+                          projects={progressData.skills.java.projectsCompleted}
+                          score={progressData.skills.java.averageScore}
+                        />
+                        <LanguageProgress
+                          language="Python"
+                          exercises={progressData.skills.python.exercisesCompleted}
+                          projects={progressData.skills.python.projectsCompleted}
+                          score={progressData.skills.python.averageScore}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Activity Summary + Language Progress */}
-              <div className="flex flex-col gap-6">
-                <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
-                  <h3 className="text-[16px] font-semibold text-[#212121] mb-4">Activity Summary</h3>
-                  <div className="space-y-3">
-                    <ActivityRow
-                      icon={Code}
-                      label="Code Executions"
-                      value={progressData.activities.codeExecutions.total}
-                      detail={`${progressData.activities.codeExecutions.java} Java, ${progressData.activities.codeExecutions.python} Python`}
-                    />
-                    <ActivityRow
-                      icon={BookOpen}
-                      label="Assignments"
-                      value={progressData.activities.assignments.totalSubmitted}
-                      detail={`${progressData.activities.assignments.onTime} on time`}
-                    />
-                    <ActivityRow
-                      icon={Target}
-                      label="Mini Projects"
-                      value={progressData.activities.miniProjects.completed}
-                      detail={`Avg score: ${Math.round(progressData.activities.miniProjects.averageScore)}%`}
-                    />
-                    <ActivityRow
-                      icon={Zap}
-                      label="Bug Hunt"
-                      value={progressData.activities.bugHunt.participated}
-                      detail={`${progressData.activities.bugHunt.bugsFound} bugs found`}
-                    />
-                    <ActivityRow
-                      icon={TrendingUp}
-                      label="AI Interactions"
-                      value={(progressData.aiInteractions?.hintsRequested || 0) + (progressData.aiInteractions?.feedbackReceived || 0)}
-                      detail={`${progressData.aiInteractions?.hintsRequested || 0} hints, ${progressData.aiInteractions?.feedbackReceived || 0} feedback`}
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
-                  <h3 className="text-[16px] font-semibold text-[#212121] mb-4">Language Progress</h3>
-                  <div className="space-y-4">
-                    <LanguageProgress
-                      language="Java"
-                      exercises={progressData.skills.java.exercisesCompleted}
-                      projects={progressData.skills.java.projectsCompleted}
-                      score={progressData.skills.java.averageScore}
-                    />
-                    <LanguageProgress
-                      language="Python"
-                      exercises={progressData.skills.python.exercisesCompleted}
-                      projects={progressData.skills.python.projectsCompleted}
-                      score={progressData.skills.python.averageScore}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Skills Tab */}
-          {activeTab === 'skills' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SkillDetails
-                  language="Java"
-                  data={progressData.skills.java}
-                />
-                <SkillDetails
-                  language="Python"
-                  data={progressData.skills.python}
-                />
-              </div>
-
-              {/* AI Skill Gap Analysis */}
-              {progressData.skillGapAnalysis && (
-                <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Target className="w-5 h-5 text-[#1B5E20]" />
-                    <h3 className="text-[16px] font-semibold text-[#212121]">Skill Gap Analysis</h3>
-                    <span className="text-xs text-[#757575] ml-auto">
-                      Analyzed {new Date(progressData.skillGapAnalysis.analyzedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  
+              {/* Skills Tab */}
+              {activeTab === 'skills' && (
+                <div className="space-y-6">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Java Gaps */}
-                    {progressData.skillGapAnalysis.java.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
-                          <span className="w-3 h-3 bg-red-500 rounded"></span>
-                          Java - Areas to Improve
-                        </h4>
-                        <div className="space-y-2">
-                          {progressData.skillGapAnalysis.java.map((gap: any, index: number) => (
-                            <div key={index} className="p-3 bg-[#F9FAFB] rounded-lg border border-[#E0E0E0]">
-                              <div className="flex items-start justify-between mb-1">
-                                <span className="text-sm font-medium text-[#212121]">{gap.concept}</span>
-                                <span className={`text-xs px-2 py-1 rounded ${
-                                  gap.priority === 'High' ? 'bg-red-100 text-red-700' :
-                                  gap.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-green-100 text-green-700'
-                                }`}>
-                                  {gap.priority}
-                                </span>
-                              </div>
-                              <p className="text-xs text-[#757575] mb-2">{gap.practice}</p>
-                              <div className="flex items-center gap-1 text-xs text-[#1B5E20]">
-                                <Clock className="w-3 h-3" />
-                                <span>{gap.time}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Python Gaps */}
-                    {progressData.skillGapAnalysis.python.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
-                          <span className="w-3 h-3 bg-blue-500 rounded"></span>
-                          Python - Areas to Improve
-                        </h4>
-                        <div className="space-y-2">
-                          {progressData.skillGapAnalysis.python.map((gap: any, index: number) => (
-                            <div key={index} className="p-3 bg-[#F9FAFB] rounded-lg border border-[#E0E0E0]">
-                              <div className="flex items-start justify-between mb-1">
-                                <span className="text-sm font-medium text-[#212121]">{gap.concept}</span>
-                                <span className={`text-xs px-2 py-1 rounded ${
-                                  gap.priority === 'High' ? 'bg-red-100 text-red-700' :
-                                  gap.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-green-100 text-green-700'
-                                }`}>
-                                  {gap.priority}
-                                </span>
-                              </div>
-                              <p className="text-xs text-[#757575] mb-2">{gap.practice}</p>
-                              <div className="flex items-center gap-1 text-xs text-[#1B5E20]">
-                                <Clock className="w-3 h-3" />
-                                <span>{gap.time}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <SkillDetails
+                      language="Java"
+                      data={progressData.skills.java}
+                    />
+                    <SkillDetails
+                      language="Python"
+                      data={progressData.skills.python}
+                    />
                   </div>
 
-                  {progressData.skillGapAnalysis.java.length === 0 && progressData.skillGapAnalysis.python.length === 0 && (
-                    <div className="text-center py-8">
-                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                      <p className="text-sm text-[#212121]">No significant skill gaps detected!</p>
-                      <p className="text-xs text-[#757575]">Keep up the great work!</p>
+                  {/* AI Skill Gap Analysis */}
+                  {progressData.skillGapAnalysis && (
+                    <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Target className="w-5 h-5 text-[#1B5E20]" />
+                        <h3 className="text-[16px] font-semibold text-[#212121]">Skill Gap Analysis</h3>
+                        <span className="text-xs text-[#757575] ml-auto">
+                          Analyzed {new Date(progressData.skillGapAnalysis.analyzedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Java Gaps */}
+                        {progressData.skillGapAnalysis && progressData.skillGapAnalysis.java && progressData.skillGapAnalysis.java.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
+                              <span className="w-3 h-3 bg-red-500 rounded"></span>
+                              Java - Areas to Improve
+                            </h4>
+                            <div className="space-y-2">
+                              {progressData.skillGapAnalysis.java.map((gap: any, index: number) => (
+                                <div key={index} className="p-3 bg-[#F9FAFB] rounded-lg border border-[#E0E0E0]">
+                                  <div className="flex items-start justify-between mb-1">
+                                    <span className="text-sm font-medium text-[#212121]">{gap.concept}</span>
+                                    <span className={`text-xs px-2 py-1 rounded ${gap.priority === 'High' ? 'bg-red-100 text-red-700' :
+                                      gap.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-green-100 text-green-700'
+                                      }`}>
+                                      {gap.priority}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-[#757575] mb-2">{gap.practice}</p>
+                                  <div className="flex items-center gap-1 text-xs text-[#1B5E20]">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{gap.time}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Python Gaps */}
+                        {progressData.skillGapAnalysis && progressData.skillGapAnalysis.python && progressData.skillGapAnalysis.python.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
+                              <span className="w-3 h-3 bg-blue-500 rounded"></span>
+                              Python - Areas to Improve
+                            </h4>
+                            <div className="space-y-2">
+                              {progressData.skillGapAnalysis.python.map((gap: any, index: number) => (
+                                <div key={index} className="p-3 bg-[#F9FAFB] rounded-lg border border-[#E0E0E0]">
+                                  <div className="flex items-start justify-between mb-1">
+                                    <span className="text-sm font-medium text-[#212121]">{gap.concept}</span>
+                                    <span className={`text-xs px-2 py-1 rounded ${gap.priority === 'High' ? 'bg-red-100 text-red-700' :
+                                      gap.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-green-100 text-green-700'
+                                      }`}>
+                                      {gap.priority}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-[#757575] mb-2">{gap.practice}</p>
+                                  <div className="flex items-center gap-1 text-xs text-[#1B5E20]">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{gap.time}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {progressData.skillGapAnalysis.java.length === 0 && progressData.skillGapAnalysis.python.length === 0 && (
+                        <div className="text-center py-8">
+                          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                          <p className="text-sm text-[#212121]">No significant skill gaps detected!</p>
+                          <p className="text-xs text-[#757575]">Keep up the great work!</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Activities Tab */}
-          {activeTab === 'activities' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ActivityDetails
-                  title="Assignment Performance"
-                  data={progressData.activities.assignments}
-                  type="assignment"
-                />
-                <ActivityDetails
-                  title="Mini Projects"
-                  data={progressData.activities.miniProjects}
-                  type="project"
-                />
-                <ActivityDetails
-                  title="Code Execution"
-                  data={progressData.activities.codeExecutions}
-                  type="code"
-                />
-                <ActivityDetails
-                  title="Bug Hunt Participation"
-                  data={progressData.activities.bugHunt}
-                  type="bughunt"
-                />
-              </div>
-            </div>
-          )}
+              {/* Activities Tab */}
+              {activeTab === 'activities' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ActivityDetails
+                      title="Assignment Performance"
+                      data={progressData.activities.assignments}
+                      type="assignment"
+                    />
+                    <ActivityDetails
+                      title="Mini Projects"
+                      data={progressData.activities.miniProjects}
+                      type="project"
+                    />
+                    <ActivityDetails
+                      title="Code Execution"
+                      data={progressData.activities.codeExecutions}
+                      type="code"
+                    />
+                    <ActivityDetails
+                      title="Bug Hunt Participation"
+                      data={progressData.activities.bugHunt}
+                      type="bughunt"
+                    />
+                  </div>
+                </div>
+              )}
 
-          {/* Skills Assessment Tab */}
-          {activeTab === 'skills-assessment' && (
-            <div className="space-y-6">
-              <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
-                <h3 className="text-[18px] font-semibold text-[#212121] mb-6">Skills Assessment</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <JobReadinessMetric
-                    title="Problem Solving"
-                    score={progressData.jobReadiness.problemSolving}
-                    description="Ability to solve complex programming problems"
-                  />
-                  <JobReadinessMetric
-                    title="Code Quality"
-                    score={progressData.jobReadiness.codeQuality}
-                    description="Writing clean, efficient, and maintainable code"
-                  />
-                  <JobReadinessMetric
-                    title="Efficiency"
-                    score={progressData.jobReadiness.efficiency}
-                    description="Completing tasks on time and managing workload"
-                  />
-                  <JobReadinessMetric
-                    title="Collaboration"
-                    score={progressData.jobReadiness.collaboration}
-                    description="Working effectively in team environments"
-                  />
-                  <JobReadinessMetric
-                    title="Consistency"
-                    score={progressData.jobReadiness.consistency}
-                    description="Regular practice and continuous learning"
-                  />
-                  <JobReadinessMetric
-                    title="Overall Score"
+              {/* Skills Assessment Tab */}
+              {activeTab === 'skills-assessment' && (
+                <div className="space-y-6">
+                  <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
+                    <h3 className="text-[18px] font-semibold text-[#212121] mb-6">Skills Assessment</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                      <JobReadinessMetric
+                        title="Problem Solving"
+                        score={progressData.jobReadiness.problemSolving}
+                        description="Ability to solve complex programming problems"
+                      />
+                      <JobReadinessMetric
+                        title="Code Quality"
+                        score={progressData.jobReadiness.codeQuality}
+                        description="Writing clean, efficient, and maintainable code"
+                      />
+                      <JobReadinessMetric
+                        title="Efficiency"
+                        score={progressData.jobReadiness.efficiency}
+                        description="Completing tasks on time and managing workload"
+                      />
+                      <JobReadinessMetric
+                        title="Collaboration"
+                        score={progressData.jobReadiness.collaboration}
+                        description="Working effectively in team environments"
+                      />
+                      <JobReadinessMetric
+                        title="Consistency"
+                        score={progressData.jobReadiness.consistency}
+                        description="Regular practice and continuous learning"
+                      />
+                      <JobReadinessMetric
+                        title="Overall Score"
+                        score={progressData.jobReadiness.overallScore}
+                        description="Combined assessment of all skills"
+                        isOverall
+                      />
+                    </div>
+                  </div>
+
+                  {/* AI Weakness Analysis */}
+                  <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert className="w-5 h-5 text-[#D32F2F]" />
+                        <h3 className="text-[18px] font-semibold text-[#212121]">AI Weakness Analysis</h3>
+                        {weaknessAnalysis?.generatedAt && (
+                          <span className="text-xs text-[#757575] ml-1">
+                            Generated {new Date(weaknessAnalysis.generatedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={fetchWeaknessAnalysis}
+                        disabled={weaknessLoading}
+                        className="flex items-center gap-1.5 text-xs text-[#1B5E20] hover:text-[#2E7D32] font-medium disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${weaknessLoading ? 'animate-spin' : ''}`} />
+                        {weaknessLoading ? 'Analyzing...' : weaknessAnalysis ? 'Refresh' : 'Analyze'}
+                      </button>
+                    </div>
+
+                    {weaknessLoading && !weaknessAnalysis && (
+                      <div className="flex flex-col items-center justify-center py-10">
+                        <div className="w-10 h-10 border-4 border-[#1B5E20] border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="text-sm text-[#757575] font-medium">AI is analyzing your skills...</p>
+                        <p className="text-xs text-[#999] mt-1">This may take a moment</p>
+                      </div>
+                    )}
+
+                    {!weaknessAnalysis && !weaknessLoading && (
+                      <div className="flex flex-col items-center justify-center py-10 text-center">
+                        <ShieldAlert className="w-12 h-12 text-[#CCC] mb-3" />
+                        <p className="text-sm font-medium text-[#757575]">No analysis yet</p>
+                        <p className="text-xs text-[#999] mt-1 mb-4">Click "Analyze" to get AI-powered insights on your weaknesses and how to improve.</p>
+                        <button
+                          onClick={fetchWeaknessAnalysis}
+                          className="px-5 py-2.5 bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          Run AI Analysis
+                        </button>
+                      </div>
+                    )}
+
+                    {weaknessAnalysis?.analysis && (
+                      <div className="space-y-6">
+                        {/* Summary */}
+                        {weaknessAnalysis.analysis.summary && (
+                          <div className="p-4 bg-[#F3F4F6] rounded-xl border border-[#E5E7EB]">
+                            <p className="text-sm text-[#374151] leading-relaxed italic">
+                              "{weaknessAnalysis.analysis.summary}"
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Weaknesses */}
+                        {weaknessAnalysis.analysis.weaknesses?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 text-[#D32F2F]" />
+                              Identified Weaknesses
+                            </h4>
+                            <div className="space-y-2">
+                              {weaknessAnalysis.analysis.weaknesses.map((w: any, i: number) => (
+                                <div key={i} className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-lg">
+                                  <div className="flex items-start justify-between mb-1">
+                                    <span className="text-sm font-medium text-[#212121]">{w.area}</span>
+                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${w.severity === 'High' ? 'bg-red-100 text-red-700' :
+                                      w.severity === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-green-100 text-green-700'
+                                      }`}>
+                                      {w.severity}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-[#6B7280] leading-relaxed">{w.description}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Improvements */}
+                        {weaknessAnalysis.analysis.improvements?.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
+                              <Lightbulb className="w-4 h-4 text-[#F59E0B]" />
+                              Ways to Improve
+                            </h4>
+                            <div className="space-y-2">
+                              {weaknessAnalysis.analysis.improvements.map((imp: any, i: number) => (
+                                <div key={i} className="p-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-lg">
+                                  <div className="flex items-start justify-between mb-1">
+                                    <span className="text-sm font-medium text-[#212121]">{imp.title}</span>
+                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${imp.priority === 'High' ? 'bg-red-100 text-red-700' :
+                                      imp.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-green-100 text-green-700'
+                                      }`}>
+                                      {imp.priority}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-[#6B7280] leading-relaxed mb-1.5">{imp.description}</p>
+                                  {imp.estimatedTime && (
+                                    <div className="flex items-center gap-1 text-xs text-[#1B5E20]">
+                                      <Clock className="w-3 h-3" />
+                                      <span>{imp.estimatedTime}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <RecommendationsSection
                     score={progressData.jobReadiness.overallScore}
-                    description="Combined assessment of all skills"
-                    isOverall
+                    aiRecommendations={progressData.aiRecommendations}
+                    onRefresh={regenerateRecommendations}
                   />
                 </div>
-              </div>
-              <RecommendationsSection 
-                score={progressData.jobReadiness.overallScore} 
-                aiRecommendations={progressData.aiRecommendations}
-                onRefresh={regenerateRecommendations}
-              />
-            </div>
-          )}
+              )}
             </>
           )}
         </div>
@@ -800,20 +940,20 @@ function InstructorView({ classrooms, selectedClassroom, setSelectedClassroom, i
   };
 
   return (
-    <div>
+    <div className="px-4 lg:px-0">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-6 pt-4 lg:pt-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-[28px] font-semibold text-[#212121]">Class Progress Tracking</h1>
-            <p className="text-[15px] text-[#757575]">Monitor student progress and class performance</p>
+            <h1 className="text-[24px] lg:text-[28px] font-semibold text-[#212121]">Class Progress Tracking</h1>
+            <p className="text-[14px] lg:text-[15px] text-[#757575]">Monitor student progress and class performance</p>
           </div>
-          
+
           {/* Classroom Selector */}
           <select
             value={selectedClassroom}
             onChange={(e) => setSelectedClassroom(e.target.value)}
-            className="px-4 py-2 border border-[#E0E0E0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E20]"
+            className="w-full sm:w-auto px-4 py-2 border border-[#E0E0E0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B5E20] bg-white shadow-sm"
           >
             {classrooms.map((classroom: any) => (
               <option key={classroom._id} value={classroom._id}>
@@ -823,17 +963,16 @@ function InstructorView({ classrooms, selectedClassroom, setSelectedClassroom, i
           </select>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-[#E0E0E0]">
+        {/* Tabs - Scrollable on mobile */}
+        <div className="flex gap-1 border-b border-[#E0E0E0] overflow-x-auto whitespace-nowrap scrollbar-hide">
           {(['overview', 'students', 'analytics'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab
-                  ? 'text-[#1B5E20] border-[#1B5E20]'
-                  : 'text-[#757575] border-transparent hover:text-[#212121]'
-              }`}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex-shrink-0 ${activeTab === tab
+                ? 'text-[#1B5E20] border-[#1B5E20]'
+                : 'text-[#757575] border-transparent hover:text-[#212121]'
+                }`}
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -847,7 +986,7 @@ function InstructorView({ classrooms, selectedClassroom, setSelectedClassroom, i
           {activeTab === 'overview' && (
             <div className="space-y-6">
               {/* Class Statistics */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <MetricCard
                   icon={BookOpen}
                   label="Total Students"
@@ -891,10 +1030,10 @@ function InstructorView({ classrooms, selectedClassroom, setSelectedClassroom, i
               </div>
 
               {/* Top Performers */}
-              {instructorData.stats.topPerformers.length > 0 && (
+              {instructorData && instructorData.stats?.topPerformers && instructorData.stats.topPerformers.length > 0 && (
                 <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
                   <h3 className="text-[16px] font-semibold text-[#212121] mb-4">Top Performers</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {instructorData.stats.topPerformers.map((student: any) => (
                       <div key={student.studentId} className="p-4 bg-[#F5F5F5] rounded-lg">
                         <div className="flex items-center justify-between mb-2">
@@ -1030,7 +1169,7 @@ function InstructorView({ classrooms, selectedClassroom, setSelectedClassroom, i
 
 function SkillDistribution({ title, data }: any) {
   const total = data.beginner + data.intermediate + data.advanced;
-  
+
   return (
     <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
       <h3 className="text-[16px] font-semibold text-[#212121] mb-4">{title}</h3>
@@ -1088,7 +1227,7 @@ function StudentAnalyticsDetails({ studentAnalytics, onClose }: any) {
           ×
         </button>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <JobReadinessMetric
           title="Problem Solving"
@@ -1162,37 +1301,37 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
   };
 
   const phaseInfo = getPhaseInfo(level, jobReadiness);
-  
+
   // Use real data from progressData or fallback to zeros
   // Angles: 0=top, 60=top-right, 120=bottom-right, 180=bottom, 240=bottom-left, 300=top-left
   const metrics = [
-    { 
-      label: 'Java', 
+    {
+      label: 'Java',
       value: progressData?.skills?.java?.averageScore || 0,
       exercises: progressData?.skills?.java?.exercisesCompleted || 0
     },
-    { 
-      label: 'Problem Solving', 
+    {
+      label: 'Problem Solving',
       value: progressData?.jobReadiness?.problemSolving || 0,
       exercises: progressData?.activities?.assignments?.totalSubmitted || 0
     },
-    { 
-      label: 'Code Quality', 
+    {
+      label: 'Code Quality',
       value: progressData?.jobReadiness?.codeQuality || 0,
       exercises: progressData?.activities?.codeExecutions?.total || 0
     },
-    { 
-      label: 'Python', 
+    {
+      label: 'Python',
       value: progressData?.skills?.python?.averageScore || 0,
       exercises: progressData?.skills?.python?.exercisesCompleted || 0
     },
-    { 
-      label: 'Efficiency', 
+    {
+      label: 'Efficiency',
       value: progressData?.jobReadiness?.efficiency || 0,
       exercises: progressData?.activities?.assignments?.onTime || 0
     },
-    { 
-      label: 'Collaboration', 
+    {
+      label: 'Collaboration',
       value: progressData?.jobReadiness?.collaboration || 0,
       exercises: progressData?.streaks?.currentStreak || 0
     }
@@ -1204,7 +1343,7 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
   const radius = 90;
   const innerRadius = 35;
   const angles = [0, 60, 120, 180, 240, 300];
-  
+
   const createHexagonPath = (r: number) => {
     return angles.map((angle, i) => {
       const x = center + r * Math.cos((angle - 90) * Math.PI / 180);
@@ -1235,7 +1374,7 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
             stroke="#E5E7EB"
             strokeWidth="2"
           />
-          
+
           {/* Inner hexagon border */}
           <path
             d={createHexagonPath(innerRadius)}
@@ -1243,7 +1382,7 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
             stroke="#E5E7EB"
             strokeWidth="2"
           />
-          
+
           {/* Section dividers */}
           {angles.map((angle, i) => (
             <line
@@ -1256,7 +1395,7 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
               strokeWidth="1"
             />
           ))}
-          
+
           {/* Data area */}
           <path
             d={createDataPath()}
@@ -1265,14 +1404,14 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
             stroke={phaseInfo.color}
             strokeWidth="2"
           />
-          
+
           {/* Data points */}
           {angles.map((angle, i) => {
             const value = metrics[i].value / 100;
             const r = innerRadius + (radius - innerRadius) * value;
             const x = center + r * Math.cos((angle - 90) * Math.PI / 180);
             const y = center + r * Math.sin((angle - 90) * Math.PI / 180);
-            
+
             return (
               <circle
                 key={i}
@@ -1283,7 +1422,7 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
               />
             );
           })}
-          
+
           {/* Center content */}
           <text
             x={center}
@@ -1303,13 +1442,13 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
           >
             LEVEL
           </text>
-          
+
           {/* Labels */}
           {angles.map((angle, i) => {
             const labelRadius = radius + 35;
             const x = center + labelRadius * Math.cos((angle - 90) * Math.PI / 180);
             const y = center + labelRadius * Math.sin((angle - 90) * Math.PI / 180);
-            
+
             return (
               <g key={i}>
                 <text
@@ -1330,7 +1469,7 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
 
       {/* Phase info below hexagon */}
       <div className="text-center mt-4 w-full">
-        <div 
+        <div
           className="inline-block px-3 py-1 rounded-lg text-xs font-semibold mb-2"
           style={{ backgroundColor: `${phaseInfo.color}20`, color: phaseInfo.color }}
         >
@@ -1338,7 +1477,7 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
         </div>
         <h2 className="text-xl font-bold text-gray-900 mb-1">{phaseInfo.description}</h2>
         <p className="text-gray-500 text-sm mb-3">Keep up the great work!</p>
-        
+
         {phaseInfo.ready ? (
           <div className="flex items-center justify-center gap-2 text-green-600">
             <CheckCircle className="w-4 h-4" />
@@ -1397,24 +1536,32 @@ function ActivityRow({ icon: Icon, label, value, detail }: any) {
 
 function LanguageProgress({ language, exercises, projects, score }: any) {
   return (
-    <div>
+    <div className="bg-[#F9FAFB] p-4 rounded-xl border border-[#F3F4F6]">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-semibold text-[#212121]">{language}</h4>
-        <span className={`text-sm font-medium ${getScoreColor(score)}`}>
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${language === 'Java' ? 'bg-blue-600' : 'bg-yellow-600'}`}></div>
+          <h4 className="text-sm font-semibold text-[#212121]">{language}</h4>
+        </div>
+        <span className={`text-sm font-bold ${getScoreColor(score)}`}>
           {Math.round(score)}%
         </span>
       </div>
-      <div className="w-full bg-[#F5F5F5] rounded-full h-2 mb-3">
+      <div className="w-full bg-[#E5E7EB] rounded-full h-2 mb-3">
         <div
-          className={`h-2 rounded-full transition-all ${
-            score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-          }`}
+          className={`h-2 rounded-full transition-all ${score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+            }`}
           style={{ width: `${score}%` }}
         />
       </div>
-      <div className="flex justify-between text-xs text-[#757575]">
-        <span>{exercises} exercises</span>
-        <span>{projects} projects</span>
+      <div className="flex justify-between text-[11px] text-[#6B7280] font-medium">
+        <span className="flex items-center gap-1">
+          <BookOpen className="w-3 h-3" />
+          {exercises} exercises
+        </span>
+        <span className="flex items-center gap-1">
+          <Target className="w-3 h-3" />
+          {projects} projects
+        </span>
       </div>
     </div>
   );
@@ -1422,7 +1569,7 @@ function LanguageProgress({ language, exercises, projects, score }: any) {
 
 function SkillDetails({ language, data }: any) {
   return (
-    <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
+    <div className="bg-white border border-[#E0E0E0] rounded-xl p-4 lg:p-6 shadow-sm">
       <h3 className="text-[16px] font-semibold text-[#212121] mb-4">{language} Skills</h3>
       <div className="space-y-4">
         <div>
@@ -1437,15 +1584,15 @@ function SkillDetails({ language, data }: any) {
             />
           </div>
         </div>
-        
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-[#757575]">Exercises</p>
-            <p className="font-semibold">{data.exercisesCompleted}</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#F3F4F6]">
+            <p className="text-[#757575] text-xs mb-1">Exercises</p>
+            <p className="font-semibold text-lg">{data.exercisesCompleted}</p>
           </div>
-          <div>
-            <p className="text-[#757575]">Projects</p>
-            <p className="font-semibold">{data.projectsCompleted}</p>
+          <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#F3F4F6]">
+            <p className="text-[#757575] text-xs mb-1">Projects</p>
+            <p className="font-semibold text-lg">{data.projectsCompleted}</p>
           </div>
         </div>
 
@@ -1453,14 +1600,13 @@ function SkillDetails({ language, data }: any) {
           <div>
             <p className="text-sm font-medium text-[#212121] mb-2">Concepts Mastered</p>
             <div className="flex flex-wrap gap-2">
-              {data.concepts.slice(0, 6).map((concept: any, index: number) => (
+              {data.concepts.slice(0, 10).map((concept: any, index: number) => (
                 <span
                   key={index}
-                  className={`px-2 py-1 rounded-full text-xs ${
-                    concept.mastered
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-[#F5F5F5] text-[#757575]'
-                  }`}
+                  className={`px-2 py-1 rounded-md text-[11px] font-medium ${concept.mastered
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-[#F5F5F5] text-[#757575] border border-[#E5E7EB]'
+                    }`}
                 >
                   {concept.name}
                 </span>
@@ -1475,9 +1621,9 @@ function SkillDetails({ language, data }: any) {
 
 function ActivityDetails({ title, data, type }: any) {
   return (
-    <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
+    <div className="bg-white border border-[#E0E0E0] rounded-xl p-4 lg:p-6 shadow-sm">
       <h3 className="text-[16px] font-semibold text-[#212121] mb-4">{title}</h3>
-      <div className="space-y-3">
+      <div className="space-y-1">
         {type === 'assignment' && (
           <>
             <StatRow label="Total Submitted" value={data.totalSubmitted} />
@@ -1566,30 +1712,30 @@ function JobReadinessMetric({ title, score, description, isOverall = false }: an
 
 function RecommendationsSection({ score, aiRecommendations, onRefresh }: any) {
   // Use AI recommendations if available, otherwise fallback to hardcoded ones
-  const recommendations = aiRecommendations?.items?.length > 0 
-    ? aiRecommendations.items 
+  const recommendations = (aiRecommendations?.items && aiRecommendations.items.length > 0)
+    ? aiRecommendations.items
     : [
-        score < 40 && {
-          priority: 'high',
-          title: 'Focus on Fundamentals',
-          description: 'Spend more time on basic concepts and exercises to build a strong foundation.'
-        },
-        score < 60 && {
-          priority: 'medium',
-          title: 'Practice Consistently',
-          description: 'Try to code every day and complete assignments regularly to improve your skills.'
-        },
-        score >= 60 && score < 80 && {
-          priority: 'low',
-          title: 'Challenge Yourself',
-          description: 'Take on more complex projects and explore advanced topics to reach job readiness.'
-        },
-        score >= 80 && {
-          priority: 'low',
-          title: 'Maintain Excellence',
-          description: 'You\'re doing great! Keep practicing and consider contributing to open source projects.'
-        }
-      ].filter(Boolean);
+      score < 40 && {
+        priority: 'high',
+        title: 'Focus on Fundamentals',
+        description: 'Spend more time on basic concepts and exercises to build a strong foundation.'
+      },
+      score < 60 && {
+        priority: 'medium',
+        title: 'Practice Consistently',
+        description: 'Try to code every day and complete assignments regularly to improve your skills.'
+      },
+      score >= 60 && score < 80 && {
+        priority: 'low',
+        title: 'Challenge Yourself',
+        description: 'Take on more complex projects and explore advanced topics to reach job readiness.'
+      },
+      score >= 80 && {
+        priority: 'low',
+        title: 'Maintain Excellence',
+        description: 'You\'re doing great! Keep practicing and consider contributing to open source projects.'
+      }
+    ].filter(Boolean);
 
   return (
     <div className="bg-white border border-[#E0E0E0] rounded-xl p-6">
@@ -1615,31 +1761,28 @@ function RecommendationsSection({ score, aiRecommendations, onRefresh }: any) {
         {recommendations.map((rec: any, index: number) => (
           <div
             key={index}
-            className={`p-4 rounded-lg border ${
-              rec.priority === 'high' || rec.difficulty === 'Advanced'
-                ? 'bg-red-50 border-red-200'
-                : rec.priority === 'medium' || rec.difficulty === 'Intermediate'
+            className={`p-4 rounded-lg border ${rec.priority === 'high' || rec.difficulty === 'Advanced'
+              ? 'bg-red-50 border-red-200'
+              : rec.priority === 'medium' || rec.difficulty === 'Intermediate'
                 ? 'bg-yellow-50 border-yellow-200'
                 : 'bg-green-50 border-green-200'
-            }`}
+              }`}
           >
             <div className="flex items-start gap-3">
-              <AlertCircle className={`w-5 h-5 mt-0.5 ${
-                rec.priority === 'high' || rec.difficulty === 'Advanced'
-                  ? 'text-red-600'
-                  : rec.priority === 'medium' || rec.difficulty === 'Intermediate'
+              <AlertCircle className={`w-5 h-5 mt-0.5 ${rec.priority === 'high' || rec.difficulty === 'Advanced'
+                ? 'text-red-600'
+                : rec.priority === 'medium' || rec.difficulty === 'Intermediate'
                   ? 'text-yellow-600'
                   : 'text-green-600'
-              }`} />
+                }`} />
               <div className="flex-1">
                 <div className="flex items-start justify-between mb-1">
                   <h4 className="text-sm font-semibold text-[#212121]">{rec.title}</h4>
                   {rec.difficulty && (
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      rec.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' :
+                    <span className={`text-xs px-2 py-1 rounded ${rec.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' :
                       rec.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
+                        'bg-green-100 text-green-700'
+                      }`}>
                       {rec.difficulty}
                     </span>
                   )}

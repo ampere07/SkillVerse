@@ -13,11 +13,11 @@ interface MiniProjectsProps {
 
 const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, onNavigateToDetails }, ref) => {
   const { isNewStudent, completeSurvey } = useAuth();
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [completedThisWeek, setCompletedThisWeek] = useState(0);
   const [allCompleted, setAllCompleted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [completedTitles, setCompletedTitles] = useState(new Set());
   const [projectStatuses, setProjectStatuses] = useState<Map<string, string>>(new Map());
   const [projectScores, setProjectScores] = useState<Map<string, number>>(new Map());
@@ -33,6 +33,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
   const [currentLevel, setCurrentLevel] = useState(1);
   const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   const [consecutiveDays, setConsecutiveDays] = useState(0);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const compilerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -42,40 +43,47 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       await fetchUserLanguage();
     };
     initializePage();
+
+    const handleProjectSubmitted = () => {
+      initializePage();
+    };
+
+    window.addEventListener('project-submitted', handleProjectSubmitted);
+    return () => window.removeEventListener('project-submitted', handleProjectSubmitted);
   }, []);
 
   useEffect(() => {
     const calculateCountdown = () => {
       const now = new Date();
       const nextReset = new Date();
-      
+
       // Set to next Monday at 1 AM
       const daysUntilMonday = (8 - now.getDay()) % 7 || 7; // 0 = Sunday, 1 = Monday
       nextReset.setDate(now.getDate() + daysUntilMonday);
       nextReset.setHours(1, 0, 0, 0);
-      
+
       // If it's already Monday and past 1 AM, set to next Monday
       if (now.getDay() === 1 && now.getHours() >= 1) {
         nextReset.setDate(nextReset.getDate() + 7);
       }
-      
+
       const timeRemaining = nextReset.getTime() - now.getTime();
-      
+
       if (timeRemaining > 0) {
         const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
         const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-        
+
         setCountdown({ days, hours, minutes, seconds });
       } else {
         setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
     };
-    
+
     calculateCountdown();
     const interval = setInterval(calculateCountdown, 1000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -288,23 +296,13 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       setAllCompleted(response.data.allCompleted || false);
       setLoading(false);
       setError(null);
-    } catch (error) {
+    } catch (error: any) {
       setError(error.response?.data?.message || error.message);
       setLoading(false);
     }
   };
 
-  const calculateXPAndLevel = (completedCount: number) => {
-    const xpPerProject = 100; // Each project gives 100 XP
-    const totalXP = completedCount * xpPerProject;
 
-    // Calculate level (each level requires 500 XP)
-    const xpPerLevel = 500;
-    const level = Math.floor(totalXP / xpPerLevel) + 1;
-    const currentLevelXP = totalXP % xpPerLevel;
-
-    return { totalXP, level, currentLevelXP, xpPerLevel };
-  };
 
   const fetchCompletedTasks = async () => {
     try {
@@ -314,14 +312,14 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       });
 
       const completedThisWeekTitles = new Set(
-        response.data.completedThisWeek.map(task => task.projectTitle.toLowerCase())
+        (response.data.completedThisWeek || []).map((task: any) => task.projectTitle.toLowerCase())
       );
       setCompletedTitles(completedThisWeekTitles);
 
       const statusMap = new Map<string, string>();
       const scoreMap = new Map<string, number>();
       const feedbackMap = new Map<string, string>();
-      response.data.completedTasks.forEach(task => {
+      response.data.completedTasks.forEach((task: any) => {
         statusMap.set(task.projectTitle.toLowerCase(), task.status);
         scoreMap.set(task.projectTitle.toLowerCase(), task.score || 0);
         feedbackMap.set(task.projectTitle.toLowerCase(), task.aiAnalyization || '');
@@ -377,7 +375,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
     }
   };
 
-  const getProjectStatus = (projectTitle) => {
+  const getProjectStatus = (projectTitle: string) => {
     const titleLower = projectTitle.toLowerCase();
     const status = projectStatuses.get(titleLower);
 
@@ -387,7 +385,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
     return 'not-started';
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
         return (
@@ -446,7 +444,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
           <p className="text-red-600 font-medium mb-2">Error loading projects</p>
           <p className="text-sm text-red-500">{error}</p>
           <button
-            onClick={fetchProjects}
+            onClick={() => fetchProjects()}
             className="mt-4 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium"
           >
             Retry
@@ -492,63 +490,63 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
               </div>
             </div>
             <div className="relative language-menu-container">
-            <button
-              onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-              className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-100"
-              style={{ color: '#757575' }}
-            >
-              <Settings className="w-5 h-5" strokeWidth={1.5} />
-            </button>
-            {showLanguageMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                <button
-                  onClick={async () => {
-                    setShowLanguageMenu(false);
-                    const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
+              <button
+                onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-100"
+                style={{ color: '#757575' }}
+              >
+                <Settings className="w-5 h-5" strokeWidth={1.5} />
+              </button>
+              {showLanguageMenu && (
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                  <button
+                    onClick={async () => {
+                      setShowLanguageMenu(false);
+                      const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
 
-                    // Check if projects exist or survey is done for target language
-                    try {
-                      const token = localStorage.getItem('token');
-                      const response = await axios.get(`${API_URL}/mini-projects/check-language-projects`, {
-                        params: { language: otherLanguage },
-                        headers: { Authorization: `Bearer ${token}` }
-                      });
+                      // Check if projects exist or survey is done for target language
+                      try {
+                        const token = localStorage.getItem('token');
+                        const response = await axios.get(`${API_URL}/mini-projects/check-language-projects`, {
+                          params: { language: otherLanguage },
+                          headers: { Authorization: `Bearer ${token}` }
+                        });
 
-                      const { hasProjects, surveyCompleted } = response.data;
+                        const { hasProjects, surveyCompleted } = response.data;
 
-                      if (hasProjects || surveyCompleted) {
-                        // Show confirmation modal if projects exist or survey is done
+                        if (hasProjects || surveyCompleted) {
+                          // Show confirmation modal if projects exist or survey is done
+                          setPendingLanguage(otherLanguage);
+                          setShowConfirmationModal(true);
+                        } else {
+                          // No projects and no survey - go directly to survey modal
+                          setPendingLanguage(otherLanguage);
+                          setSurveyLanguage(otherLanguage);
+                          setShowSurvey(true);
+                        }
+                      } catch (error) {
+                        // On error, show confirmation modal as fallback
                         setPendingLanguage(otherLanguage);
                         setShowConfirmationModal(true);
-                      } else {
-                        // No projects and no survey - go directly to survey modal
-                        setPendingLanguage(otherLanguage);
-                        setSurveyLanguage(otherLanguage);
-                        setShowSurvey(true);
                       }
-                    } catch (error) {
-                      // On error, show confirmation modal as fallback
-                      setPendingLanguage(otherLanguage);
-                      setShowConfirmationModal(true);
-                    }
-                  }}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'python' ? '#DBEAFE' : '#FEF3C7' }}>
-                    <span className="text-sm font-bold" style={{ color: currentLanguage === 'python' ? '#3B82F6' : '#F59E0B' }}>
-                      {currentLanguage === 'python' ? 'Jv' : 'Py'}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: '#212121' }}>
-                      Switch Language
-                    </p>
-                    <p className="text-xs" style={{ color: '#757575' }}>Change to {currentLanguage === 'python' ? 'Java' : 'Python'}</p>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: currentLanguage === 'python' ? '#DBEAFE' : '#FEF3C7' }}>
+                      <span className="text-sm font-bold" style={{ color: currentLanguage === 'python' ? '#3B82F6' : '#F59E0B' }}>
+                        {currentLanguage === 'python' ? 'Jv' : 'Py'}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: '#212121' }}>
+                        Switch Language
+                      </p>
+                      <p className="text-xs" style={{ color: '#757575' }}>Change to {currentLanguage === 'python' ? 'Java' : 'Python'}</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <p className="text-sm" style={{ color: '#757575' }}>
@@ -585,8 +583,29 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm font-semibold" style={{ color: '#212121' }}>{currentXP} / 500 XP</p>
-            <p className="text-xs" style={{ color: '#757575' }}>{500 - currentXP} XP to Level {currentLevel + 1}</p>
+            {(() => {
+              const getXpRequiredForLevel = (level: number) => {
+                if (level <= 1) return 0;
+                let totalXp = 0;
+                for (let i = 2; i <= level; i++) {
+                  totalXp += i * 100;
+                }
+                return totalXp;
+              };
+
+              const currentLevelXp = getXpRequiredForLevel(currentLevel);
+              const nextLevelTotalXp = getXpRequiredForLevel(currentLevel + 1);
+              const xpProgress = currentXP - currentLevelXp;
+              const xpNeededForLevel = nextLevelTotalXp - currentLevelXp;
+              const xpToNextLevel = nextLevelTotalXp - currentXP;
+
+              return (
+                <>
+                  <p className="text-sm font-semibold" style={{ color: '#212121' }}>{xpProgress} / {xpNeededForLevel} XP</p>
+                  <p className="text-xs" style={{ color: '#757575' }}>{xpToNextLevel} XP to Level {currentLevel + 1}</p>
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -595,7 +614,20 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
             <div
               className="h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden"
               style={{
-                width: `${(currentXP / 500) * 100}%`,
+                width: `${(() => {
+                  const getXpRequiredForLevel = (level: number) => {
+                    if (level <= 1) return 0;
+                    let totalXp = 0;
+                    for (let i = 2; i <= level; i++) {
+                      totalXp += i * 100;
+                    }
+                    return totalXp;
+                  };
+                  const currentLevelXp = getXpRequiredForLevel(currentLevel);
+                  const nextLevelTotalXp = getXpRequiredForLevel(currentLevel + 1);
+                  const progress = ((currentXP - currentLevelXp) / (nextLevelTotalXp - currentLevelXp)) * 100;
+                  return Math.min(100, Math.max(0, progress));
+                })()}%`,
                 background: 'linear-gradient(90deg, #FFB300 0%, #FFA000 100%)'
               }}
             >
@@ -773,7 +805,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
             Complete your onboarding survey to get personalized AI-generated projects
           </p>
           <button
-            onClick={fetchProjects}
+            onClick={() => fetchProjects()}
             className="px-6 py-2.5 text-white rounded-lg transition-all text-sm font-medium hover:shadow-md"
             style={{ backgroundColor: '#1B5E20' }}
           >

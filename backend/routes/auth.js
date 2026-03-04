@@ -12,11 +12,33 @@ const verificationCodes = new Map();
 const passwordResetCodes = new Map();
 
 const toTitleCase = (str) => {
+  if (!str) return '';
   return str
     .toLowerCase()
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+};
+
+const getFullName = (user) => {
+  const isBad = (s) => !s || String(s).toLowerCase().includes('undefined') || String(s).toLowerCase().includes('null');
+
+  const first = isBad(user.firstName) ? '' : user.firstName;
+  const last = isBad(user.lastName) ? '' : user.lastName;
+  const middle = isBad(user.middleInitial) ? '' : user.middleInitial;
+
+  // Even if user.name exists physically, if it's "bad", we ignore it
+  let finalName = isBad(user.name) ? '' : user.name;
+
+  if (!finalName) {
+    if (!first && !last) return user.email.split('@')[0];
+    const middlePart = middle ? ` ${middle}.` : '';
+    const lastPart = last ? ` ${last}` : '';
+    finalName = `${first}${middlePart}${lastPart}`.trim();
+  }
+
+  // Final fallback if everything is still bad
+  return isBad(finalName) ? user.email.split('@')[0] : finalName;
 };
 
 router.post('/send-verification-code', async (req, res) => {
@@ -313,6 +335,7 @@ router.post('/register', async (req, res) => {
       email: email.toLowerCase(),
       password: hashedPassword,
       role,
+      name: `${firstName}${middleInitial ? ' ' + middleInitial + '.' : ''} ${lastName}`.trim(),
       firstName,
       middleInitial,
       lastName
@@ -357,7 +380,7 @@ router.post('/register', async (req, res) => {
       user: {
         id: user._id.toString(),
         email: user.email,
-        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        name: getFullName(user),
         firstName: user.firstName,
         middleInitial: user.middleInitial || '',
         lastName: user.lastName,
@@ -427,7 +450,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id.toString(),
         email: user.email,
-        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        name: getFullName(user),
         firstName: user.firstName,
         middleInitial: user.middleInitial || '',
         lastName: user.lastName,
@@ -455,7 +478,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        name: getFullName(user),
         firstName: user.firstName,
         middleInitial: user.middleInitial || '',
         lastName: user.lastName,
@@ -499,11 +522,15 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
     const formattedFirstName = toTitleCase(firstName.trim());
     const formattedLastName = toTitleCase(lastName.trim());
     const formattedMiddleInitial = middleInitial ? middleInitial.trim().charAt(0).toUpperCase() : '';
+    const fullName = `${formattedFirstName}${formattedMiddleInitial ? ' ' + formattedMiddleInitial + '.' : ''} ${formattedLastName}`.trim();
 
     const user = await User.findByIdAndUpdate(
       req.user.userId,
-      { 
-        name: formattedName,
+      {
+        firstName: formattedFirstName,
+        middleInitial: formattedMiddleInitial,
+        lastName: formattedLastName,
+        name: fullName,
         email: email.toLowerCase()
       },
       { new: true, runValidators: true }
@@ -521,7 +548,7 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        name: getFullName(user),
         firstName: user.firstName,
         middleInitial: user.middleInitial || '',
         lastName: user.lastName,
@@ -743,7 +770,7 @@ router.put('/change-language', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        name: getFullName(user),
         firstName: user.firstName,
         middleInitial: user.middleInitial || '',
         lastName: user.lastName,
@@ -811,7 +838,7 @@ router.put('/update-language', authenticateToken, async (req, res) => {
         _id: user._id.toString(),
         id: user._id.toString(),
         email: user.email,
-        name: `${user.firstName}${user.middleInitial ? ' ' + user.middleInitial + '.' : ''} ${user.lastName}`,
+        name: getFullName(user),
         firstName: user.firstName,
         middleInitial: user.middleInitial || '',
         lastName: user.lastName,
@@ -834,16 +861,16 @@ router.put('/update-language', authenticateToken, async (req, res) => {
 router.get('/users/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const user = await User.findById(id).select('name email profilePicture level xp role');
-    
+
+    const user = await User.findById(id).select('name firstName middleInitial lastName email profilePicture level xp role');
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-    
+
     res.json({
       success: true,
       user: {
