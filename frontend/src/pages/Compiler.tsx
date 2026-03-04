@@ -86,9 +86,10 @@ interface CompilerProps {
   onHasUnsavedChanges?: (hasChanges: boolean) => void;
   isActivityMode?: boolean;
   readOnly?: boolean;
+  onSubmitSuccess?: () => void;
 }
 
-const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges, isActivityMode = false, readOnly = false }, ref) => {
+const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, onBack, onHasUnsavedChanges, isActivityMode = false, readOnly = false, onSubmitSuccess }, ref) => {
   const { user } = useAuth();
   const [language, setLanguage] = useState('java');
   const [code, setCode] = useState(DEFAULT_CODE.java);
@@ -1113,6 +1114,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         return { success: false, error: error.message || 'Failed to submit activity' };
       }
 
+      if (onSubmitSuccess) {
+        onSubmitSuccess();
+      }
+
       return { success: true };
     } catch (error) {
       return {
@@ -1128,6 +1133,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   };
 
   const confirmSubmitProject = async () => {
+    if (!projectDetails) return;
     setShowSubmitConfirmModal(false);
     setIsSaving(true);
     setIsGrading(true);
@@ -1159,6 +1165,10 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
         setGradingResult(data.gradingResult);
         setShowGradingModal(true);
         setSaveMessage('');
+
+        if (onSubmitSuccess) {
+          onSubmitSuccess();
+        }
 
         setTypedFeedback('');
         setIsTyping(true);
@@ -1258,8 +1268,8 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                 )}
                 {saveMessage && (
                   <div className={`px-4 py-2 rounded-lg text-sm font-medium ${saveMessage.includes('Error')
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-green-100 text-green-700'
                     }`}>
                     {saveMessage}
                   </div>
@@ -1297,8 +1307,8 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
           <div className="flex items-center space-x-2">
             {isActivityMode && timeRemaining !== null && (
               <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg font-mono text-sm font-semibold ${timeRemaining <= 300 ? 'bg-red-100 text-red-700' :
-                  timeRemaining <= 600 ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-blue-100 text-blue-700'
+                timeRemaining <= 600 ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-blue-100 text-blue-700'
                 }`}>
                 <Clock className="w-4 h-4" />
                 <span>{formatTime(timeRemaining)}</span>
@@ -1447,8 +1457,8 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                       <div
                         key={num}
                         className={`text-xs font-mono flex items-center justify-end space-x-1 ${hasError ? 'text-red-600 font-bold' :
-                            hasWarning ? 'text-yellow-600 font-bold' :
-                              'text-gray-400'
+                          hasWarning ? 'text-yellow-600 font-bold' :
+                            'text-gray-400'
                           }`}
                         style={{ height: '24px', minHeight: '24px', lineHeight: '24px' }}
                         title={
@@ -1571,8 +1581,8 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
                         <span className="text-xs text-gray-500">{suggestion.description}</span>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded ${suggestion.type === 'import' ? 'bg-purple-100 text-purple-700' :
-                          suggestion.type === 'keyword' ? 'bg-blue-100 text-blue-700' :
-                            'bg-green-100 text-green-700'
+                        suggestion.type === 'keyword' ? 'bg-blue-100 text-blue-700' :
+                          'bg-green-100 text-green-700'
                         }`}>
                         {suggestion.type}
                       </span>

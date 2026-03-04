@@ -87,7 +87,8 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
     useEffect(() => {
         // Setup socket for code execution
-        const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
+        const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+        const socket = io(baseUrl);
         socketRef.current = socket;
 
         socket.on('output', (data: string) => {
@@ -342,7 +343,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="text-[11px] font-black text-[#555] uppercase tracking-[0.3em] flex items-center gap-3">
                                     <Trophy className="w-4 h-4 text-[#F57C00]" />
-                                    Global Leaderboard
+                                    Leaderboard
                                 </h3>
                                 <div className="flex items-center gap-2 px-2.5 py-1 bg-white border border-[#E0E0E0] rounded-lg">
                                     <span className="w-1.5 h-1.5 bg-[#4CAF50] rounded-full animate-pulse"></span>
@@ -351,9 +352,14 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                             </div>
 
                             <div className="space-y-4">
-                                {[0, 1, 2, 3, 4].map((i) => {
-                                    const entry = leaderboard[i];
-                                    return (
+                                {leaderboard.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-8 opacity-50">
+                                        <Trophy className="w-10 h-10 text-[#CCC] mb-3" />
+                                        <p className="text-sm font-bold text-[#AAA]">No data yet</p>
+                                        <p className="text-[10px] text-[#CCC] mt-1">Be the first to complete a mission!</p>
+                                    </div>
+                                ) : (
+                                    leaderboard.slice(0, 5).map((entry, i) => (
                                         <div key={i} className="flex items-center justify-between group p-1.5 hover:bg-white hover:rounded-2xl transition-all duration-300">
                                             <div className="flex items-center gap-4">
                                                 <div className={`text-xs font-black w-7 h-7 flex items-center justify-center rounded-xl shadow-sm ${i === 0 ? 'bg-[#FFD700] text-white' :
@@ -364,30 +370,28 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                                                     {i + 1}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className={`text-sm font-bold ${entry ? 'text-[#212121]' : 'text-[#CCC] italic'}`}>
-                                                        {entry ? entry.name : 'Searching for signal...'}
+                                                    <span className="text-sm font-bold text-[#212121]">
+                                                        {entry.name}
                                                     </span>
-                                                    {entry && (
-                                                        <span className="text-[9px] font-bold text-[#AAA] uppercase tracking-tighter">
-                                                            {entry.sessionsCompleted} Extractions
-                                                        </span>
-                                                    )}
+                                                    <span className="text-[9px] font-bold text-[#AAA] uppercase tracking-tighter">
+                                                        {(entry.sessionsCompleted || 0) + (entry.sessionsSurrendered || 0)} Missions • {entry.totalBugsFixed || 0} Bugs Fixed
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#E0E0E0] shadow-sm">
                                                 <Zap className="w-3 h-3 text-[#F57C00]" />
-                                                <span className={`text-[12px] font-mono font-black ${entry ? 'text-[#212121]' : 'text-[#CCC]'}`}>
-                                                    {entry ? entry.totalScore.toLocaleString() : '---'}
+                                                <span className="text-[12px] font-mono font-black text-[#212121]">
+                                                    {entry.totalScore.toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
-                                    );
-                                })}
+                                    ))
+                                )}
                             </div>
 
                             <div className="mt-8 pt-8 border-t border-[#E0E0E0]">
                                 <p className="text-[10px] text-[#AAA] font-medium leading-relaxed italic text-center">
-                                    "Students are ranked by total extracted intel points across all successful missions."
+                                    "Students are ranked by total extracted intel points across all missions."
                                 </p>
                             </div>
                         </div>

@@ -351,6 +351,17 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
     );
   }
 
+  if (error || !post) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">{error || 'Post not found'}</p>
+        <button onClick={onBack} className="mt-4 text-gray-600 hover:text-gray-900">
+          Go back
+        </button>
+      </div>
+    );
+  }
+
   if (showSubmissionDetails && selectedSubmission) {
     const student = typeof selectedSubmission.student === 'object' ? selectedSubmission.student : null;
     const studentName = student ? student.name : 'Unknown Student';
@@ -540,16 +551,7 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
     );
   }
 
-  if (error || !post) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-600">{error || 'Post not found'}</p>
-        <button onClick={onBack} className="mt-4 text-gray-600 hover:text-gray-900">
-          Go back
-        </button>
-      </div>
-    );
-  }
+
 
   const dueDate = post.dueDate ? new Date(post.dueDate) : null;
   const isOverdue = dueDate && dueDate < new Date();
@@ -850,8 +852,8 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                       }}
                       disabled={mySubmission.grade !== undefined}
                       className={`w-full px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${mySubmission.grade !== undefined
-                          ? 'bg-green-600 text-white cursor-not-allowed opacity-75'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                        ? 'bg-green-600 text-white cursor-not-allowed opacity-75'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                     >
                       {mySubmission.grade !== undefined ? 'Graded' : 'Unsubmit'}

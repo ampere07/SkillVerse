@@ -47,7 +47,7 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       // Fetch all projects
       const projectsResponse = await axios.get(`${API_URL}/mini-projects/available-projects`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -138,11 +138,11 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
       <div className="p-6" style={{ backgroundColor: '#FAFAFA', minHeight: '100vh' }}>
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center shadow-sm">
           <p className="text-red-600 font-medium mb-2">{error || 'Project not found'}</p>
-          <button 
-          onClick={onBack}
-          className="mt-4 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium"
+          <button
+            onClick={onBack}
+            className="mt-4 px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium"
           >
-          Back to Projects
+            Back to Projects
           </button>
         </div>
       </div>
@@ -152,15 +152,19 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
   if (showCompiler) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
-        <Compiler 
+        <Compiler
           ref={compilerRef}
-          onMenuClick={() => {}}
+          onMenuClick={() => { }}
           projectDetails={project}
           onBack={() => {
             setShowCompiler(false);
             fetchProjectDetails();
           }}
           onHasUnsavedChanges={onHasUnsavedChanges}
+          onSubmitSuccess={() => {
+            fetchProjectDetails();
+            window.dispatchEvent(new CustomEvent('project-submitted'));
+          }}
         />
       </div>
     );
@@ -171,12 +175,12 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
       {/* Header */}
       <div className="mb-6">
         <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-sm mb-4 hover:opacity-70 transition-opacity"
-        style={{ color: '#757575' }}
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm mb-4 hover:opacity-70 transition-opacity"
+          style={{ color: '#757575' }}
         >
-        <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
-        Back to Projects
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
+          Back to Projects
         </button>
 
         <div className="flex items-center justify-between">
@@ -223,12 +227,10 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
                   {score}/100
                 </span>
               </div>
-              <div className={`text-center py-3 rounded-lg mb-4 ${
-                score >= 70 ? 'bg-green-50' : 'bg-red-50'
-              }`}>
-                <span className={`text-base font-semibold ${
-                  score >= 70 ? 'text-green-700' : 'text-red-700'
+              <div className={`text-center py-3 rounded-lg mb-4 ${score >= 70 ? 'bg-green-50' : 'bg-red-50'
                 }`}>
+                <span className={`text-base font-semibold ${score >= 70 ? 'text-green-700' : 'text-red-700'
+                  }`}>
                   {score >= 70 ? 'You Passed!' : 'Keep Practicing!'}
                 </span>
               </div>
@@ -252,11 +254,11 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
             <h2 className="text-sm font-semibold mb-3" style={{ color: '#212121' }}>Programming Language</h2>
             <div className="flex items-center gap-2">
               <Code className="w-5 h-5" style={{ color: project.language?.toLowerCase() === 'python' ? '#F59E0B' : '#3B82F6' }} strokeWidth={1.5} />
-              <span 
-                className="px-3 py-1.5 rounded-lg font-medium" 
-                style={{ 
-                  backgroundColor: project.language?.toLowerCase() === 'python' ? '#FEF3C7' : '#DBEAFE', 
-                  color: project.language?.toLowerCase() === 'python' ? '#F59E0B' : '#3B82F6' 
+              <span
+                className="px-3 py-1.5 rounded-lg font-medium"
+                style={{
+                  backgroundColor: project.language?.toLowerCase() === 'python' ? '#FEF3C7' : '#DBEAFE',
+                  color: project.language?.toLowerCase() === 'python' ? '#F59E0B' : '#3B82F6'
                 }}
               >
                 {project.language}
@@ -274,19 +276,18 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
                 }
               }}
               disabled={status === 'completed' || status === 'submitted'}
-              className={`w-full px-6 py-3 text-sm font-medium rounded-lg transition-all ${
-                status === 'completed' || status === 'submitted'
+              className={`w-full px-6 py-3 text-sm font-medium rounded-lg transition-all ${status === 'completed' || status === 'submitted'
                   ? 'bg-gray-100 cursor-not-allowed'
                   : 'text-white hover:shadow-md'
-              }`}
-              style={status === 'completed' || status === 'submitted' 
+                }`}
+              style={status === 'completed' || status === 'submitted'
                 ? { color: '#757575' }
                 : { backgroundColor: '#1B5E20' }
               }
             >
-              {status === 'completed' ? 'Completed' : 
-               status === 'submitted' ? 'Submitted' :
-               status === 'paused' ? 'Continue Project' : 'Start Project'}
+              {status === 'completed' ? 'Completed' :
+                status === 'submitted' ? 'Submitted' :
+                  status === 'paused' ? 'Continue Project' : 'Start Project'}
             </button>
             {(status === 'completed' || status === 'submitted') && (
               <p className="text-xs text-center mt-2" style={{ color: '#757575' }}>
@@ -325,12 +326,10 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
                 </div>
               </div>
 
-              <div className={`text-center py-3 rounded-lg ${
-                score! >= 70 ? 'bg-green-50' : 'bg-red-50'
-              }`}>
-                <span className={`text-base font-semibold ${
-                  score! >= 70 ? 'text-green-700' : 'text-red-700'
+              <div className={`text-center py-3 rounded-lg ${score! >= 70 ? 'bg-green-50' : 'bg-red-50'
                 }`}>
+                <span className={`text-base font-semibold ${score! >= 70 ? 'text-green-700' : 'text-red-700'
+                  }`}>
                   {score! >= 70 ? 'You Passed!' : 'Keep Practicing!'}
                 </span>
               </div>

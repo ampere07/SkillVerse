@@ -11,6 +11,21 @@ import {
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
+
+const getSafeName = (user: any) => {
+  if (!user?.name || user.name.toLowerCase().includes('undefined')) {
+    return user?.email?.split('@')[0] || 'User';
+  }
+  return user.name;
+};
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
 import Compiler from '../pages/Compiler';
 import Classrooms from '../pages/Classrooms';
 import MiniProjects from '../pages/MiniProjects';
@@ -108,6 +123,8 @@ export default function Dashboard() {
   const miniProjectsRef = useRef<any>(null);
   const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
   const [completedProjectsCount, setCompletedProjectsCount] = useState(0);
+
+
   const [activeAssignmentsCount, setActiveAssignmentsCount] = useState(0);
   const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
@@ -121,7 +138,8 @@ export default function Dashboard() {
   // Initialize socket connection for real-time updates
   useEffect(() => {
     if (user?.role === 'student') {
-      const socket = io(`${import.meta.env.VITE_API_URL}/dashboard`, {
+      const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+      const socket = io(`${baseUrl}/dashboard`, {
         transports: ['websocket', 'polling']
       });
 
@@ -192,6 +210,12 @@ export default function Dashboard() {
       const coursesResponse = await fetch(`${import.meta.env.VITE_API_URL}/courses/enrolled`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+
+      if (coursesResponse.status === 401 || coursesResponse.status === 403) {
+        logout();
+        return;
+      }
+
       const coursesData = await coursesResponse.json();
       if (coursesResponse.ok) {
         setEnrolledCoursesCount(coursesData.enrolledCourses?.length || 0);
@@ -376,7 +400,7 @@ export default function Dashboard() {
         (window as any).clearViewingStudent();
       }
     }
-    
+
     if (hasUnsavedChanges && activeNav === '/mini-projects') {
       setPendingNavigation(href);
       setShowNavigationWarning(true);
@@ -444,17 +468,27 @@ export default function Dashboard() {
             <div className="flex flex-col items-center gap-0 w-full">
               <div className="w-[100px] h-[100px] bg-white rounded-lg flex items-center justify-center p-2">
                 <img
-                  src="/assets/badges/graduationhat.png"
+                  src="/assets/skillverseLogoV2.webp"
                   alt="SkillVerse Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
-              <span className="text-xl font-bold text-[#212121]">SkillVerse</span>
+              <span className="text-xl font-bold text-[#1B5E20]">SkillVerse</span>
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="relative flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+          <nav className="relative flex-1 flex flex-col gap-1 overflow-y-auto">
+            {/* Sliding selection pill */}
+            <div
+              className="absolute left-0 right-0 h-[46px] bg-[#F1F8F1] border-l-4 border-[#1B5E20] transition-all duration-300 ease-in-out pointer-events-none z-0"
+              style={{
+                transform: `translateY(${activeIndex * 50}px)`,
+                top: 0,
+                opacity: activeIndex === -1 ? 0 : 1
+              }}
+            />
+
             {filteredNavigation.map((item) => {
               const isActive = activeNav === item.href || (activeNav.startsWith(item.href) && item.href !== '/dashboard');
 
@@ -464,37 +498,27 @@ export default function Dashboard() {
                   onClick={() => !isGameActive && handleNavigation(item.href)}
                   disabled={isGameActive}
                   className={`
-                    relative z-10 w-full flex items-center gap-3 px-3 py-[10px] rounded-lg transition-all border
+                    relative z-10 w-full h-[46px] flex items-center gap-3 px-6 transition-all
                     ${isActive
-                      ? 'text-[#1B5E20] lg:bg-transparent lg:border-transparent bg-white border-[#1B5E20]'
-                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent border-transparent'
+                      ? 'text-[#1B5E20]'
+                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent'
                     }
                     ${isGameActive ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}
                   `}
                 >
+                  <span className="text-sm font-semibold flex-1 text-left leading-none">
+                    {item.label === 'Progress Tracking' && user?.role === 'teacher'
+                      ? 'Student Tracking'
+                      : item.label}
+                  </span>
                   <img
                     src={item.icon}
                     alt={item.label}
-                    className="w-6 h-6 object-contain"
+                    className={`w-6 h-6 object-contain transition-transform duration-300 ${isActive ? 'scale-[1.8]' : ''}`}
                   />
-                  <span className="text-sm font-semibold flex-1 text-left">
-                    {item.label === 'Progress Tracking' && user?.role === 'teacher' 
-                      ? 'Student Tracking' 
-                      : item.label}
-                  </span>
                 </button>
               );
             })}
-
-            {/* Sliding selection pill - Desktop only */}
-            <div 
-              className="absolute left-3 right-3 h-[46px] bg-white border border-[#1B5E20] rounded-lg transition-all duration-300 ease-in-out pointer-events-none hidden lg:block z-0"
-              style={{ 
-                transform: `translateY(${activeIndex * 50}px)`,
-                top: '10px',
-                opacity: activeIndex === -1 ? 0 : 1
-              }}
-            />
           </nav>
 
           {/* User Profile & Logout */}
@@ -502,25 +526,25 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 px-3 py-3 border border-[#E0E0E0] rounded-lg">
               <div className="w-10 h-10 bg-[#F5F5F5] border border-[#E0E0E0] rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-semibold text-[#1B5E20]">
-                  {user.name.charAt(0).toUpperCase()}
+                  {getSafeName(user).charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-[#212121] truncate">{user.name}</p>
+                <p className="text-[13px] font-semibold text-[#212121] truncate">{getSafeName(user)}</p>
                 <p className="text-[11px] text-[#757575] capitalize">{user.role}</p>
               </div>
             </div>
 
             <button
               onClick={logout}
-              className="w-full flex items-center justify-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
+              className="w-full flex items-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
             >
+              <span className="text-sm font-semibold flex-1 text-left">Logout</span>
               <img
                 src="/assets/badges/logout.png"
                 alt="Logout"
                 className="w-6 h-6 object-contain"
               />
-              <span className="text-sm font-semibold">Logout</span>
             </button>
           </div>
         </div>
@@ -660,6 +684,7 @@ function StudentDashboardContent({
   onMiniProjectsClick
 }: StudentDashboardContentProps) {
   const [projects, setProjects] = useState<any[]>([]);
+  const { logout } = useAuth();
 
   useEffect(() => {
     fetchMiniProjects();
@@ -674,6 +699,11 @@ function StudentDashboardContent({
       const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/available-projects`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+
+      if (response.status === 401 || response.status === 403) {
+        logout();
+        return;
+      }
 
       const data = await response.json();
       if (response.ok && data.availableProjects) {
@@ -716,7 +746,7 @@ function StudentDashboardContent({
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <h1 className="text-[28px] font-semibold text-[#212121]">
-            Welcome back, {user.name.split(' ')[0]}
+            {getGreeting()}, {getSafeName(user).split(' ')[0]}
           </h1>
           <Sparkles className="w-6 h-6 text-[#FFB300]" />
         </div>

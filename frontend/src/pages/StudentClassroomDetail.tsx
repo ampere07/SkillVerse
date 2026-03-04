@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   ChevronRight,
-  Users, 
+  Users,
   Calendar,
   FileText,
   CheckCircle,
@@ -71,23 +71,23 @@ export default function StudentClassroomDetail({ classroomId, onBack, initialPos
         activityAPI.getClassroomActivities(classroomId),
         moduleAPI.getClassroomModules(classroomId)
       ]);
-      
+
       setClassroom(classroomRes.classroom);
-      
+
       const activities = (activitiesRes.activities || []).map((activity: any) => ({
         ...activity,
         postType: 'activity' as const
       }));
-      
+
       const modules = (modulesRes.modules || []).map((module: any) => ({
         ...module,
         postType: 'module' as const
       }));
-      
-      const allPosts = [...activities, ...modules].sort((a, b) => 
+
+      const allPosts = [...activities, ...modules].sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      
+
       setPosts(allPosts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
@@ -115,8 +115,8 @@ export default function StudentClassroomDetail({ classroomId, onBack, initialPos
     );
   }
 
-  const teacherName = typeof classroom.teacher === 'object' && classroom.teacher !== null 
-    ? classroom.teacher.name 
+  const teacherName = typeof classroom.teacher === 'object' && classroom.teacher !== null
+    ? classroom.teacher.name
     : 'Unknown Teacher';
 
   return (
@@ -140,7 +140,7 @@ export default function StudentClassroomDetail({ classroomId, onBack, initialPos
             <div className="flex items-center space-x-4 mt-3">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Users className="w-4 h-4" />
-                <span>{classroom.students.length} student{classroom.students.length !== 1 ? 's' : ''}</span>
+                <span>{(classroom.students || []).length} student{(classroom.students || []).length !== 1 ? 's' : ''}</span>
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <FileText className="w-4 h-4" />
@@ -174,7 +174,7 @@ export default function StudentClassroomDetail({ classroomId, onBack, initialPos
               <StudentPostCard
                 key={post._id}
                 post={post}
-                userId={user?.userId || ''}
+                userId={user?.id || ''}
                 onViewDetails={() => setSelectedPost({ id: post._id, type: post.postType })}
               />
             ))}
@@ -212,13 +212,13 @@ function StudentPostCard({ post, userId, onViewDetails }: StudentPostCardProps) 
     const now = new Date();
     const diff = date.getTime() - now.getTime();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days < 0) return { text: 'Overdue', color: 'text-red-600' };
     if (days === 0) return { text: 'Due today', color: 'text-red-600' };
     if (days === 1) return { text: 'Due tomorrow', color: 'text-gray-600' };
     if (days < 7) return { text: `Due in ${days} days`, color: 'text-gray-600' };
-    
-    return { 
+
+    return {
       text: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       color: 'text-gray-600'
     };
@@ -256,7 +256,7 @@ function StudentPostCard({ post, userId, onViewDetails }: StudentPostCardProps) 
         <h3 className="text-base font-semibold text-gray-900 mb-2">
           {post.title}
         </h3>
-        
+
         <p className="text-sm text-gray-600">
           {post.description}
         </p>
@@ -280,7 +280,7 @@ function StudentPostCard({ post, userId, onViewDetails }: StudentPostCardProps) 
                   <span>{formatDueDate(dueDate).text}</span>
                 </div>
               )}
-              
+
               {post.points && post.points > 0 && (
                 <div className="flex items-center space-x-1.5 text-gray-600">
                   <span className="font-medium">{post.points} pts</span>

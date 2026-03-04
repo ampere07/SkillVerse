@@ -3,10 +3,10 @@ import User from '../models/User.js';
 import Progress from '../models/Progress.js';
 import Classroom from '../models/Classroom.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
-import { 
-  generateProgressInsights, 
-  generateLearningRecommendations, 
-  analyzeSkillGaps 
+import {
+  generateProgressInsights,
+  generateLearningRecommendations,
+  analyzeSkillGaps
 } from '../services/aiProgressService.js';
 
 const router = express.Router();
@@ -22,7 +22,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('xp level badges demoXP demoLevel demoBadges');
     console.log('[Progress] User found:', user ? 'Yes' : 'No');
-    
+
     if (!user) {
       console.log('[Progress] User not found in database');
       return res.status(404).json({ error: 'User not found' });
@@ -136,7 +136,7 @@ router.post('/backfill-xp', authenticateToken, async (req, res) => {
     const { awardXp } = await import('../services/xpService.js');
 
     const userDoc = await User.findById(studentId).select('xp level');
-    
+
     // Only backfill if user has 0 XP (never been awarded)
     if (userDoc.xp > 0) {
       return res.json({ success: true, message: 'XP already awarded', xp: userDoc.xp, level: userDoc.level });
@@ -167,7 +167,7 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
   try {
     let studentId = req.user.userId;
     const userRole = req.user.role;
-    
+
     // If teacher is requesting, allow passing a studentId parameter
     if (userRole === 'teacher' && req.query.studentId) {
       studentId = req.query.studentId;
@@ -176,7 +176,7 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     // Allow both students and teachers to access this route
     // Students can only view their own progress
     // Teachers can view their own progress or their students' progress
-    
+
     // Import MiniProject model to read real mini-project data
     const MiniProject = (await import('../models/MiniProject.js')).default;
 
@@ -192,14 +192,14 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
 
     // Accept any non-paused task as completed
     const submittedTasks = completedTasks.filter(t => t.status !== 'paused');
-    
+
 
     // Separate by language by looking at weekly project history
     const weeklyHistory = miniProjectDoc?.weeklyProjectHistory || [];
     let javaProjectsCompleted = 0;
     let pythonProjectsCompleted = 0;
     let totalProjectScore = 0;
-    
+
     submittedTasks.forEach(task => {
       // Look up the language from weekly history
       let lang = null;
@@ -215,7 +215,7 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       totalProjectScore += task.score || 0;
     });
 
-    
+
     const avgProjectScore = submittedTasks.length > 0 ? totalProjectScore / submittedTasks.length : 0;
 
     // Get real user XP and level
@@ -318,11 +318,11 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       ['java', 'python'].forEach(lang => {
         aggregatedProgress.skills[lang].exercisesCompleted += progress.skills[lang].exercisesCompleted;
         aggregatedProgress.skills[lang].projectsCompleted += progress.skills[lang].projectsCompleted;
-        
+
         // Keep the most recent activity
-        if (progress.skills[lang].lastActivity && 
-            (!aggregatedProgress.skills[lang].lastActivity || 
-             new Date(progress.skills[lang].lastActivity) > new Date(aggregatedProgress.skills[lang].lastActivity))) {
+        if (progress.skills[lang].lastActivity &&
+          (!aggregatedProgress.skills[lang].lastActivity ||
+            new Date(progress.skills[lang].lastActivity) > new Date(aggregatedProgress.skills[lang].lastActivity))) {
           aggregatedProgress.skills[lang].lastActivity = progress.skills[lang].lastActivity;
         }
       });
@@ -331,14 +331,14 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       aggregatedProgress.activities.codeExecutions.total += progress.activities.codeExecutions.total;
       aggregatedProgress.activities.codeExecutions.java += progress.activities.codeExecutions.java;
       aggregatedProgress.activities.codeExecutions.python += progress.activities.codeExecutions.python;
-      
+
       aggregatedProgress.activities.assignments.totalSubmitted += progress.activities.assignments.totalSubmitted;
       aggregatedProgress.activities.assignments.onTime += progress.activities.assignments.onTime;
       aggregatedProgress.activities.assignments.late += progress.activities.assignments.late;
-      
+
       aggregatedProgress.activities.miniProjects.completed += progress.activities.miniProjects.completed;
       aggregatedProgress.activities.miniProjects.inProgress += progress.activities.miniProjects.inProgress;
-      
+
       aggregatedProgress.activities.bugHunt.participated += progress.activities.bugHunt.participated;
       aggregatedProgress.activities.bugHunt.bugsFound += progress.activities.bugHunt.bugsFound;
       if (progress.activities.bugHunt.bestScore > aggregatedProgress.activities.bugHunt.bestScore) {
@@ -358,34 +358,34 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       }
 
       // Keep most recent dates
-      if (progress.activities.codeExecutions.lastExecution && 
-          (!aggregatedProgress.activities.codeExecutions.lastExecution || 
-           new Date(progress.activities.codeExecutions.lastExecution) > new Date(aggregatedProgress.activities.codeExecutions.lastExecution))) {
+      if (progress.activities.codeExecutions.lastExecution &&
+        (!aggregatedProgress.activities.codeExecutions.lastExecution ||
+          new Date(progress.activities.codeExecutions.lastExecution) > new Date(aggregatedProgress.activities.codeExecutions.lastExecution))) {
         aggregatedProgress.activities.codeExecutions.lastExecution = progress.activities.codeExecutions.lastExecution;
       }
-      
-      if (progress.activities.assignments.lastSubmission && 
-          (!aggregatedProgress.activities.assignments.lastSubmission || 
-           new Date(progress.activities.assignments.lastSubmission) > new Date(aggregatedProgress.activities.assignments.lastSubmission))) {
+
+      if (progress.activities.assignments.lastSubmission &&
+        (!aggregatedProgress.activities.assignments.lastSubmission ||
+          new Date(progress.activities.assignments.lastSubmission) > new Date(aggregatedProgress.activities.assignments.lastSubmission))) {
         aggregatedProgress.activities.assignments.lastSubmission = progress.activities.assignments.lastSubmission;
       }
-      
-      if (progress.activities.miniProjects.lastCompleted && 
-          (!aggregatedProgress.activities.miniProjects.lastCompleted || 
-           new Date(progress.activities.miniProjects.lastCompleted) > new Date(aggregatedProgress.activities.miniProjects.lastCompleted))) {
+
+      if (progress.activities.miniProjects.lastCompleted &&
+        (!aggregatedProgress.activities.miniProjects.lastCompleted ||
+          new Date(progress.activities.miniProjects.lastCompleted) > new Date(aggregatedProgress.activities.miniProjects.lastCompleted))) {
         aggregatedProgress.activities.miniProjects.lastCompleted = progress.activities.miniProjects.lastCompleted;
       }
-      
-      if (progress.activities.bugHunt.lastParticipated && 
-          (!aggregatedProgress.activities.bugHunt.lastParticipated || 
-           new Date(progress.activities.bugHunt.lastParticipated) > new Date(aggregatedProgress.activities.bugHunt.lastParticipated))) {
+
+      if (progress.activities.bugHunt.lastParticipated &&
+        (!aggregatedProgress.activities.bugHunt.lastParticipated ||
+          new Date(progress.activities.bugHunt.lastParticipated) > new Date(aggregatedProgress.activities.bugHunt.lastParticipated))) {
         aggregatedProgress.activities.bugHunt.lastParticipated = progress.activities.bugHunt.lastParticipated;
       }
 
       // Update streaks (use the most recent)
-      if (progress.streaks.lastActiveDate && 
-          (!aggregatedProgress.streaks.lastActiveDate || 
-           new Date(progress.streaks.lastActiveDate) > new Date(aggregatedProgress.streaks.lastActiveDate))) {
+      if (progress.streaks.lastActiveDate &&
+        (!aggregatedProgress.streaks.lastActiveDate ||
+          new Date(progress.streaks.lastActiveDate) > new Date(aggregatedProgress.streaks.lastActiveDate))) {
         aggregatedProgress.streaks = { ...progress.streaks };
       }
 
@@ -398,14 +398,14 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     // Calculate average scores
     const totalJavaExercises = aggregatedProgress.skills.java.exercisesCompleted;
     const totalPythonExercises = aggregatedProgress.skills.python.exercisesCompleted;
-    
+
     progressRecords.forEach(progress => {
       if (totalJavaExercises > 0) {
-        aggregatedProgress.skills.java.averageScore += 
+        aggregatedProgress.skills.java.averageScore +=
           (progress.skills.java.averageScore * progress.skills.java.exercisesCompleted) / totalJavaExercises;
       }
       if (totalPythonExercises > 0) {
-        aggregatedProgress.skills.python.averageScore += 
+        aggregatedProgress.skills.python.averageScore +=
           (progress.skills.python.averageScore * progress.skills.python.exercisesCompleted) / totalPythonExercises;
       }
     });
@@ -415,7 +415,7 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       progressRecords.forEach(progress => {
         totalScore += progress.activities.assignments.averageScore * progress.activities.assignments.totalSubmitted;
       });
-      aggregatedProgress.activities.assignments.averageScore = 
+      aggregatedProgress.activities.assignments.averageScore =
         totalScore / aggregatedProgress.activities.assignments.totalSubmitted;
     }
 
@@ -424,13 +424,13 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       progressRecords.forEach(progress => {
         totalScore += progress.activities.miniProjects.averageScore * progress.activities.miniProjects.completed;
       });
-      aggregatedProgress.activities.miniProjects.averageScore = 
+      aggregatedProgress.activities.miniProjects.averageScore =
         totalScore / aggregatedProgress.activities.miniProjects.completed;
     }
 
     // Calculate average per day
     if (aggregatedProgress.streaks.totalActiveDays > 0) {
-      aggregatedProgress.timeSpent.averagePerDay = 
+      aggregatedProgress.timeSpent.averagePerDay =
         aggregatedProgress.timeSpent.totalMinutes / aggregatedProgress.streaks.totalActiveDays;
     }
 
@@ -499,13 +499,13 @@ router.get('/student/:classroomId', authenticateToken, authorizeRole('student'),
       // Get user's primary language for initial skill setup
       const User = (await import('../models/User.js')).default;
       const user = await User.findById(studentId);
-      
+
       if (user && user.primaryLanguage) {
         progress.skills[user.primaryLanguage].lastActivity = new Date();
       }
 
       await progress.save();
-      
+
       // Re-populate for response
       progress = await Progress.findOne({ student: studentId, classroom: classroomId })
         .populate('student', 'name email')
@@ -530,7 +530,7 @@ router.get('/student/:classroomId', authenticateToken, authorizeRole('student'),
 router.get('/instructor/:classroomId', authenticateToken, authorizeRole('teacher'), async (req, res) => {
   try {
     const { classroomId } = req.params;
-    
+
     // Verify teacher has access to this classroom
     const classroom = await Classroom.findOne({ _id: classroomId, teacher: req.user.userId });
     if (!classroom) {
@@ -573,8 +573,8 @@ router.get('/instructor/:classroomId', authenticateToken, authorizeRole('teacher
       }));
 
       // Identify at-risk students (bottom 20% or score < 40)
-      stats.atRiskStudents = progressList.filter(p => 
-        p.jobReadiness.overallScore < 40 || 
+      stats.atRiskStudents = progressList.filter(p =>
+        p.jobReadiness.overallScore < 40 ||
         progressList.indexOf(p) >= progressList.length - Math.ceil(progressList.length * 0.2)
       ).map(p => ({
         studentId: p.student._id,
@@ -613,10 +613,10 @@ router.get('/instructor/:classroomId', authenticateToken, authorizeRole('teacher
 // Update progress after activity completion
 router.post('/update', authenticateToken, async (req, res) => {
   try {
-    const { 
-      classroomId, 
+    const {
+      classroomId,
       activityType, // 'assignment', 'miniproject', 'code_execution', 'bug_hunt'
-      data 
+      data
     } = req.body;
 
     const studentId = req.user.userId;
@@ -644,7 +644,7 @@ router.post('/update', authenticateToken, async (req, res) => {
           progress.activities.assignments.averageScore = (total + data.score) / progress.activities.assignments.totalSubmitted;
         }
         progress.activities.assignments.lastSubmission = now;
-        
+
         // Update language-specific progress
         if (data.language) {
           progress.skills[data.language].exercisesCompleted++;
@@ -659,7 +659,7 @@ router.post('/update', authenticateToken, async (req, res) => {
           progress.activities.miniProjects.averageScore = (total + data.score) / progress.activities.miniProjects.completed;
         }
         progress.activities.miniProjects.lastCompleted = now;
-        
+
         if (data.language) {
           progress.skills[data.language].projectsCompleted++;
           progress.skills[data.language].lastActivity = now;
@@ -685,22 +685,22 @@ router.post('/update', authenticateToken, async (req, res) => {
     }
 
     // Update streaks
-    if (!progress.streaks.lastActiveDate || 
-        progress.streaks.lastActiveDate < today) {
+    if (!progress.streaks.lastActiveDate ||
+      progress.streaks.lastActiveDate < today) {
       // Check if yesterday was active
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      
-      if (progress.streaks.lastActiveDate && 
-          progress.streaks.lastActiveDate >= yesterday) {
+
+      if (progress.streaks.lastActiveDate &&
+        progress.streaks.lastActiveDate >= yesterday) {
         progress.streaks.currentStreak++;
       } else {
         progress.streaks.currentStreak = 1;
       }
-      
+
       progress.streaks.lastActiveDate = today;
       progress.streaks.totalActiveDays++;
-      
+
       if (progress.streaks.currentStreak > progress.streaks.longestStreak) {
         progress.streaks.longestStreak = progress.streaks.currentStreak;
       }
@@ -753,7 +753,7 @@ router.get('/analytics/:studentId', authenticateToken, authorizeRole('teacher'),
     }
 
     // Get progress data
-    const progress = await Progress.findOne({ 
+    const progress = await Progress.findOne({
       student: studentId,
       ...(classroomId && { classroom: classroomId })
     }).populate('student', 'name email');
@@ -807,9 +807,9 @@ router.post('/ai-insights/:classroomId', authenticateToken, async (req, res) => 
 
     // Allow both students and teachers to generate insights for themselves
     console.log(`[Progress] Generating AI insights for user ${userId} in classroom ${classroomId}`);
-    
+
     const insights = await generateProgressInsights(userId, classroomId);
-    
+
     res.json({
       success: true,
       insights,
@@ -834,9 +834,9 @@ router.post('/ai-recommendations/:classroomId', authenticateToken, async (req, r
 
     // Allow both students and teachers to generate recommendations for themselves
     console.log(`[Progress] Generating AI recommendations for user ${userId} in classroom ${classroomId}`);
-    
+
     const recommendations = await generateLearningRecommendations(userId, classroomId);
-    
+
     res.json({
       success: true,
       recommendations,
@@ -861,9 +861,9 @@ router.post('/skill-gap-analysis/:classroomId', authenticateToken, async (req, r
 
     // Allow both students and teachers to analyze skill gaps for themselves
     console.log(`[Progress] Analyzing skill gaps for user ${userId} in classroom ${classroomId}`);
-    
+
     const analysis = await analyzeSkillGaps(userId, classroomId);
-    
+
     res.json({
       success: true,
       analysis,
@@ -879,13 +879,146 @@ router.post('/skill-gap-analysis/:classroomId', authenticateToken, async (req, r
   }
 });
 
+// AI-powered skill weakness analysis (does NOT require classroomId)
+router.post('/skill-weakness-analysis', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { generateWithRetry } = await import('../services/ollamaService.js');
+    const MiniProject = (await import('../models/MiniProject.js')).default;
+
+    // Gather all progress records
+    const progressRecords = await Progress.find({ student: userId });
+    const userDoc = await User.findById(userId).select('xp level name firstName lastName primaryLanguage');
+    const miniProjectDoc = await MiniProject.findOne({ userId });
+
+    // Build aggregated stats
+    const submittedTasks = (miniProjectDoc?.completedTasks || []).filter(t => t.status !== 'paused');
+    const avgProjectScore = submittedTasks.length > 0
+      ? submittedTasks.reduce((sum, t) => sum + (t.score || 0), 0) / submittedTasks.length
+      : 0;
+
+    // Aggregate job readiness from progress records or build defaults
+    let jobReadiness = { overallScore: 0, problemSolving: 0, codeQuality: 0, efficiency: 0, collaboration: 0, consistency: 0 };
+    let totalCodeExecutions = 0;
+    let totalAssignments = 0;
+    let assignmentsOnTime = 0;
+    let currentStreak = 0;
+    let totalActiveDays = 0;
+    let totalMinutes = 0;
+    let bugHuntParticipated = 0;
+    let bugsFound = 0;
+
+    if (progressRecords.length > 0) {
+      progressRecords.forEach(p => {
+        totalCodeExecutions += p.activities?.codeExecutions?.total || 0;
+        totalAssignments += p.activities?.assignments?.totalSubmitted || 0;
+        assignmentsOnTime += p.activities?.assignments?.onTime || 0;
+        bugHuntParticipated += p.activities?.bugHunt?.participated || 0;
+        bugsFound += p.activities?.bugHunt?.bugsFound || 0;
+        totalActiveDays += p.streaks?.totalActiveDays || 0;
+        totalMinutes += p.timeSpent?.totalMinutes || 0;
+        if (p.streaks?.currentStreak > currentStreak) currentStreak = p.streaks.currentStreak;
+      });
+      // Use latest calculated job readiness
+      const latestWithJR = progressRecords.find(p => p.jobReadiness?.overallScore > 0);
+      if (latestWithJR) jobReadiness = latestWithJR.jobReadiness;
+    }
+
+    // Build the prompt
+    const studentName = userDoc?.name || `${userDoc?.firstName || ''} ${userDoc?.lastName || ''}`.trim() || 'Student';
+    const prompt = `You are an AI learning coach. Analyze this student's programming learning data and identify their KEY WEAKNESSES and provide SPECIFIC, ACTIONABLE ways to improve.
+
+STUDENT: ${studentName}
+PRIMARY LANGUAGE: ${userDoc?.primaryLanguage || 'Not set'}
+LEVEL: ${userDoc?.level || 1} (XP: ${userDoc?.xp || 0})
+
+SKILLS ASSESSMENT SCORES:
+- Problem Solving: ${Math.round(jobReadiness.problemSolving)}%
+- Code Quality: ${Math.round(jobReadiness.codeQuality)}%
+- Efficiency: ${Math.round(jobReadiness.efficiency)}%
+- Collaboration: ${Math.round(jobReadiness.collaboration)}%
+- Consistency: ${Math.round(jobReadiness.consistency)}%
+- Overall Score: ${Math.round(jobReadiness.overallScore)}%
+
+ACTIVITY DATA:
+- Code Executions: ${totalCodeExecutions}
+- Assignments Submitted: ${totalAssignments} (${assignmentsOnTime} on time)
+- Mini Projects Completed: ${submittedTasks.length} (Avg Score: ${Math.round(avgProjectScore)}%)
+- Bug Hunt Participated: ${bugHuntParticipated} (Bugs Found: ${bugsFound})
+- Current Streak: ${currentStreak} days
+- Total Active Days: ${totalActiveDays}
+- Total Time Spent: ${totalMinutes} minutes
+
+Respond in STRICT JSON format ONLY:
+{
+  "weaknesses": [
+    {
+      "area": "Short name of weakness area",
+      "severity": "High" or "Medium" or "Low",
+      "description": "1-2 sentence description of the weakness"
+    }
+  ],
+  "improvements": [
+    {
+      "title": "Short actionable title",
+      "description": "Specific 1-2 sentence advice on how to improve",
+      "priority": "High" or "Medium" or "Low",
+      "estimatedTime": "e.g., 30 mins/day, 1 week"
+    }
+  ],
+  "summary": "A 2-3 sentence overall analysis summary"
+}
+
+Return 3-5 weaknesses and 3-5 improvements. Focus on the LOWEST scoring areas. Be specific and encouraging. Return ONLY the JSON.`;
+
+    const response = await generateWithRetry(prompt, { temperature: 0.4, num_predict: 800 });
+    const content = response.message.content;
+
+    // Parse the response
+    const startIdx = content.indexOf('{');
+    const endIdx = content.lastIndexOf('}');
+    let analysis = { weaknesses: [], improvements: [], summary: '' };
+
+    if (startIdx !== -1 && endIdx !== -1) {
+      try {
+        const jsonStr = content.substring(startIdx, endIdx + 1);
+        analysis = JSON.parse(jsonStr);
+      } catch (parseErr) {
+        console.error('[Progress] Failed to parse AI weakness analysis:', parseErr.message);
+        // Attempt cleanup
+        try {
+          let cleaned = content.substring(startIdx, endIdx + 1)
+            .replace(/```json\n?|```/g, '')
+            .replace(/[\x00-\x1F\x7F]/g, ' ');
+          analysis = JSON.parse(cleaned);
+        } catch (e2) {
+          console.error('[Progress] Second parse attempt failed');
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      analysis,
+      generatedAt: new Date()
+    });
+  } catch (error) {
+    console.error('[Progress] Error generating skill weakness analysis:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate skill weakness analysis',
+      error: error.message
+    });
+  }
+});
+
 // Helper function to generate personalized recommendations
 function generateRecommendations(progress) {
   const recommendations = [];
 
   // Analyze weak areas
   const jobReadiness = progress.jobReadiness;
-  
+
   if (jobReadiness.problemSolving < 60) {
     recommendations.push({
       type: 'practice',
