@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus, Mail, Lock, User, GraduationCap, BookOpen, Check, X, Eye, EyeOff, Send } from 'lucide-react';
+import { Mail, Lock, User, GraduationCap, BookOpen, Check, X, Eye, EyeOff, Send } from 'lucide-react';
 import axios from 'axios';
 
 interface RegisterProps {
@@ -84,7 +84,7 @@ export default function Register({ onToggle }: RegisterProps) {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/send-verification-code', {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/send-verification-code`, {
         email
       });
 
@@ -132,273 +132,417 @@ export default function Register({ onToggle }: RegisterProps) {
     }
   };
 
+  const inputStyle = {
+    background: 'rgba(31, 41, 55, 0.8)',
+    border: '1px solid rgba(75, 85, 99, 0.4)'
+  };
+
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.boxShadow = '0 0 0 2px rgba(74, 222, 128, 0.3)';
+    e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+  };
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.boxShadow = 'none';
+    e.target.style.borderColor = 'rgba(75, 85, 99, 0.4)';
+  };
+
   return (
-    <div className="fixed inset-0 bg-white overflow-y-auto">
-      <div className="min-h-full py-8 px-4">
-      <div className="w-full max-w-sm mx-auto">
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 mb-4">
-            <UserPlus className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-light text-slate-900 mb-1 tracking-tight">Create account</h1>
-          <p className="text-slate-500 text-sm">Start your learning experience</p>
-        </div>
+    <div className="fixed inset-0 flex" style={{ background: 'linear-gradient(135deg, #0a0f1a 0%, #111827 40%, #0f1a2e 100%)' }}>
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden items-center justify-center flex-shrink-0">
+        {/* Animated gradient orbs */}
+        <div className="absolute top-20 left-20 w-72 h-72 rounded-full opacity-20 animate-pulse" style={{ background: 'radial-gradient(circle, #4ade80, transparent)', filter: 'blur(60px)' }} />
+        <div className="absolute bottom-32 right-16 w-96 h-96 rounded-full opacity-15 animate-pulse" style={{ background: 'radial-gradient(circle, #22c55e, transparent)', filter: 'blur(80px)', animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full opacity-10 animate-pulse" style={{ background: 'radial-gradient(circle, #86efac, transparent)', filter: 'blur(40px)', animationDelay: '4s' }} />
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-r">
-            <p className="text-xs text-red-700">{error}</p>
-          </div>
-        )}
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-slate-700">
-              Name
-            </label>
-            <div className="grid grid-cols-12 gap-2">
-              <div className="col-span-5 relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  id="firstName"
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                  placeholder="First"
-                />
-              </div>
-              <div className="col-span-2">
-                <input
-                  id="middleInitial"
-                  type="text"
-                  value={middleInitial}
-                  onChange={(e) => setMiddleInitial(e.target.value.toUpperCase())}
-                  maxLength={1}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all text-center"
-                  placeholder="M.I."
-                />
-              </div>
-              <div className="col-span-5">
-                <input
-                  id="lastName"
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                  placeholder="Last"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-xs font-medium text-slate-700">
-              Email address
-            </label>
+        <div className="relative z-10 text-center px-12">
+          <div className="mb-8 flex justify-center">
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                placeholder="name@company.com"
+              <div className="absolute inset-0 rounded-3xl opacity-30 blur-xl" style={{ background: 'linear-gradient(135deg, #4ade80, #22c55e)' }} />
+              <img
+                src="/assets/skillverseLogoV2.webp"
+                alt="SkillVerse Logo"
+                className="relative w-32 h-32 object-contain drop-shadow-2xl"
+                style={{ filter: 'drop-shadow(0 0 30px rgba(74, 222, 128, 0.3))' }}
               />
             </div>
           </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="verificationCode" className="block text-xs font-medium text-slate-700">
-              Verification Code
-            </label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  id="verificationCode"
-                  type="text"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  required
-                  disabled={!codeSent}
-                  maxLength={6}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all disabled:bg-slate-50 disabled:cursor-not-allowed"
-                  placeholder="Enter 6-digit code"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleSendCode}
-                disabled={sendingCode || !email || cooldownTime > 0}
-                className="px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2 whitespace-nowrap"
-              >
-                <Send className="w-4 h-4" />
-                {sendingCode ? 'Sending...' : cooldownTime > 0 ? `Wait ${Math.floor(cooldownTime / 60)}:${String(cooldownTime % 60).padStart(2, '0')}` : codeSent ? 'Resend' : 'Send Code'}
-              </button>
-            </div>
-            {codeSent && (
-              <p className="text-xs text-green-600 mt-1">Verification code sent to your email</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-xs font-medium text-slate-700">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => setPasswordFocused(true)}
-                required
-                className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                placeholder="Create a strong password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-            
-            {passwordFocused && (
-              <div className="mt-2 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs font-medium text-gray-700 mb-1.5">Password requirements:</p>
-                <div className="space-y-1">
-                  {passwordRequirements.map((requirement, index) => {
-                    const isValid = requirement.test(password);
-                    return (
-                      <div key={index} className="flex items-center space-x-1.5">
-                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          isValid ? 'bg-green-500' : 'bg-gray-300'
-                        }`}>
-                          {isValid ? (
-                            <Check className="w-2.5 h-2.5 text-white" />
-                          ) : (
-                            <X className="w-2.5 h-2.5 text-gray-500" />
-                          )}
-                        </div>
-                        <span className={`text-xs ${
-                          isValid ? 'text-green-700 font-medium' : 'text-gray-600'
-                        }`}>
-                          {requirement.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="confirmPassword" className="block text-xs font-medium text-slate-700">
-              Confirm password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                id="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                placeholder="Confirm your password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                {showConfirmPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-            {confirmPassword && password !== confirmPassword && (
-              <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-xs font-medium text-slate-700">
-              Select your role
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setRole('student')}
-                className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
-                  role === 'student'
-                    ? 'border-slate-900 bg-slate-50'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <BookOpen className={`w-6 h-6 mb-1.5 ${role === 'student' ? 'text-slate-900' : 'text-slate-400'}`} />
-                <span className={`text-xs font-medium ${role === 'student' ? 'text-slate-900' : 'text-slate-600'}`}>
-                  Student
-                </span>
-                {role === 'student' && (
-                  <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-slate-900 rounded-full" />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('teacher')}
-                className={`relative flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
-                  role === 'teacher'
-                    ? 'border-slate-900 bg-slate-50'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <GraduationCap className={`w-6 h-6 mb-1.5 ${role === 'teacher' ? 'text-slate-900' : 'text-slate-400'}`} />
-                <span className={`text-xs font-medium ${role === 'teacher' ? 'text-slate-900' : 'text-slate-600'}`}>
-                  Teacher
-                </span>
-                {role === 'teacher' && (
-                  <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-slate-900 rounded-full" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-slate-900 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            {loading ? 'Creating account...' : 'Create account'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-xs text-slate-600">
-            Already have an account?{' '}
-            <button
-              onClick={onToggle}
-              className="text-slate-900 font-medium hover:underline underline-offset-4 transition-all"
-            >
-              Sign in
-            </button>
+          <h1 className="text-5xl font-bold text-white mb-4 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            Skill<span style={{ color: '#4ade80' }}>Verse</span>
+          </h1>
+          <p className="text-lg text-gray-400 max-w-md mx-auto leading-relaxed">
+            Begin your journey to mastering programming with AI-guided learning and collaborative education.
           </p>
+
+          {/* Stats */}
+          <div className="mt-10 grid grid-cols-3 gap-4">
+            {[
+              { label: 'Languages', value: '10+' },
+              { label: 'Projects', value: 'AI-Gen' },
+              { label: 'Tracking', value: 'Real-time' }
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="p-4 rounded-xl text-center border transition-all duration-300 hover:scale-105"
+                style={{
+                  background: 'rgba(74, 222, 128, 0.05)',
+                  borderColor: 'rgba(74, 222, 128, 0.15)',
+                  backdropFilter: 'blur(10px)'
+                }}
+              >
+                <div className="text-lg font-bold" style={{ color: '#4ade80' }}>{stat.value}</div>
+                <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Right Panel - Register Form */}
+      <div className="w-full lg:w-7/12 flex items-center justify-center overflow-y-auto">
+        <div className="w-full max-w-lg px-6 sm:px-8 py-8">
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-6">
+            <div className="flex justify-center mb-3">
+              <img
+                src="/assets/skillverseLogoV2.webp"
+                alt="SkillVerse Logo"
+                className="w-16 h-16 object-contain"
+                style={{ filter: 'drop-shadow(0 0 20px rgba(74, 222, 128, 0.3))' }}
+              />
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              Skill<span style={{ color: '#4ade80' }}>Verse</span>
+            </h1>
+          </div>
+
+          {/* Card */}
+          <div
+            className="rounded-2xl p-6 sm:p-8 shadow-2xl border"
+            style={{
+              background: 'rgba(17, 24, 39, 0.8)',
+              borderColor: 'rgba(55, 65, 81, 0.5)',
+              backdropFilter: 'blur(20px)'
+            }}
+          >
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">Create account</h2>
+              <p className="text-sm text-gray-400">Start your learning experience today</p>
+            </div>
+
+            {error && (
+              <div
+                className="mb-5 p-3 rounded-xl flex items-start gap-3"
+                style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+              >
+                <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
+                  <span className="text-red-400 text-xs font-bold">!</span>
+                </div>
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Name Fields */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Full Name
+                </label>
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-5 relative group">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                    <input
+                      id="register-firstName"
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                      className="w-full pl-10 pr-3 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                      style={inputStyle}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      placeholder="First"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      id="register-middleInitial"
+                      type="text"
+                      value={middleInitial}
+                      onChange={(e) => setMiddleInitial(e.target.value.toUpperCase())}
+                      maxLength={1}
+                      className="w-full px-3 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200 text-center"
+                      style={inputStyle}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      placeholder="M.I."
+                    />
+                  </div>
+                  <div className="col-span-5">
+                    <input
+                      id="register-lastName"
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                      className="w-full px-3 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                      style={inputStyle}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      placeholder="Last"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <label htmlFor="register-email" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Email address
+                </label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <input
+                    id="register-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full pl-11 pr-4 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    placeholder="name@example.com"
+                  />
+                </div>
+              </div>
+
+              {/* Verification Code */}
+              <div className="space-y-2">
+                <label htmlFor="register-verificationCode" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Verification Code
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      id="register-verificationCode"
+                      type="text"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      required
+                      disabled={!codeSent}
+                      maxLength={6}
+                      className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={inputStyle}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      placeholder="Enter 6-digit code"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={sendingCode || !email || cooldownTime > 0}
+                    className="px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                    style={{
+                      background: 'linear-gradient(135deg, #16a34a, #22c55e)',
+                      boxShadow: '0 4px 15px rgba(34, 197, 94, 0.2)'
+                    }}
+                  >
+                    <Send className="w-4 h-4" />
+                    {sendingCode ? '...' : cooldownTime > 0 ? `${Math.floor(cooldownTime / 60)}:${String(cooldownTime % 60).padStart(2, '0')}` : codeSent ? 'Resend' : 'Send'}
+                  </button>
+                </div>
+                {codeSent && (
+                  <p className="text-xs mt-1" style={{ color: '#4ade80' }}>✓ Verification code sent to your email</p>
+                )}
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <label htmlFor="register-password" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Password
+                </label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <input
+                    id="register-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={(e) => { setPasswordFocused(true); handleInputFocus(e); }}
+                    onBlur={handleInputBlur}
+                    required
+                    className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                    style={inputStyle}
+                    placeholder="Create a strong password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors duration-200"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {passwordFocused && (
+                  <div
+                    className="mt-2 p-3 rounded-xl border"
+                    style={{ background: 'rgba(31, 41, 55, 0.6)', borderColor: 'rgba(75, 85, 99, 0.3)' }}
+                  >
+                    <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Requirements</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {passwordRequirements.map((requirement, index) => {
+                        const isValid = requirement.test(password);
+                        return (
+                          <div key={index} className="flex items-center gap-1.5">
+                            <div
+                              className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300"
+                              style={{ background: isValid ? 'rgba(74, 222, 128, 0.8)' : 'rgba(75, 85, 99, 0.5)' }}
+                            >
+                              {isValid ? (
+                                <Check className="w-2.5 h-2.5 text-white" />
+                              ) : (
+                                <X className="w-2.5 h-2.5 text-gray-400" />
+                              )}
+                            </div>
+                            <span className={`text-xs ${isValid ? 'text-green-400 font-medium' : 'text-gray-500'} transition-colors duration-300`}>
+                              {requirement.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-2">
+                <label htmlFor="register-confirmPassword" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Confirm password
+                </label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <input
+                    id="register-confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    placeholder="Confirm your password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors duration-200"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+                )}
+              </div>
+
+              {/* Role Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Select your role
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRole('student')}
+                    className="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 group"
+                    style={{
+                      borderColor: role === 'student' ? '#4ade80' : 'rgba(75, 85, 99, 0.4)',
+                      background: role === 'student' ? 'rgba(74, 222, 128, 0.08)' : 'rgba(31, 41, 55, 0.5)'
+                    }}
+                  >
+                    <BookOpen className={`w-6 h-6 mb-2 transition-colors duration-300 ${role === 'student' ? 'text-green-400' : 'text-gray-500'}`} />
+                    <span className={`text-xs font-semibold transition-colors duration-300 ${role === 'student' ? 'text-green-400' : 'text-gray-400'}`}>
+                      Student
+                    </span>
+                    {role === 'student' && (
+                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }} />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRole('teacher')}
+                    className="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 group"
+                    style={{
+                      borderColor: role === 'teacher' ? '#4ade80' : 'rgba(75, 85, 99, 0.4)',
+                      background: role === 'teacher' ? 'rgba(74, 222, 128, 0.08)' : 'rgba(31, 41, 55, 0.5)'
+                    }}
+                  >
+                    <GraduationCap className={`w-6 h-6 mb-2 transition-colors duration-300 ${role === 'teacher' ? 'text-green-400' : 'text-gray-500'}`} />
+                    <span className={`text-xs font-semibold transition-colors duration-300 ${role === 'teacher' ? 'text-green-400' : 'text-gray-400'}`}>
+                      Teacher
+                    </span>
+                    {role === 'teacher' && (
+                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }} />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, #16a34a, #22c55e)',
+                  boxShadow: '0 4px 15px rgba(34, 197, 94, 0.3)'
+                }}
+                onMouseEnter={(e) => { if (!loading) (e.target as HTMLElement).style.boxShadow = '0 6px 25px rgba(34, 197, 94, 0.5)'; }}
+                onMouseLeave={(e) => { (e.target as HTMLElement).style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.3)'; }}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Creating account...
+                  </span>
+                ) : 'Create account'}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-400">
+                Already have an account?{' '}
+                <button
+                  onClick={onToggle}
+                  className="font-semibold transition-colors duration-200 hover:underline underline-offset-4"
+                  style={{ color: '#4ade80' }}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#86efac'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#4ade80'}
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <p className="mt-4 text-center text-xs text-gray-600">
+            © 2025 SkillVerse. All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );

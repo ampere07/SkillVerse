@@ -29,16 +29,27 @@ import { initializeCronJobs } from './services/cronService.js';
 
 const app = express();
 const httpServer = createServer(app);
+
+const allowedOrigins = [
+  'https://skillverse-eta.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   }
 });
 
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
