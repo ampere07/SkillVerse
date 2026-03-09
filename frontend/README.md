@@ -71,7 +71,7 @@ npm install
 Create `.env` file in `frontend` directory:
 
 ```env
-VITE_API_URL=http://localhost:5000/api
+VITE_API_URL=https://skillverse-1.onrender.com/api
 ```
 
 ### 3. Backend Setup
@@ -126,8 +126,8 @@ npm run dev
 ### Access Application
 
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:5000/api
-- Health Check: http://localhost:5000/api/health
+- Backend API: https://skillverse-1.onrender.com/api
+- Health Check: https://skillverse-1.onrender.com/api/health
 
 ## Python Libraries Installed
 
@@ -268,7 +268,7 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ### Frontend (.env)
 | Variable | Description | Example |
 |----------|-------------|---------|
-| VITE_API_URL | Backend API URL | http://localhost:5000/api |
+| VITE_API_URL | Backend API URL | https://skillverse-1.onrender.com/api |
 
 ### Backend (.env)
 | Variable | Description | Example |

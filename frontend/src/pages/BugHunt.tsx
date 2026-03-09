@@ -87,7 +87,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
     useEffect(() => {
         // Setup socket for code execution
-        const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+        const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-1.onrender.com';
         const socket = io(baseUrl);
         socketRef.current = socket;
 

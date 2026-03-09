@@ -3,7 +3,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 're
 import axios from 'axios';
 import Compiler from './Compiler';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
 
 interface ProjectDetails {
   title: string;
@@ -277,8 +277,8 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
               }}
               disabled={status === 'completed' || status === 'submitted'}
               className={`w-full px-6 py-3 text-sm font-medium rounded-lg transition-all ${status === 'completed' || status === 'submitted'
-                  ? 'bg-gray-100 cursor-not-allowed'
-                  : 'text-white hover:shadow-md'
+                ? 'bg-gray-100 cursor-not-allowed'
+                : 'text-white hover:shadow-md'
                 }`}
               style={status === 'completed' || status === 'submitted'
                 ? { color: '#757575' }

@@ -1,16 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { RefreshCw, Users, Filter, Download } from 'lucide-react';
 
-const StudentTracking = ({ onNavigate, setViewingStudent }) => {
-  const { user } = useAuth();
-  const [students, setStudents] = useState([]);
+interface StudentTrackingProps {
+  onNavigate?: (path: string) => void;
+  setViewingStudent?: (value: boolean) => void;
+}
+
+interface Student {
+  _id: string;
+  name: string;
+  email: string;
+  profilePicture?: string;
+  level?: number;
+  classroomName: string;
+  classroomCode: string;
+  joinedAt?: string;
+}
+
+interface Classroom {
+  _id: string;
+  name: string;
+  code: string;
+  students?: Array<{
+    studentId: string | { _id: string };
+    joinedAt?: string;
+  }>;
+}
+
+export default function StudentTracking({ onNavigate, setViewingStudent }: StudentTrackingProps) {
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedClassroom, setSelectedClassroom] = useState('');
-  const [classrooms, setClassrooms] = useState([]);
-  const [allStudents, setAllStudents] = useState([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
 
   useEffect(() => {
     fetchStudentsProgress();
@@ -24,9 +48,8 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
 
   useEffect(() => {
     if (selectedClassroom && classrooms.length > 0) {
-      // Filter existing students by selected classroom
-      const filtered = allStudents.filter(s => {
-        const classroom = classrooms.find(c => c._id === selectedClassroom);
+      const filtered = allStudents.filter((s: Student) => {
+        const classroom = classrooms.find((c: Classroom) => c._id === selectedClassroom);
         return s.classroomName === classroom?.name;
       });
       setStudents(filtered);
@@ -37,10 +60,9 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       console.log('Fetching classrooms...');
-      
-      // Get all classrooms for the teacher
+
       const classroomsResponse = await axios.get(
         `${import.meta.env.VITE_API_URL}/classrooms/teacher`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -49,33 +71,30 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
       console.log('Classrooms response:', classroomsResponse.data);
 
       if (classroomsResponse.data.success) {
-        const teacherClassrooms = classroomsResponse.data.classrooms;
+        const teacherClassrooms: Classroom[] = classroomsResponse.data.classrooms;
         console.log('Teacher classrooms:', teacherClassrooms);
-        
-        // Only update if classrooms have changed
+
         if (JSON.stringify(teacherClassrooms) !== JSON.stringify(classrooms)) {
           setClassrooms(teacherClassrooms);
         }
-        
-        // Extract all students from all classrooms
-        const allStudentsData = [];
-        
+
+        const allStudentsData: Student[] = [];
+
         for (const classroom of teacherClassrooms) {
           console.log('Processing classroom:', classroom.name, 'Students:', classroom.students);
-          
-          // Get student details for each student ID in the students array
+
           for (const studentEnrollment of classroom.students || []) {
             try {
-              const studentId = typeof studentEnrollment.studentId === 'string' 
-                ? studentEnrollment.studentId 
-                : studentEnrollment.studentId._id || studentEnrollment.studentId.toString();
-              
+              const studentId = typeof studentEnrollment.studentId === 'string'
+                ? studentEnrollment.studentId
+                : (studentEnrollment.studentId as { _id: string })._id || String(studentEnrollment.studentId);
+
               console.log('Fetching student:', studentId);
               const studentResponse = await axios.get(
                 `${import.meta.env.VITE_API_URL}/auth/users/${studentId}`,
                 { headers: { Authorization: `Bearer ${token}` } }
               );
-              
+
               if (studentResponse.data.success) {
                 allStudentsData.push({
                   _id: studentResponse.data.user._id,
@@ -93,19 +112,17 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
             }
           }
         }
-        
+
         console.log('All students data:', allStudentsData);
         setAllStudents(allStudentsData);
-        
-        // Set initial students list
+
         if (!selectedClassroom && teacherClassrooms.length > 0) {
           setSelectedClassroom(teacherClassrooms[0]._id);
         }
-        
-        // Filter by selected classroom
+
         if (selectedClassroom) {
-          const filtered = allStudentsData.filter(s => {
-            const classroom = teacherClassrooms.find(c => c._id === selectedClassroom);
+          const filtered = allStudentsData.filter((s: Student) => {
+            const classroom = teacherClassrooms.find((c: Classroom) => c._id === selectedClassroom);
             return s.classroomName === classroom?.name;
           });
           setStudents(filtered);
@@ -113,9 +130,9 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
           setStudents(allStudentsData);
         }
       }
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      setError('Failed to fetch students: ' + error.message);
+    } catch (err: any) {
+      console.error('Error fetching students:', err);
+      setError('Failed to fetch students: ' + (err?.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -125,22 +142,19 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
     fetchStudentsProgress();
   };
 
-  const handleRowClick = (student) => {
-  // Store the student data in sessionStorage to pass it to the next page
-  sessionStorage.setItem('viewingStudent', 'true');
-  sessionStorage.setItem('studentId', student._id);
-  sessionStorage.setItem('studentName', student.name);
-  
-  // Set the viewingStudent state to true
-  if (setViewingStudent) {
-    setViewingStudent(true);
-  }
-  
-  // Use the onNavigate function from Dashboard
-  if (onNavigate) {
-    onNavigate('/progress-tracking');
-  }
-};
+  const handleRowClick = (student: Student) => {
+    sessionStorage.setItem('viewingStudent', 'true');
+    sessionStorage.setItem('studentId', student._id);
+    sessionStorage.setItem('studentName', student.name);
+
+    if (setViewingStudent) {
+      setViewingStudent(true);
+    }
+
+    if (onNavigate) {
+      onNavigate('/progress-tracking');
+    }
+  };
 
   if (loading && students.length === 0) {
     return (
@@ -160,9 +174,9 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
             onClick={() => {
               const csvContent = [
                 ['Student Name', 'Classroom Name', 'Code'],
-                ...students.map(s => [s.name, s.classroomName, s.classroomCode])
+                ...students.map((s: Student) => [s.name, s.classroomName, s.classroomCode])
               ].map(row => row.join(',')).join('\n');
-              
+
               const blob = new Blob([csvContent], { type: 'text/csv' });
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement('a');
@@ -195,7 +209,7 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
             className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Classrooms</option>
-            {classrooms.map((classroom) => (
+            {classrooms.map((classroom: Classroom) => (
               <option key={classroom._id} value={classroom._id}>
                 {classroom.name}
               </option>
@@ -232,9 +246,9 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {students.map((student) => (
-                <tr 
-                  key={student._id} 
+              {students.map((student: Student) => (
+                <tr
+                  key={student._id}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={() => handleRowClick(student)}
                 >
@@ -288,6 +302,4 @@ const StudentTracking = ({ onNavigate, setViewingStudent }) => {
       )}
     </div>
   );
-};
-
-export default StudentTracking;
+}

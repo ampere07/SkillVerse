@@ -138,7 +138,7 @@ export default function Dashboard() {
   // Initialize socket connection for real-time updates
   useEffect(() => {
     if (user?.role === 'student') {
-      const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+      const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
       const socket = io(`${baseUrl}/dashboard`, {
         transports: ['websocket', 'polling']
       });

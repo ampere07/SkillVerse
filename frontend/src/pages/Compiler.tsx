@@ -259,7 +259,7 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
   }, []);
 
   useEffect(() => {
-    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000');
+    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-1.onrender.com');
 
     newSocket.on('connect', () => {
     });

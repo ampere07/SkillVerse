@@ -1,7 +1,7 @@
 import axios from 'axios';
 import 'dotenv/config';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://skillverse-1.onrender.com';
 const CHECK_INTERVAL = 60000; // 1 minute
 
 console.log('Starting Kaggle AI Service Monitor...');
@@ -27,7 +27,7 @@ async function checkAIStatus() {
     } else {
       consecutiveFailures++;
       console.log(`[${timestamp}] ✗ AI Service: ${status} | Mode: ${mode}`);
-      
+
       if (consecutiveFailures >= MAX_FAILURES_BEFORE_ALERT) {
         console.log(`\n⚠️  ALERT: AI service has been unavailable for ${consecutiveFailures} consecutive checks!`);
         console.log('Action required: Check Kaggle notebook and restart if needed.\n');
@@ -37,7 +37,7 @@ async function checkAIStatus() {
   } catch (error) {
     consecutiveFailures++;
     const timestamp = new Date().toISOString();
-    
+
     if (error.code === 'ECONNREFUSED') {
       console.log(`[${timestamp}] ✗ Backend not reachable at ${BACKEND_URL}`);
     } else if (error.code === 'ECONNABORTED') {

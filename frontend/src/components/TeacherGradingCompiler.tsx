@@ -17,11 +17,11 @@ const highlightCode = (code: string, language: string, errors: CompilationError[
   if (language === 'java') {
     return highlightJavaCode(code, errors, new Set());
   }
-  
+
   if (language === 'python') {
     return highlightPythonCode(code, errors);
   }
-  
+
   return code.split('\n').map((line, index) => (
     <div key={index} style={{ height: '24px', minHeight: '24px' }}>
       {line || '\u00A0'}
@@ -69,8 +69,8 @@ export default function TeacherGradingCompiler({
   }, [code]);
 
   useEffect(() => {
-    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000');
-    
+    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-1.onrender.com');
+
     newSocket.on('output', (data: { type: string; data: string }) => {
       setOutput(prev => prev + data.data);
       setTimeout(() => {
@@ -111,7 +111,7 @@ export default function TeacherGradingCompiler({
     setCurrentInput('');
     setCompilationErrors([]);
     setIsRunning(true);
-    
+
     if (language === 'java') {
       socket.emit('compile-and-run', { code, sessionId });
     } else if (language === 'python') {
@@ -157,7 +157,7 @@ export default function TeacherGradingCompiler({
     if (textareaRef.current && lineNumbersRef.current && highlightRef.current) {
       const scrollTop = textareaRef.current.scrollTop;
       const scrollLeft = textareaRef.current.scrollLeft;
-      
+
       lineNumbersRef.current.scrollTop = scrollTop;
       highlightRef.current.scrollTop = scrollTop;
       highlightRef.current.scrollLeft = scrollLeft;
@@ -246,40 +246,36 @@ export default function TeacherGradingCompiler({
         <div className="lg:hidden flex border-b border-gray-200 bg-white">
           <button
             onClick={() => setShowMobilePanel('code')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
-              showMobilePanel === 'code'
-                ? 'text-gray-900 border-b-2 border-gray-900'
-                : 'text-gray-500'
-            }`}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${showMobilePanel === 'code'
+              ? 'text-gray-900 border-b-2 border-gray-900'
+              : 'text-gray-500'
+              }`}
           >
             Code
           </button>
           <button
             onClick={() => setShowMobilePanel('console')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
-              showMobilePanel === 'console'
-                ? 'text-gray-900 border-b-2 border-gray-900'
-                : 'text-gray-500'
-            }`}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${showMobilePanel === 'console'
+              ? 'text-gray-900 border-b-2 border-gray-900'
+              : 'text-gray-500'
+              }`}
           >
             Console
           </button>
           <button
             onClick={() => setShowMobilePanel('grade')}
-            className={`flex-1 px-4 py-3 text-sm font-medium ${
-              showMobilePanel === 'grade'
-                ? 'text-gray-900 border-b-2 border-gray-900'
-                : 'text-gray-500'
-            }`}
+            className={`flex-1 px-4 py-3 text-sm font-medium ${showMobilePanel === 'grade'
+              ? 'text-gray-900 border-b-2 border-gray-900'
+              : 'text-gray-500'
+              }`}
           >
             Grade
           </button>
         </div>
 
         {/* Code Editor */}
-        <div className={`flex-1 flex-col border-r border-gray-200 bg-white overflow-hidden ${
-          showMobilePanel === 'code' ? 'flex' : 'hidden lg:flex'
-        }`}>
+        <div className={`flex-1 flex-col border-r border-gray-200 bg-white overflow-hidden ${showMobilePanel === 'code' ? 'flex' : 'hidden lg:flex'
+          }`}>
           <div className="px-4 py-2 border-b border-gray-200 flex-shrink-0">
             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
               Student's Code (Read-Only)
@@ -295,7 +291,7 @@ export default function TeacherGradingCompiler({
                 {lineNumbers.map((num) => {
                   const hasError = compilationErrors.some(err => err.line === num);
                   const error = compilationErrors.find(err => err.line === num);
-                  
+
                   return (
                     <div
                       key={num}
@@ -323,7 +319,7 @@ export default function TeacherGradingCompiler({
                 readOnly
                 onScroll={handleScroll}
                 className="absolute inset-0 px-4 py-3 bg-transparent text-sm font-mono text-transparent resize-none focus:outline-none overflow-auto whitespace-pre cursor-default"
-                style={{ 
+                style={{
                   lineHeight: '24px',
                   caretColor: 'transparent'
                 }}
@@ -334,19 +330,17 @@ export default function TeacherGradingCompiler({
         </div>
 
         {/* Console and Grading Panel */}
-        <div className={`lg:w-96 flex flex-col overflow-hidden ${
-          showMobilePanel === 'console' || showMobilePanel === 'grade' ? 'flex' : 'hidden lg:flex'
-        }`}>
-          {/* Console */}
-          <div className={`flex-1 flex-col bg-gray-900 overflow-hidden ${
-            showMobilePanel === 'console' ? 'flex' : showMobilePanel === 'grade' ? 'hidden lg:flex' : 'hidden lg:flex'
+        <div className={`lg:w-96 flex flex-col overflow-hidden ${showMobilePanel === 'console' || showMobilePanel === 'grade' ? 'flex' : 'hidden lg:flex'
           }`}>
+          {/* Console */}
+          <div className={`flex-1 flex-col bg-gray-900 overflow-hidden ${showMobilePanel === 'console' ? 'flex' : showMobilePanel === 'grade' ? 'hidden lg:flex' : 'hidden lg:flex'
+            }`}>
             <div className="px-4 py-2 bg-gray-800 border-b border-gray-700 flex-shrink-0">
               <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
                 Console Output
               </h3>
             </div>
-            <div 
+            <div
               ref={consoleRef}
               className="flex-1 overflow-auto min-h-0 focus:outline-none p-4"
               tabIndex={0}
@@ -362,9 +356,8 @@ export default function TeacherGradingCompiler({
           </div>
 
           {/* Grading Panel */}
-          <div className={`border-t border-gray-200 bg-white overflow-y-auto ${
-            showMobilePanel === 'grade' ? 'flex-1' : 'lg:max-h-[50%] hidden lg:block'
-          }`}>
+          <div className={`border-t border-gray-200 bg-white overflow-y-auto ${showMobilePanel === 'grade' ? 'flex-1' : 'lg:max-h-[50%] hidden lg:block'
+            }`}>
             <div className="p-6">
               <h3 className="text-base font-semibold text-gray-900 mb-4">Grade Submission</h3>
 
@@ -397,8 +390,8 @@ export default function TeacherGradingCompiler({
                       <div>
                         <p className="text-xs font-medium text-gray-500">Due Date</p>
                         <p className="text-sm text-gray-900">
-                          {new Date(activity.dueDate).toLocaleDateString('en-US', { 
-                            month: 'short', 
+                          {new Date(activity.dueDate).toLocaleDateString('en-US', {
+                            month: 'short',
                             day: 'numeric',
                             year: 'numeric'
                           })}

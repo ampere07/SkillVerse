@@ -1,7 +1,7 @@
 import axios from 'axios';
 import readline from 'readline';
 
-const API_URL = 'http://localhost:5000/api/demo';
+const API_URL = 'https://skillverse-1.onrender.com/api/demo';
 
 const rl = readline.createInterface({
   input: process.stdin,

@@ -225,7 +225,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/survey/submit', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/survey/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -307,7 +307,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
     try {
       console.log('[OnboardingSurvey] Starting project generation...');
 
-      const response = await fetch(`http://localhost:5000/api/survey/generate-projects/${user.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/survey/generate-projects/${user.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -892,8 +892,8 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                               <label
                                 key={optionIndex}
                                 className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${javaAnswers[index] === optionIndex
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-300 hover:bg-gray-50'
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-300 hover:bg-gray-50'
                                   }`}
                               >
                                 <input
@@ -933,8 +933,8 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                               <label
                                 key={optionIndex}
                                 className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${pythonAnswers[index] === optionIndex
-                                    ? 'border-yellow-500 bg-yellow-50'
-                                    : 'border-gray-300 hover:bg-gray-50'
+                                  ? 'border-yellow-500 bg-yellow-50'
+                                  : 'border-gray-300 hover:bg-gray-50'
                                   }`}
                               >
                                 <input

@@ -49,7 +49,7 @@ const OnboardingSurvey = () => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
-    
+
     if (!user?.id) {
       setError('User not found. Please login again.');
       setIsSubmitting(false);
@@ -57,7 +57,7 @@ const OnboardingSurvey = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/survey/submit', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/survey/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
