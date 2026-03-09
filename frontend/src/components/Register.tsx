@@ -98,6 +98,7 @@ export default function Register({ onToggle }: RegisterProps) {
         setCooldownTime(120);
       }
     } catch (err: any) {
+      console.error('Send verification code error:', err);
       setError(err.response?.data?.message || 'Failed to send verification code');
     } finally {
       setSendingCode(false);
