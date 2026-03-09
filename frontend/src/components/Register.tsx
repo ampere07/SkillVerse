@@ -84,9 +84,10 @@ export default function Register({ onToggle }: RegisterProps) {
     setError('');
 
     try {
-      const baseUrl = import.meta.env.VITE_API_URL.endsWith('/api')
-        ? import.meta.env.VITE_API_URL
-        : `${import.meta.env.VITE_API_URL}/api`;
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const baseUrl = apiUrl.endsWith('/api')
+        ? apiUrl
+        : `${apiUrl}/api`;
 
       const response = await axios.post(`${baseUrl}/auth/send-verification-code`, {
         email
