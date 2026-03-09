@@ -194,7 +194,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
 
         {/* Card */}
         <div
-          className="rounded-2xl p-8 shadow-2xl border"
+          className="rounded-2xl p-6 sm:p-8 shadow-2xl border"
           style={{
             background: 'rgba(255, 255, 255, 0.9)',
             borderColor: 'rgba(226, 232, 240, 1)',
@@ -210,8 +210,8 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
           </button>
 
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Reset password</h2>
-            <p className="text-sm text-gray-600">Enter your email to receive a verification code</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">Reset password</h2>
+            <p className="text-xs sm:text-sm text-gray-600">Enter your email to receive a verification code</p>
           </div>
 
           {error && (

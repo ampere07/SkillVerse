@@ -62,32 +62,32 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-8">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="flex justify-center mb-4">
+          <div className="lg:hidden text-center mb-6">
+            <div className="flex justify-center mb-3">
               <img
                 src="/assets/skillverseLogoV2.webp"
                 alt="SkillVerse Logo"
-                className="w-20 h-20 object-contain"
+                className="w-16 h-16 object-contain"
                 style={{ filter: 'drop-shadow(0 0 20px rgba(0, 0, 0, 0.1))' }}
               />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
               Skill<span style={{ color: '#16a34a' }}>Verse</span>
             </h1>
           </div>
 
           {/* Card */}
           <div
-            className="rounded-2xl p-8 sm:p-10 shadow-2xl border"
+            className="rounded-2xl p-6 sm:p-10 shadow-2xl border"
             style={{
               background: 'rgba(255, 255, 255, 0.9)',
               borderColor: 'rgba(226, 232, 240, 1)',
               backdropFilter: 'blur(20px)'
             }}
           >
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
-              <p className="text-sm text-gray-600">Sign in to continue your learning journey</p>
+            <div className="mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">Welcome back</h2>
+              <p className="text-xs sm:text-sm text-gray-600">Sign in to continue your learning journey</p>
             </div>
 
             {error && (

@@ -152,7 +152,7 @@ export default function Register({ onToggle }: RegisterProps) {
   };
 
   return (
-    <div className="fixed inset-0 flex" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
+    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden items-center justify-center flex-shrink-0">
 
@@ -181,7 +181,7 @@ export default function Register({ onToggle }: RegisterProps) {
       </div>
 
       {/* Right Panel - Register Form */}
-      <div className="w-full lg:w-7/12 flex items-center justify-center overflow-y-auto">
+      <div className="w-full lg:w-7/12 flex items-center justify-center p-4 sm:p-8">
         <div className="w-full max-w-lg px-6 sm:px-8 py-8">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-6">
@@ -200,16 +200,16 @@ export default function Register({ onToggle }: RegisterProps) {
 
           {/* Card */}
           <div
-            className="rounded-2xl p-6 sm:p-8 shadow-2xl border"
+            className="rounded-2xl p-5 sm:p-8 shadow-2xl border"
             style={{
               background: 'rgba(255, 255, 255, 0.9)',
               borderColor: 'rgba(226, 232, 240, 1)',
               backdropFilter: 'blur(20px)'
             }}
           >
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Create account</h2>
-              <p className="text-sm text-gray-600">Start your learning experience today</p>
+            <div className="mb-5 sm:mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">Create account</h2>
+              <p className="text-xs sm:text-sm text-gray-600">Start your learning experience today</p>
             </div>
 
             {error && (
@@ -230,8 +230,8 @@ export default function Register({ onToggle }: RegisterProps) {
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Full Name
                 </label>
-                <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-5 relative group">
+                <div className="flex flex-col sm:grid sm:grid-cols-12 gap-2">
+                  <div className="sm:col-span-5 relative group">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                     <input
                       id="register-firstName"
@@ -243,10 +243,10 @@ export default function Register({ onToggle }: RegisterProps) {
                       style={inputStyle}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
-                      placeholder="First"
+                      placeholder="First Name"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <input
                       id="register-middleInitial"
                       type="text"
@@ -260,7 +260,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       placeholder="M.I."
                     />
                   </div>
-                  <div className="col-span-5">
+                  <div className="sm:col-span-5">
                     <input
                       id="register-lastName"
                       type="text"
@@ -271,7 +271,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       style={inputStyle}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
-                      placeholder="Last"
+                      placeholder="Last Name"
                     />
                   </div>
                 </div>
