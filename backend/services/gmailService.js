@@ -32,15 +32,39 @@ let oauth2Client = null;
 function getOAuth2Client() {
   if (!oauth2Client) {
     oauth2Client = createOAuth2Client();
-    
+
+    // 1. Try to load from Environment Variable first (best for Production/Render)
+    if (process.env.GMAIL_REFRESH_TOKEN) {
+      try {
+        oauth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
+        console.log('Gmail API credentials loaded successfully from GMAIL_REFRESH_TOKEN');
+        return oauth2Client;
+      } catch (error) {
+        console.error('Error loading Gmail refresh token from environment:', error.message);
+      }
+    }
+
+    // 2. Try to load from complete Token JSON string in Environment
+    if (process.env.GMAIL_TOKEN) {
+      try {
+        const token = JSON.parse(process.env.GMAIL_TOKEN);
+        oauth2Client.setCredentials(token);
+        console.log('Gmail API credentials loaded successfully from GMAIL_TOKEN');
+        return oauth2Client;
+      } catch (error) {
+        console.error('Error loading Gmail token from environment:', error.message);
+      }
+    }
+
+    // 3. Fallback to Local File (for Local Development)
     const tokenPath = join(__dirname, '../config/gmail-token.json');
     if (existsSync(tokenPath)) {
       try {
         const token = JSON.parse(readFileSync(tokenPath, 'utf8'));
         oauth2Client.setCredentials(token);
-        console.log('Gmail API credentials loaded successfully');
+        console.log('Gmail API credentials loaded successfully from local file');
       } catch (error) {
-        console.error('Error loading Gmail token:', error.message);
+        console.error('Error loading Gmail token from file:', error.message);
       }
     }
   }
@@ -49,7 +73,7 @@ function getOAuth2Client() {
 
 export function getAuthUrl() {
   const client = getOAuth2Client();
-  
+
   const authUrl = client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
@@ -76,16 +100,16 @@ export async function generateTokenFromCode(code) {
 export async function sendEmail(to, subject, htmlBody) {
   try {
     const client = getOAuth2Client();
-    
+
     const tokenPath = join(__dirname, '../config/gmail-token.json');
-    if (!existsSync(tokenPath)) {
+    if (!process.env.GMAIL_REFRESH_TOKEN && !process.env.GMAIL_TOKEN && !existsSync(tokenPath)) {
       throw new Error(
-        'Gmail token not found. Run: node scripts/setupGmail.js'
+        'Gmail credentials not found. Set GMAIL_REFRESH_TOKEN environment variable in production, or run setupGmailAuth.js locally.'
       );
     }
-    
+
     const gmail = google.gmail({ version: 'v1', auth: client });
-    
+
     const message = [
       'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
