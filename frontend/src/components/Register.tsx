@@ -133,22 +133,22 @@ export default function Register({ onToggle }: RegisterProps) {
   };
 
   const inputStyle = {
-    background: 'rgba(31, 41, 55, 0.8)',
-    border: '1px solid rgba(75, 85, 99, 0.4)'
+    background: '#ffffff',
+    border: '1px solid rgba(226, 232, 240, 1)'
   };
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.boxShadow = '0 0 0 2px rgba(74, 222, 128, 0.3)';
-    e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+    e.target.style.boxShadow = '0 0 0 2px rgba(34, 197, 94, 0.2)';
+    e.target.style.borderColor = 'rgba(34, 197, 94, 0.5)';
   };
 
   const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     e.target.style.boxShadow = 'none';
-    e.target.style.borderColor = 'rgba(75, 85, 99, 0.4)';
+    e.target.style.borderColor = 'rgba(226, 232, 240, 1)';
   };
 
   return (
-    <div className="fixed inset-0 flex" style={{ background: 'linear-gradient(135deg, #0a0f1a 0%, #111827 40%, #0f1a2e 100%)' }}>
+    <div className="fixed inset-0 flex" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden items-center justify-center flex-shrink-0">
         {/* Animated gradient orbs */}
@@ -171,34 +171,14 @@ export default function Register({ onToggle }: RegisterProps) {
               />
             </div>
           </div>
-          <h1 className="text-5xl font-bold text-white mb-4 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            Skill<span style={{ color: '#4ade80' }}>Verse</span>
+          <h1 className="text-5xl font-bold text-gray-900 mb-4 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            Skill<span style={{ color: '#16a34a' }}>Verse</span>
           </h1>
-          <p className="text-lg text-gray-400 max-w-md mx-auto leading-relaxed">
+          <p className="text-lg text-gray-600 max-w-md mx-auto leading-relaxed">
             Begin your journey to mastering programming with AI-guided learning and collaborative education.
           </p>
 
-          {/* Stats */}
-          <div className="mt-10 grid grid-cols-3 gap-4">
-            {[
-              { label: 'Languages', value: '10+' },
-              { label: 'Projects', value: 'AI-Gen' },
-              { label: 'Tracking', value: 'Real-time' }
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="p-4 rounded-xl text-center border transition-all duration-300 hover:scale-105"
-                style={{
-                  background: 'rgba(74, 222, 128, 0.05)',
-                  borderColor: 'rgba(74, 222, 128, 0.15)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <div className="text-lg font-bold" style={{ color: '#4ade80' }}>{stat.value}</div>
-                <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
-              </div>
-            ))}
-          </div>
+
         </div>
       </div>
 
@@ -215,8 +195,8 @@ export default function Register({ onToggle }: RegisterProps) {
                 style={{ filter: 'drop-shadow(0 0 20px rgba(74, 222, 128, 0.3))' }}
               />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              Skill<span style={{ color: '#4ade80' }}>Verse</span>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              Skill<span style={{ color: '#16a34a' }}>Verse</span>
             </h1>
           </div>
 
@@ -224,14 +204,14 @@ export default function Register({ onToggle }: RegisterProps) {
           <div
             className="rounded-2xl p-6 sm:p-8 shadow-2xl border"
             style={{
-              background: 'rgba(17, 24, 39, 0.8)',
-              borderColor: 'rgba(55, 65, 81, 0.5)',
+              background: 'rgba(255, 255, 255, 0.9)',
+              borderColor: 'rgba(226, 232, 240, 1)',
               backdropFilter: 'blur(20px)'
             }}
           >
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white mb-2">Create account</h2>
-              <p className="text-sm text-gray-400">Start your learning experience today</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Create account</h2>
+              <p className="text-sm text-gray-600">Start your learning experience today</p>
             </div>
 
             {error && (
@@ -249,19 +229,19 @@ export default function Register({ onToggle }: RegisterProps) {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name Fields */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Full Name
                 </label>
                 <div className="grid grid-cols-12 gap-2">
                   <div className="col-span-5 relative group">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                     <input
                       id="register-firstName"
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
-                      className="w-full pl-10 pr-3 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                      className="w-full pl-10 pr-3 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                       style={inputStyle}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
@@ -275,7 +255,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       value={middleInitial}
                       onChange={(e) => setMiddleInitial(e.target.value.toUpperCase())}
                       maxLength={1}
-                      className="w-full px-3 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200 text-center"
+                      className="w-full px-3 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200 text-center"
                       style={inputStyle}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
@@ -289,7 +269,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
-                      className="w-full px-3 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                      className="w-full px-3 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                       style={inputStyle}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
@@ -301,18 +281,18 @@ export default function Register({ onToggle }: RegisterProps) {
 
               {/* Email */}
               <div className="space-y-2">
-                <label htmlFor="register-email" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label htmlFor="register-email" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Email address
                 </label>
                 <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                   <input
                     id="register-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full pl-11 pr-4 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                    className="w-full pl-11 pr-4 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                     style={inputStyle}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
@@ -323,7 +303,7 @@ export default function Register({ onToggle }: RegisterProps) {
 
               {/* Verification Code */}
               <div className="space-y-2">
-                <label htmlFor="register-verificationCode" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label htmlFor="register-verificationCode" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Verification Code
                 </label>
                 <div className="flex gap-2">
@@ -336,7 +316,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       required
                       disabled={!codeSent}
                       maxLength={6}
-                      className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={inputStyle}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
@@ -358,17 +338,17 @@ export default function Register({ onToggle }: RegisterProps) {
                   </button>
                 </div>
                 {codeSent && (
-                  <p className="text-xs mt-1" style={{ color: '#4ade80' }}>✓ Verification code sent to your email</p>
+                  <p className="text-xs mt-1" style={{ color: '#16a34a' }}>✓ Verification code sent to your email</p>
                 )}
               </div>
 
               {/* Password */}
               <div className="space-y-2">
-                <label htmlFor="register-password" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label htmlFor="register-password" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Password
                 </label>
                 <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                   <input
                     id="register-password"
                     type={showPassword ? 'text' : 'password'}
@@ -377,7 +357,7 @@ export default function Register({ onToggle }: RegisterProps) {
                     onFocus={(e) => { setPasswordFocused(true); handleInputFocus(e); }}
                     onBlur={handleInputBlur}
                     required
-                    className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                    className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                     style={inputStyle}
                     placeholder="Create a strong password"
                   />
@@ -424,18 +404,18 @@ export default function Register({ onToggle }: RegisterProps) {
 
               {/* Confirm Password */}
               <div className="space-y-2">
-                <label htmlFor="register-confirmPassword" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label htmlFor="register-confirmPassword" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Confirm password
                 </label>
                 <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                   <input
                     id="register-confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                    className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                     style={inputStyle}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
@@ -456,7 +436,7 @@ export default function Register({ onToggle }: RegisterProps) {
 
               {/* Role Selection */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Select your role
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -465,16 +445,16 @@ export default function Register({ onToggle }: RegisterProps) {
                     onClick={() => setRole('student')}
                     className="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 group"
                     style={{
-                      borderColor: role === 'student' ? '#4ade80' : 'rgba(75, 85, 99, 0.4)',
-                      background: role === 'student' ? 'rgba(74, 222, 128, 0.08)' : 'rgba(31, 41, 55, 0.5)'
+                      borderColor: role === 'student' ? '#16a34a' : 'rgba(226, 232, 240, 1)',
+                      background: role === 'student' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(248, 250, 252, 0.5)'
                     }}
                   >
-                    <BookOpen className={`w-6 h-6 mb-2 transition-colors duration-300 ${role === 'student' ? 'text-green-400' : 'text-gray-500'}`} />
-                    <span className={`text-xs font-semibold transition-colors duration-300 ${role === 'student' ? 'text-green-400' : 'text-gray-400'}`}>
+                    <BookOpen className={`w-6 h-6 mb-2 transition-colors duration-300 ${role === 'student' ? 'text-green-600' : 'text-gray-400'}`} />
+                    <span className={`text-xs font-semibold transition-colors duration-300 ${role === 'student' ? 'text-green-600' : 'text-gray-600'}`}>
                       Student
                     </span>
                     {role === 'student' && (
-                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }} />
+                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: '#16a34a', boxShadow: '0 0 8px rgba(34, 197, 94, 0.5)' }} />
                     )}
                   </button>
 
@@ -483,16 +463,16 @@ export default function Register({ onToggle }: RegisterProps) {
                     onClick={() => setRole('teacher')}
                     className="relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 group"
                     style={{
-                      borderColor: role === 'teacher' ? '#4ade80' : 'rgba(75, 85, 99, 0.4)',
-                      background: role === 'teacher' ? 'rgba(74, 222, 128, 0.08)' : 'rgba(31, 41, 55, 0.5)'
+                      borderColor: role === 'teacher' ? '#16a34a' : 'rgba(226, 232, 240, 1)',
+                      background: role === 'teacher' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(248, 250, 252, 0.5)'
                     }}
                   >
-                    <GraduationCap className={`w-6 h-6 mb-2 transition-colors duration-300 ${role === 'teacher' ? 'text-green-400' : 'text-gray-500'}`} />
-                    <span className={`text-xs font-semibold transition-colors duration-300 ${role === 'teacher' ? 'text-green-400' : 'text-gray-400'}`}>
+                    <GraduationCap className={`w-6 h-6 mb-2 transition-colors duration-300 ${role === 'teacher' ? 'text-green-600' : 'text-gray-400'}`} />
+                    <span className={`text-xs font-semibold transition-colors duration-300 ${role === 'teacher' ? 'text-green-600' : 'text-gray-600'}`}>
                       Teacher
                     </span>
                     {role === 'teacher' && (
-                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: '#4ade80', boxShadow: '0 0 8px rgba(74, 222, 128, 0.5)' }} />
+                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full" style={{ background: '#16a34a', boxShadow: '0 0 8px rgba(34, 197, 94, 0.5)' }} />
                     )}
                   </button>
                 </div>
@@ -523,14 +503,14 @@ export default function Register({ onToggle }: RegisterProps) {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-600">
                 Already have an account?{' '}
                 <button
                   onClick={onToggle}
                   className="font-semibold transition-colors duration-200 hover:underline underline-offset-4"
-                  style={{ color: '#4ade80' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#86efac'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#4ade80'}
+                  style={{ color: '#16a34a' }}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#15803d'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#16a34a'}
                 >
                   Sign in
                 </button>

@@ -30,7 +30,7 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #0a0f1a 0%, #111827 40%, #0f1a2e 100%)' }}>
+    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
         {/* Animated gradient orbs */}
@@ -53,30 +53,14 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
               />
             </div>
           </div>
-          <h1 className="text-5xl font-bold text-white mb-4 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            Skill<span style={{ color: '#4ade80' }}>Verse</span>
+          <h1 className="text-5xl font-bold text-gray-900 mb-4 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            Skill<span style={{ color: '#16a34a' }}>Verse</span>
           </h1>
-          <p className="text-lg text-gray-400 max-w-md mx-auto leading-relaxed">
+          <p className="text-lg text-gray-600 max-w-md mx-auto leading-relaxed">
             Unlock your potential through interactive coding challenges, collaborative classrooms, and AI-powered learning paths.
           </p>
 
-          {/* Feature pills */}
-          <div className="mt-10 flex flex-wrap gap-3 justify-center">
-            {['AI-Powered', 'Interactive Coding', 'Progress Tracking', 'Classrooms'].map((feature) => (
-              <span
-                key={feature}
-                className="px-4 py-2 rounded-full text-xs font-medium border transition-all duration-300 hover:scale-105"
-                style={{
-                  color: '#86efac',
-                  borderColor: 'rgba(74, 222, 128, 0.2)',
-                  background: 'rgba(74, 222, 128, 0.05)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                {feature}
-              </span>
-            ))}
-          </div>
+
         </div>
       </div>
 
@@ -93,8 +77,8 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
                 style={{ filter: 'drop-shadow(0 0 20px rgba(74, 222, 128, 0.3))' }}
               />
             </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              Skill<span style={{ color: '#4ade80' }}>Verse</span>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+              Skill<span style={{ color: '#16a34a' }}>Verse</span>
             </h1>
           </div>
 
@@ -102,14 +86,14 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
           <div
             className="rounded-2xl p-8 sm:p-10 shadow-2xl border"
             style={{
-              background: 'rgba(17, 24, 39, 0.8)',
-              borderColor: 'rgba(55, 65, 81, 0.5)',
+              background: 'rgba(255, 255, 255, 0.9)',
+              borderColor: 'rgba(226, 232, 240, 1)',
               backdropFilter: 'blur(20px)'
             }}
           >
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome back</h2>
-              <p className="text-sm text-gray-400">Sign in to continue your learning journey</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
+              <p className="text-sm text-gray-600">Sign in to continue your learning journey</p>
             </div>
 
             {error && (
@@ -126,48 +110,48 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <label htmlFor="login-email" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label htmlFor="login-email" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Email address
                 </label>
                 <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                   <input
                     id="login-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full pl-11 pr-4 py-3.5 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-200"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200"
                     style={{
-                      background: 'rgba(31, 41, 55, 0.8)',
-                      border: '1px solid rgba(75, 85, 99, 0.4)'
+                      background: '#ffffff',
+                      border: '1px solid rgba(226, 232, 240, 1)'
                     }}
-                    onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px rgba(74, 222, 128, 0.3)'; e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)'; }}
-                    onBlur={(e) => { e.target.style.boxShadow = 'none'; e.target.style.borderColor = 'rgba(75, 85, 99, 0.4)'; }}
+                    onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px rgba(34, 197, 94, 0.2)'; e.target.style.borderColor = 'rgba(34, 197, 94, 0.5)'; }}
+                    onBlur={(e) => { e.target.style.boxShadow = 'none'; e.target.style.borderColor = 'rgba(226, 232, 240, 1)'; }}
                     placeholder="name@example.com"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="login-password" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                <label htmlFor="login-password" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Password
                 </label>
                 <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                   <input
                     id="login-password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full pl-11 pr-12 py-3.5 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                    className="w-full pl-11 pr-12 py-3.5 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                     style={{
-                      background: 'rgba(31, 41, 55, 0.8)',
-                      border: '1px solid rgba(75, 85, 99, 0.4)'
+                      background: '#ffffff',
+                      border: '1px solid rgba(226, 232, 240, 1)'
                     }}
-                    onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px rgba(74, 222, 128, 0.3)'; e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)'; }}
-                    onBlur={(e) => { e.target.style.boxShadow = 'none'; e.target.style.borderColor = 'rgba(75, 85, 99, 0.4)'; }}
+                    onFocus={(e) => { e.target.style.boxShadow = '0 0 0 2px rgba(34, 197, 94, 0.2)'; e.target.style.borderColor = 'rgba(34, 197, 94, 0.5)'; }}
+                    onBlur={(e) => { e.target.style.boxShadow = 'none'; e.target.style.borderColor = 'rgba(226, 232, 240, 1)'; }}
                     placeholder="Enter your password"
                   />
                   <button
@@ -183,9 +167,9 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
                     type="button"
                     onClick={onForgotPassword}
                     className="text-xs font-medium transition-colors duration-200 hover:underline underline-offset-4"
-                    style={{ color: '#86efac' }}
-                    onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#4ade80'}
-                    onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#86efac'}
+                    style={{ color: '#16a34a' }}
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#15803d'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#16a34a'}
                   >
                     Forgot password?
                   </button>
@@ -218,14 +202,14 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
             </form>
 
             <div className="mt-8 text-center">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-600">
                 Don't have an account?{' '}
                 <button
                   onClick={onToggle}
                   className="font-semibold transition-colors duration-200 hover:underline underline-offset-4"
-                  style={{ color: '#4ade80' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#86efac'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#4ade80'}
+                  style={{ color: '#16a34a' }}
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#15803d'}
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#16a34a'}
                 >
                   Create account
                 </button>

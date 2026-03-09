@@ -153,22 +153,22 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
   };
 
   const inputStyle = {
-    background: 'rgba(31, 41, 55, 0.8)',
-    border: '1px solid rgba(75, 85, 99, 0.4)'
+    background: '#ffffff',
+    border: '1px solid rgba(226, 232, 240, 1)'
   };
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.boxShadow = '0 0 0 2px rgba(74, 222, 128, 0.3)';
-    e.target.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+    e.target.style.boxShadow = '0 0 0 2px rgba(34, 197, 94, 0.2)';
+    e.target.style.borderColor = 'rgba(34, 197, 94, 0.5)';
   };
 
   const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     e.target.style.boxShadow = 'none';
-    e.target.style.borderColor = 'rgba(75, 85, 99, 0.4)';
+    e.target.style.borderColor = 'rgba(226, 232, 240, 1)';
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0a0f1a 0%, #111827 40%, #0f1a2e 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
       {/* Animated gradient orbs */}
       <div className="fixed top-20 left-20 w-72 h-72 rounded-full opacity-15 animate-pulse" style={{ background: 'radial-gradient(circle, #4ade80, transparent)', filter: 'blur(60px)' }} />
       <div className="fixed bottom-32 right-16 w-96 h-96 rounded-full opacity-10 animate-pulse" style={{ background: 'radial-gradient(circle, #22c55e, transparent)', filter: 'blur(80px)', animationDelay: '2s' }} />
@@ -190,14 +190,14 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
         <div
           className="rounded-2xl p-8 shadow-2xl border"
           style={{
-            background: 'rgba(17, 24, 39, 0.8)',
-            borderColor: 'rgba(55, 65, 81, 0.5)',
+            background: 'rgba(255, 255, 255, 0.9)',
+            borderColor: 'rgba(226, 232, 240, 1)',
             backdropFilter: 'blur(20px)'
           }}
         >
           <button
             onClick={onBack}
-            className="mb-6 flex items-center gap-2 text-gray-400 hover:text-green-400 transition-colors duration-200"
+            className="mb-6 flex items-center gap-2 text-gray-400 hover:text-green-600 transition-colors duration-200"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back to login</span>
@@ -207,13 +207,13 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
             <div className="flex items-center gap-3 mb-2">
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(74, 222, 128, 0.15)' }}
+                style={{ background: 'rgba(34, 197, 94, 0.1)' }}
               >
-                <KeyRound className="w-5 h-5" style={{ color: '#4ade80' }} />
+                <KeyRound className="w-5 h-5" style={{ color: '#16a34a' }} />
               </div>
-              <h2 className="text-2xl font-bold text-white">Reset password</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Reset password</h2>
             </div>
-            <p className="text-sm text-gray-400 ml-[52px]">Enter your email to receive a verification code</p>
+            <p className="text-sm text-gray-600 ml-[52px]">Enter your email to receive a verification code</p>
           </div>
 
           {error && (
@@ -233,27 +233,27 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
               className="mb-5 p-3 rounded-xl flex items-start gap-3"
               style={{ background: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.2)' }}
             >
-              <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: 'rgba(74, 222, 128, 0.2)' }}>
-                <Check className="w-3 h-3" style={{ color: '#4ade80' }} />
+              <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: 'rgba(34, 197, 94, 0.2)' }}>
+                <Check className="w-3 h-3" style={{ color: '#16a34a' }} />
               </div>
-              <p className="text-sm" style={{ color: '#86efac' }}>{success}</p>
+              <p className="text-sm" style={{ color: '#15803d' }}>{success}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="forgot-email" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              <label htmlFor="forgot-email" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Email address
               </label>
               <div className="relative group">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                 <input
                   id="forgot-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full pl-11 pr-4 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                   style={inputStyle}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
@@ -263,7 +263,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="forgot-verificationCode" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              <label htmlFor="forgot-verificationCode" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Verification Code
               </label>
               <div className="flex gap-2">
@@ -276,7 +276,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
                     required
                     disabled={!codeSent}
                     maxLength={6}
-                    className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={inputStyle}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
@@ -298,16 +298,16 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
                 </button>
               </div>
               {codeSent && !success && (
-                <p className="text-xs mt-1" style={{ color: '#4ade80' }}>✓ Verification code sent to your email</p>
+                <p className="text-xs mt-1" style={{ color: '#16a34a' }}>✓ Verification code sent to your email</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="forgot-newPassword" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              <label htmlFor="forgot-newPassword" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 New Password
               </label>
               <div className="relative group">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                 <input
                   id="forgot-newPassword"
                   type={showNewPassword ? 'text' : 'password'}
@@ -316,7 +316,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
                   onFocus={(e) => { setPasswordFocused(true); handleInputFocus(e); }}
                   onBlur={handleInputBlur}
                   required
-                  className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                  className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                   style={inputStyle}
                   placeholder="Create a strong password"
                 />
@@ -362,18 +362,18 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="forgot-confirmPassword" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              <label htmlFor="forgot-confirmPassword" className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Confirm New Password
               </label>
               <div className="relative group">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 group-focus-within:text-green-400 transition-colors duration-200" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                 <input
                   id="forgot-confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none transition-all duration-200"
+                  className="w-full pl-11 pr-12 py-3 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all duration-200"
                   style={inputStyle}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
