@@ -33,23 +33,17 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
     <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
-        {/* Animated gradient orbs */}
-        <div className="absolute top-20 left-20 w-72 h-72 rounded-full opacity-20 animate-pulse" style={{ background: 'radial-gradient(circle, #4ade80, transparent)', filter: 'blur(60px)' }} />
-        <div className="absolute bottom-32 right-16 w-96 h-96 rounded-full opacity-15 animate-pulse" style={{ background: 'radial-gradient(circle, #22c55e, transparent)', filter: 'blur(80px)', animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full opacity-10 animate-pulse" style={{ background: 'radial-gradient(circle, #86efac, transparent)', filter: 'blur(40px)', animationDelay: '4s' }} />
 
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
 
         <div className="relative z-10 text-center px-12">
           <div className="mb-8 flex justify-center">
             <div className="relative">
-              <div className="absolute inset-0 rounded-3xl opacity-30 blur-xl" style={{ background: 'linear-gradient(135deg, #4ade80, #22c55e)' }} />
+
               <img
                 src="/assets/skillverseLogoV2.webp"
                 alt="SkillVerse Logo"
                 className="relative w-32 h-32 object-contain drop-shadow-2xl"
-                style={{ filter: 'drop-shadow(0 0 30px rgba(74, 222, 128, 0.3))' }}
+                style={{ filter: 'drop-shadow(0 0 30px rgba(0, 0, 0, 0.1))' }}
               />
             </div>
           </div>
@@ -74,7 +68,7 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
                 src="/assets/skillverseLogoV2.webp"
                 alt="SkillVerse Logo"
                 className="w-20 h-20 object-contain"
-                style={{ filter: 'drop-shadow(0 0 20px rgba(74, 222, 128, 0.3))' }}
+                style={{ filter: 'drop-shadow(0 0 20px rgba(0, 0, 0, 0.1))' }}
               />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -102,9 +96,9 @@ export default function Login({ onToggle, onForgotPassword }: LoginProps) {
                 style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
               >
                 <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
-                  <span className="text-red-400 text-xs font-bold">!</span>
+                  <span className="text-red-600 text-xs font-bold">!</span>
                 </div>
-                <p className="text-sm text-red-300">{error}</p>
+                <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
 
