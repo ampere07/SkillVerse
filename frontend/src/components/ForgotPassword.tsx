@@ -80,7 +80,11 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
     setSuccess('');
 
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/send-password-reset-code`, {
+      const baseUrl = import.meta.env.VITE_API_URL.endsWith('/api')
+        ? import.meta.env.VITE_API_URL
+        : `${import.meta.env.VITE_API_URL}/api`;
+
+      const response = await axios.post(`${baseUrl}/auth/send-password-reset-code`, {
         email
       });
 
@@ -133,7 +137,11 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/reset-password`, {
+      const baseUrl = import.meta.env.VITE_API_URL.endsWith('/api')
+        ? import.meta.env.VITE_API_URL
+        : `${import.meta.env.VITE_API_URL}/api`;
+
+      const response = await axios.post(`${baseUrl}/auth/reset-password`, {
         email,
         verificationCode,
         newPassword
@@ -418,7 +426,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-gray-600">
-          © 2025 SkillVerse. All rights reserved.
+          © 2026 SkillVerse.
         </p>
       </div>
     </div>

@@ -84,7 +84,11 @@ export default function Register({ onToggle }: RegisterProps) {
     setError('');
 
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/send-verification-code`, {
+      const baseUrl = import.meta.env.VITE_API_URL.endsWith('/api')
+        ? import.meta.env.VITE_API_URL
+        : `${import.meta.env.VITE_API_URL}/api`;
+
+      const response = await axios.post(`${baseUrl}/auth/send-verification-code`, {
         email
       });
 
@@ -520,7 +524,7 @@ export default function Register({ onToggle }: RegisterProps) {
 
           {/* Footer */}
           <p className="mt-4 text-center text-xs text-gray-600">
-            © 2025 SkillVerse. All rights reserved.
+            © 2026 SkillVerse.
           </p>
         </div>
       </div>
