@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { KeyRound, Mail, Lock, Send, ArrowLeft, Eye, EyeOff, Check, X } from 'lucide-react';
+import { Mail, Lock, Send, ArrowLeft, Eye, EyeOff, Check, X } from 'lucide-react';
 import axios from 'axios';
 
 interface ForgotPasswordProps {
@@ -169,9 +169,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
-      {/* Animated gradient orbs */}
-      <div className="fixed top-20 left-20 w-72 h-72 rounded-full opacity-15 animate-pulse" style={{ background: 'radial-gradient(circle, #4ade80, transparent)', filter: 'blur(60px)' }} />
-      <div className="fixed bottom-32 right-16 w-96 h-96 rounded-full opacity-10 animate-pulse" style={{ background: 'radial-gradient(circle, #22c55e, transparent)', filter: 'blur(80px)', animationDelay: '2s' }} />
+
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
@@ -181,7 +179,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
               src="/assets/skillverseLogoV2.webp"
               alt="SkillVerse Logo"
               className="w-20 h-20 object-contain"
-              style={{ filter: 'drop-shadow(0 0 20px rgba(74, 222, 128, 0.3))' }}
+              style={{ filter: 'drop-shadow(0 0 20px rgba(0, 0, 0, 0.1))' }}
             />
           </div>
         </div>
@@ -204,16 +202,8 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
           </button>
 
           <div className="mb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(34, 197, 94, 0.1)' }}
-              >
-                <KeyRound className="w-5 h-5" style={{ color: '#16a34a' }} />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">Reset password</h2>
-            </div>
-            <p className="text-sm text-gray-600 ml-[52px]">Enter your email to receive a verification code</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Reset password</h2>
+            <p className="text-sm text-gray-600">Enter your email to receive a verification code</p>
           </div>
 
           {error && (
@@ -222,9 +212,9 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
               style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
             >
               <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
-                <span className="text-red-400 text-xs font-bold">!</span>
+                <span className="text-red-600 text-xs font-bold">!</span>
               </div>
-              <p className="text-sm text-red-300">{error}</p>
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
@@ -332,9 +322,9 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
               {passwordFocused && (
                 <div
                   className="mt-2 p-3 rounded-xl border"
-                  style={{ background: 'rgba(31, 41, 55, 0.6)', borderColor: 'rgba(75, 85, 99, 0.3)' }}
+                  style={{ background: 'rgba(249, 250, 251, 1)', borderColor: 'rgba(226, 232, 240, 1)' }}
                 >
-                  <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Requirements</p>
+                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Requirements</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {passwordRequirements.map((requirement, index) => {
                       const isValid = requirement.test(newPassword);
@@ -342,7 +332,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
                         <div key={index} className="flex items-center gap-1.5">
                           <div
                             className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300"
-                            style={{ background: isValid ? 'rgba(74, 222, 128, 0.8)' : 'rgba(75, 85, 99, 0.5)' }}
+                            style={{ background: isValid ? '#16a34a' : 'rgba(226, 232, 240, 1)' }}
                           >
                             {isValid ? (
                               <Check className="w-2.5 h-2.5 text-white" />
@@ -350,7 +340,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
                               <X className="w-2.5 h-2.5 text-gray-400" />
                             )}
                           </div>
-                          <span className={`text-xs ${isValid ? 'text-green-400 font-medium' : 'text-gray-500'} transition-colors duration-300`}>
+                          <span className={`text-xs ${isValid ? 'text-green-700 font-medium' : 'text-gray-500'} transition-colors duration-300`}>
                             {requirement.label}
                           </span>
                         </div>
