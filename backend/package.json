@@ -28,6 +28,7 @@
     "ollama": "^0.6.3",
     "pdfjs-dist": "^5.4.394",
     "react-pdf": "^10.2.0",
+    "resend": "^6.9.3",
     "socket.io": "^4.8.3",
     "transformers": "^3.1.0"
   }

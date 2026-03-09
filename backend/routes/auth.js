@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import MiniProject from '../models/MiniProject.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { sendEmail } from '../services/gmailService.js';
+import { sendEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
