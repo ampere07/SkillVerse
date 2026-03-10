@@ -6,7 +6,7 @@ const resend = new Resend(resendApiKey);
 export async function sendEmail(to, subject, htmlBody) {
     try {
         const data = await resend.emails.send({
-            from: 'ATSS Fiber <billing@atssfiber.ph>', // MUST be this exact string for Resend free tiers on unverified domains
+            from: 'Skillverse <billing@atssfiber.ph>', // MUST be this exact string for Resend free tiers on unverified domains
             reply_to: 'billing@atssfiber.ph',
             to: [to],
             subject: subject,
