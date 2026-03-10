@@ -1,13 +1,13 @@
 import { Resend } from 'resend';
 
-const resendApiKey = process.env.RESEND_API_KEY || 're_WAPt6yvF_CggJZBY1v3fLBsBHR9osLurM';
+const resendApiKey = process.env.RESEND_API_KEY || 're_3ukT4Pws_BmYcGQXMq5G7Y5sJ2NaxkbK5';
 const resend = new Resend(resendApiKey);
 
 export async function sendEmail(to, subject, htmlBody) {
     try {
         const data = await resend.emails.send({
-            from: 'SkillVerse <onboarding@resend.dev>', // MUST be this exact string for Resend free tiers on unverified domains
-            reply_to: 'ravenampere0123@gmail.com',
+            from: 'ATSS Fiber <billing@atssfiber.ph>', // MUST be this exact string for Resend free tiers on unverified domains
+            reply_to: 'billing@atssfiber.ph',
             to: [to],
             subject: subject,
             html: htmlBody
