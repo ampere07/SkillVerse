@@ -257,7 +257,7 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
     try {
         const leaderboard = await BugHuntLeaderboard.find()
             .sort({ totalScore: -1 })
-            .limit(10)
+            .limit(5)
             .populate('userId', 'name firstName lastName')
             .lean();
 
