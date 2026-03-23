@@ -29,8 +29,22 @@ export const setupDashboardSocket = (io) => {
 
                 // Join user-specific room
                 socket.join(`user-${socket.userId}`);
+
+                // Join classroom specific rooms
+                try {
+                    const user = await User.findById(socket.userId);
+                    if (socket.userRole === 'teacher' && user.teacherClassrooms) {
+                        user.teacherClassrooms.forEach(c => socket.join(`classroom-${c._id || c}`));
+                    } else if (socket.userRole === 'student' && user.studentClassrooms) {
+                        user.studentClassrooms.forEach(c => socket.join(`classroom-${c._id || c}`));
+                    }
+                } catch (roomError) {
+                    console.error('Error joining classroom rooms:', roomError);
+                }
+
+                socket.emit('authenticated', { success: true, userId: socket.userId });
+                console.log(`User ${socket.userId} authenticated on dashboard socket`);
             } catch (error) {
-                console.error('Socket authentication failed:', error.message);
                 socket.emit('authentication-error', { message: 'Invalid token' });
                 socket.disconnect();
             }
@@ -79,6 +93,12 @@ export const emitToUser = (io, userId, event, data) => {
     dashboardNamespace.to(`user-${userId}`).emit(event, data);
 };
 
+// Helper function to emit updates to a specific classroom
+export const emitToClassroom = (io, classroomId, event, data) => {
+    const dashboardNamespace = io.of('/dashboard');
+    dashboardNamespace.to(`classroom-${classroomId}`).emit(event, data);
+};
+
 // Helper function to emit updates when mini-projects are completed
 export const emitMiniProjectUpdate = (io, userId, projectData) => {
     emitToUser(io, userId, 'mini-project-update', projectData);
@@ -89,9 +109,19 @@ export const emitAssignmentUpdate = (io, userId, assignmentData) => {
     emitToUser(io, userId, 'assignment-update', assignmentData);
 };
 
+// Helper function to emit classroom-wide assignment updates
+export const emitClassroomAssignmentUpdate = (io, classroomId, assignmentData) => {
+    emitToClassroom(io, classroomId, 'assignment-update', assignmentData);
+};
+
 // Helper function to emit updates when courses are enrolled
 export const emitCourseUpdate = (io, userId, courseData) => {
     emitToUser(io, userId, 'course-update', courseData);
+};
+
+// Helper function to emit updates when classrooms are updated
+export const emitClassroomUpdate = (io, classroomId, classroomData) => {
+    emitToClassroom(io, classroomId, 'classroom-update', classroomData);
 };
 
 // Helper function to emit real-time activity updates

@@ -10,7 +10,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { connectSocket, disconnectSocket, getSocket } from '../utils/socket';
+import LevelUpModal from './LevelUpModal';
 
 const getSafeName = (user: any) => {
   if (!user?.name || user.name.toLowerCase().includes('undefined')) {
@@ -133,67 +134,48 @@ export default function Dashboard() {
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [selectedProjectTitle, setSelectedProjectTitle] = useState<string | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [leveledLevel, setLeveledLevel] = useState(1);
+
+  useEffect(() => {
+    const handleLevelUp = (event: any) => {
+      const level = event.detail?.level;
+      if (level) {
+        setLeveledLevel(level);
+        setShowLevelUp(true);
+      }
+    };
+
+    window.addEventListener('level-up', handleLevelUp);
+    return () => window.removeEventListener('level-up', handleLevelUp);
+  }, []);
 
   // Initialize socket connection for real-time updates
+  // Initialize socket connection for real-time updates
   useEffect(() => {
-    if (user?.role === 'student') {
-      const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
-      const socket = io(`${baseUrl}/dashboard`, {
-        transports: ['websocket', 'polling']
-      });
+    const token = localStorage.getItem('token');
+    connectSocket(token);
+    const socket = getSocket();
 
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        console.log('Dashboard socket connected');
-        const token = localStorage.getItem('token');
-        if (token) {
-          socket.emit('authenticate', token);
-        }
-      });
-
-      socket.on('authenticated', () => {
-        console.log('Dashboard socket authenticated');
-      });
-
-      socket.on('mini-project-update', (data) => {
-        console.log('Mini project update received:', data);
+    const refreshStats = () => {
+      if (user?.role === 'student') {
         fetchDashboardStats();
-      });
+      }
+    };
 
-      socket.on('assignment-update', (data) => {
-        console.log('Assignment update received:', data);
-        fetchDashboardStats();
-      });
+    socket.on('mini-project-update', refreshStats);
+    socket.on('assignment-update', refreshStats);
+    socket.on('course-update', refreshStats);
+    socket.on('activity-update', refreshStats);
+    socket.on('dashboard-update', refreshStats);
 
-      socket.on('course-update', (data) => {
-        console.log('Course update received:', data);
-        fetchDashboardStats();
-      });
-
-      socket.on('activity-update', (data) => {
-        console.log('Activity update received:', data);
-        fetchDashboardStats();
-      });
-
-      socket.on('dashboard-update', (data) => {
-        console.log('Dashboard update received:', data);
-        fetchDashboardStats();
-      });
-
-      socket.on('error', (error) => {
-        console.error('Dashboard socket error:', error);
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Dashboard socket disconnected');
-      });
-
-      return () => {
-        socket.disconnect();
-      };
-    }
+    return () => {
+      socket.off('mini-project-update', refreshStats);
+      socket.off('assignment-update', refreshStats);
+      socket.off('course-update', refreshStats);
+      socket.off('activity-update', refreshStats);
+      socket.off('dashboard-update', refreshStats);
+    };
   }, [user]);
 
   useEffect(() => {
@@ -646,6 +628,12 @@ export default function Dashboard() {
         onSaveAndLeave={handleSaveAndNavigate}
         isSaving={false}
       />
+      {showLevelUp && (
+        <LevelUpModal
+          level={leveledLevel}
+          onClose={() => setShowLevelUp(false)}
+        />
+      )}
     </div>
   );
 }

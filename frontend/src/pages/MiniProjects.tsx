@@ -586,11 +586,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
             {(() => {
               const getXpRequiredForLevel = (level: number) => {
                 if (level <= 1) return 0;
-                let totalXp = 0;
-                for (let i = 2; i <= level; i++) {
-                  totalXp += i * 100;
-                }
-                return totalXp;
+                return (level - 1) * 500;
               };
 
               const currentLevelXp = getXpRequiredForLevel(currentLevel);
@@ -617,11 +613,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                 width: `${(() => {
                   const getXpRequiredForLevel = (level: number) => {
                     if (level <= 1) return 0;
-                    let totalXp = 0;
-                    for (let i = 2; i <= level; i++) {
-                      totalXp += i * 100;
-                    }
-                    return totalXp;
+                    return (level - 1) * 500;
                   };
                   const currentLevelXp = getXpRequiredForLevel(currentLevel);
                   const nextLevelTotalXp = getXpRequiredForLevel(currentLevel + 1);

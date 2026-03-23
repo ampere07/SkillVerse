@@ -202,6 +202,13 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
             const data = await response.json();
 
             if (data.success && data.fixed) {
+                // Check for Level Up
+                if (data.leveledUp) {
+                    window.dispatchEvent(new CustomEvent('level-up', { 
+                        detail: { level: data.newLevel } 
+                    }));
+                }
+                
                 setScore(data.totalScore || score);
                 setFeedback(data.feedback || "Bug Caught! Excellent work.");
 
@@ -265,7 +272,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
         if (!sessionId) return;
         try {
-            await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/surrender`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/surrender`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -277,6 +284,15 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                     totalScore: score
                 })
             });
+            const data = await response.json();
+
+            // Check for Level Up
+            if (data.leveledUp) {
+                window.dispatchEvent(new CustomEvent('level-up', { 
+                    detail: { level: data.newLevel } 
+                }));
+            }
+
             setIsSurrendered(true);
             setGameState('completed');
         } catch (error) {

@@ -25,6 +25,8 @@ interface ClassroomsProps {
   onClearSelection?: () => void;
 }
 
+import { getSocket } from '../utils/socket';
+
 export default function Classrooms({ selectedClassroomId: propSelectedClassroomId, onClearSelection }: ClassroomsProps = {}) {
   const { user } = useAuth();
   const isTeacher = user?.role === 'teacher';
@@ -61,6 +63,20 @@ export default function Classrooms({ selectedClassroomId: propSelectedClassroomI
 
   useEffect(() => {
     fetchClassrooms();
+
+    // Listen for real-time updates
+    const socket = getSocket();
+    const handleUpdate = () => {
+      fetchClassrooms();
+    };
+
+    socket.on('classroom-update', handleUpdate);
+    socket.on('assignment-update', handleUpdate);
+
+    return () => {
+      socket.off('classroom-update', handleUpdate);
+      socket.off('assignment-update', handleUpdate);
+    };
   }, [isTeacher]);
 
   useEffect(() => {

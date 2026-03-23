@@ -60,14 +60,13 @@ router.post('/add-xp', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    user.xp += amount;
+    user.xp += Number(amount);
 
-    // Check for level up
-    let leveledUp = false;
-    while (user.xp >= 500) {
-      user.xp -= 500;
-      user.level += 1;
-      leveledUp = true;
+    const newLevel = Math.floor(user.xp / 500) + 1;
+    const leveledUp = newLevel > user.level;
+    
+    if (leveledUp) {
+      user.level = newLevel;
     }
 
     await user.save();

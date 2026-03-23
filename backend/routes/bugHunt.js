@@ -98,11 +98,16 @@ router.post('/validate', authenticateToken, async (req, res) => {
 
                 // Reward XP to user
                 const user = await User.findById(req.user.userId);
+                let leveledUp = false;
+                let newLevel = user?.level || 1;
                 if (user) {
                     const xpReward = Math.floor(session.totalScore / 5);
+                    const totalXp = (user.xp || 0) + xpReward;
+                    newLevel = Math.floor(totalXp / 500) + 1;
+                    leveledUp = newLevel > user.level;
                     await User.findByIdAndUpdate(req.user.userId, {
                         $inc: { xp: xpReward },
-                        $set: { level: Math.floor(((user.xp || 0) + xpReward) / 500) + 1 }
+                        $set: { level: newLevel }
                     });
                 }
 
@@ -139,7 +144,9 @@ router.post('/validate', authenticateToken, async (req, res) => {
             success: true,
             ...result,
             sessionStatus: session.status,
-            totalScore: session.totalScore
+            totalScore: session.totalScore,
+            leveledUp: typeof leveledUp !== 'undefined' ? leveledUp : false,
+            newLevel: typeof newLevel !== 'undefined' ? newLevel : (user?.level || 1)
         });
     } catch (error) {
         console.error('[BugHunt Route] Validation error:', error);
@@ -210,11 +217,17 @@ router.post('/surrender', authenticateToken, async (req, res) => {
 
         // Give partial XP even for surrender
         const user = await User.findById(req.user.userId);
+        let leveledUp = false;
+        let newLevel = user?.level || 1;
+        const rewardScore = totalScore || session.totalScore || 0;
         if (user) {
-            const xpReward = Math.floor((finalScore || 0) / 10);
+            const xpReward = Math.floor((rewardScore || 0) / 10);
+            const totalXp = (user.xp || 0) + xpReward;
+            newLevel = Math.floor(totalXp / 500) + 1;
+            leveledUp = newLevel > (user.level || 1);
             await User.findByIdAndUpdate(req.user.userId, {
                 $inc: { xp: xpReward },
-                $set: { level: Math.floor(((user.xp || 0) + xpReward) / 500) + 1 }
+                $set: { level: newLevel }
             });
         }
 
@@ -250,7 +263,13 @@ router.post('/surrender', authenticateToken, async (req, res) => {
         );
         console.log(`[BugHunt Surrender] Leaderboard updated for ${req.user.userId}. New Score: ${updateResult?.totalScore}`);
 
-        res.json({ success: true, message: 'Mission surrendered. Intel recorded.' });
+        res.json({ 
+            success: true, 
+            message: 'Mission surrendered. Intel recorded.',
+            leveledUp,
+            newLevel,
+            totalScore: finalScore
+        });
     } catch (error) {
         console.error('[BugHunt Surrender Route] Error:', error);
         res.status(500).json({ success: false, error: error.message });

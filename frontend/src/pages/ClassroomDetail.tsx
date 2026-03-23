@@ -36,6 +36,8 @@ interface ClassroomDetailProps {
 
 type PostType = 'activity' | 'module';
 
+import { getSocket } from '../utils/socket';
+
 export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetailProps) {
   const [classroom, setClassroom] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -83,6 +85,20 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
 
   useEffect(() => {
     fetchClassroomData();
+
+    // Listen for real-time updates
+    const socket = getSocket();
+    const handleUpdate = () => {
+      fetchClassroomData();
+    };
+
+    socket.on('assignment-update', handleUpdate);
+    socket.on('classroom-update', handleUpdate);
+
+    return () => {
+      socket.off('assignment-update', handleUpdate);
+      socket.off('classroom-update', handleUpdate);
+    };
   }, [fetchClassroomData]);
 
   if (showSettings) {

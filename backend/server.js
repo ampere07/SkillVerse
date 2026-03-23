@@ -27,6 +27,8 @@ import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
 import { setupDashboardSocket } from './routes/dashboardSocket.js';
 import { initializeCronJobs } from './services/cronService.js';
 
+import { setIO } from './utils/socket.js';
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -43,6 +45,8 @@ const io = new Server(httpServer, {
     methods: ['GET', 'POST']
   }
 });
+
+setIO(io);
 
 const PORT = process.env.PORT || 5000;
 

@@ -35,6 +35,8 @@ interface Classroom {
 
 type TabType = 'todo' | 'dueToday' | 'missing';
 
+import { getSocket } from '../utils/socket';
+
 export default function Assignments() {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -48,6 +50,20 @@ export default function Assignments() {
 
   useEffect(() => {
     fetchData();
+
+    // Listen for real-time updates
+    const socket = getSocket();
+    const handleUpdate = () => {
+      fetchData();
+    };
+
+    socket.on('assignment-update', handleUpdate);
+    socket.on('classroom-update', handleUpdate);
+
+    return () => {
+      socket.off('assignment-update', handleUpdate);
+      socket.off('classroom-update', handleUpdate);
+    };
   }, []);
 
   const fetchData = async () => {

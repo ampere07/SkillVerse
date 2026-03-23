@@ -1,6 +1,8 @@
 import express from 'express';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 import { classroomService } from '../services/classroomService.js';
+import { getIO } from '../utils/socket.js';
+import { emitClassroomUpdate } from './dashboardSocket.js';
 
 const router = express.Router();
 
@@ -80,6 +82,18 @@ router.post('/join', authenticateToken, authorizeRole('student'), async (req, re
 
     console.log(`Student ${req.user.email} joined classroom: ${classroom.name}`);
 
+    // Emit real-time update
+    try {
+        const io = getIO();
+        emitClassroomUpdate(io, classroom._id, {
+            type: 'student-joined',
+            classroomId: classroom._id,
+            studentId: req.user.userId
+        });
+    } catch (ioError) {
+        console.error('Socket emission error:', ioError);
+    }
+
     res.json({
       success: true,
       message: 'Successfully joined classroom',
@@ -109,6 +123,18 @@ router.post('/:id/leave', authenticateToken, authorizeRole('student'), async (re
     await classroomService.leaveClassroom(req.params.id, req.user.userId);
 
     console.log(`Student ${req.user.email} left classroom`);
+
+    // Emit real-time update
+    try {
+        const io = getIO();
+        emitClassroomUpdate(io, req.params.id, {
+            type: 'student-left',
+            classroomId: req.params.id,
+            studentId: req.user.userId
+        });
+    } catch (ioError) {
+        console.error('Socket emission error:', ioError);
+    }
 
     res.json({
       success: true,
@@ -236,6 +262,18 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
 
     console.log(`Classroom updated: ${classroom.name} by ${req.user.email}`);
 
+    // Emit real-time update
+    try {
+        const io = getIO();
+        emitClassroomUpdate(io, classroom._id, {
+            type: 'updated',
+            classroomId: classroom._id,
+            name: classroom.name
+        });
+    } catch (ioError) {
+        console.error('Socket emission error:', ioError);
+    }
+
     res.json({
       success: true,
       message: 'Classroom updated successfully',
@@ -265,6 +303,17 @@ router.delete('/:id', authenticateToken, authorizeRole('teacher'), async (req, r
     await classroomService.deleteClassroom(req.params.id);
 
     console.log(`Classroom deleted by ${req.user.email}`);
+
+    // Emit real-time update
+    try {
+        const io = getIO();
+        emitClassroomUpdate(io, req.params.id, {
+            type: 'deleted',
+            classroomId: req.params.id
+        });
+    } catch (ioError) {
+        console.error('Socket emission error:', ioError);
+    }
 
     res.json({
       success: true,
