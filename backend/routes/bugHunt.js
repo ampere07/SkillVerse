@@ -99,12 +99,11 @@ router.post('/validate', authenticateToken, async (req, res) => {
                 // Reward XP to user
                 const user = await User.findById(req.user.userId);
                 if (user) {
-                    const xpReward = Math.floor(session.totalScore / 5); // 1 XP for every 5 points
-                    user.xp = (user.xp || 0) + xpReward;
-
-                    // Simple level up logic (every 500 XP)
-                    user.level = Math.floor(user.xp / 500) + 1;
-                    await user.save();
+                    const xpReward = Math.floor(session.totalScore / 5);
+                    await User.findByIdAndUpdate(req.user.userId, {
+                        $inc: { xp: xpReward },
+                        $set: { level: Math.floor(((user.xp || 0) + xpReward) / 500) + 1 }
+                    });
                 }
 
                 // Update BugHuntLeaderboard
@@ -212,10 +211,11 @@ router.post('/surrender', authenticateToken, async (req, res) => {
         // Give partial XP even for surrender
         const user = await User.findById(req.user.userId);
         if (user) {
-            const xpReward = Math.floor((totalScore || 0) / 10); // 1 XP for every 10 points on surrender
-            user.xp = (user.xp || 0) + xpReward;
-            user.level = Math.floor(user.xp / 500) + 1;
-            await user.save();
+            const xpReward = Math.floor((finalScore || 0) / 10);
+            await User.findByIdAndUpdate(req.user.userId, {
+                $inc: { xp: xpReward },
+                $set: { level: Math.floor(((user.xp || 0) + xpReward) / 500) + 1 }
+            });
         }
 
         await session.save();
@@ -226,18 +226,21 @@ router.post('/surrender', authenticateToken, async (req, res) => {
         const finalTime = totalTime || session.totalTime || 0;
 
         console.log(`[BugHunt Surrender] Updating leaderboard for user ${req.user.userId}...`);
+        // Ensure all values are valid numbers to prevent $inc failures
+        const incValues = {
+            totalScore: Number(finalScore) || 0,
+            totalTime: Number(finalTime) || 0,
+            sessionsSurrendered: 1,
+            totalBugsFixed: Number(bugsFixed) || 0,
+            totalHintsUsed: Number(session?.hintsUsed) || 0
+        };
+
         const updateResult = await BugHuntLeaderboard.findOneAndUpdate(
             { userId: req.user.userId },
             {
-                $inc: {
-                    totalScore: finalScore,
-                    totalTime: finalTime,
-                    sessionsSurrendered: 1,
-                    totalBugsFixed: bugsFixed,
-                    totalHintsUsed: session.hintsUsed || 0
-                },
+                $inc: incValues,
                 $max: {
-                    bestScore: finalScore
+                    bestScore: Number(finalScore) || 0
                 },
                 $set: {
                     lastPlayedAt: new Date()
@@ -245,7 +248,7 @@ router.post('/surrender', authenticateToken, async (req, res) => {
             },
             { upsert: true, new: true, setDefaultsOnInsert: true }
         );
-        console.log(`[BugHunt Surrender] Leaderboard updated successfully. New total score: ${updateResult.totalScore}`);
+        console.log(`[BugHunt Surrender] Leaderboard updated for ${req.user.userId}. New Score: ${updateResult?.totalScore}`);
 
         res.json({ success: true, message: 'Mission surrendered. Intel recorded.' });
     } catch (error) {
