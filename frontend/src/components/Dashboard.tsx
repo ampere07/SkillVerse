@@ -481,7 +481,7 @@ export default function Dashboard() {
           <nav className="relative flex-1 flex flex-col gap-1 overflow-y-auto">
             {/* Sliding selection pill */}
             <div
-              className="absolute left-0 right-0 h-[46px] bg-[#F1F8F1] border-l-4 border-[#1B5E20] transition-all duration-300 ease-in-out pointer-events-none z-0"
+              className="absolute left-0 right-0 h-[46px] bg-[#F1F8F1] border-l-4 border-[#1B5E20] pointer-events-none z-0"
               style={{
                 transform: `translateY(${activeIndex * 50}px)`,
                 top: 0,
@@ -514,7 +514,7 @@ export default function Dashboard() {
                   <img
                     src={item.icon}
                     alt={item.label}
-                    className={`w-6 h-6 object-contain transition-transform duration-300 ${isActive ? 'scale-[1.8]' : ''}`}
+                    className={`w-6 h-6 object-contain ${isActive ? 'scale-[1.8]' : ''}`}
                   />
                 </button>
               );
