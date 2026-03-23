@@ -225,7 +225,8 @@ router.post('/surrender', authenticateToken, async (req, res) => {
         const finalScore = totalScore || session.totalScore || 0;
         const finalTime = totalTime || session.totalTime || 0;
 
-        await BugHuntLeaderboard.findOneAndUpdate(
+        console.log(`[BugHunt Surrender] Updating leaderboard for user ${req.user.userId}...`);
+        const updateResult = await BugHuntLeaderboard.findOneAndUpdate(
             { userId: req.user.userId },
             {
                 $inc: {
@@ -242,8 +243,9 @@ router.post('/surrender', authenticateToken, async (req, res) => {
                     lastPlayedAt: new Date()
                 }
             },
-            { upsert: true, new: true }
+            { upsert: true, new: true, setDefaultsOnInsert: true }
         );
+        console.log(`[BugHunt Surrender] Leaderboard updated successfully. New total score: ${updateResult.totalScore}`);
 
         res.json({ success: true, message: 'Mission surrendered. Intel recorded.' });
     } catch (error) {
