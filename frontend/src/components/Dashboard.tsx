@@ -448,11 +448,6 @@ export default function Dashboard() {
     setPendingNavigation(null);
   };
 
-  const activeIndex = filteredNavigation.findIndex(item => {
-    if (activeNav === item.href) return true;
-    if (activeNav.startsWith(item.href) && item.href !== '/dashboard') return true;
-    return false;
-  });
 
   return (
     <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
@@ -479,15 +474,6 @@ export default function Dashboard() {
 
           {/* Navigation */}
           <nav className="relative flex-1 flex flex-col gap-1 overflow-y-auto">
-            {/* Sliding selection pill */}
-            <div
-              className="absolute left-0 right-0 h-[46px] bg-[#F1F8F1] border-l-4 border-[#1B5E20] pointer-events-none z-0"
-              style={{
-                transform: `translateY(${activeIndex * 50}px)`,
-                top: 0,
-                opacity: activeIndex === -1 ? 0 : 1
-              }}
-            />
 
             {filteredNavigation.map((item) => {
               const isActive = activeNav === item.href || (activeNav.startsWith(item.href) && item.href !== '/dashboard');
@@ -500,8 +486,8 @@ export default function Dashboard() {
                   className={`
                     relative z-10 w-full h-[46px] flex items-center gap-3 px-6 transition-all
                     ${isActive
-                      ? 'text-[#1B5E20]'
-                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent'
+                      ? 'text-[#1B5E20] bg-[#F1F8F1] border-l-4 border-[#1B5E20]'
+                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent border-l-4 border-transparent'
                     }
                     ${isGameActive ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}
                   `}
