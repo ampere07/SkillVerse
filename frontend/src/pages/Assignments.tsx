@@ -235,7 +235,7 @@ export default function Assignments() {
       ) : (
         <>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="border-b border-gray-200">
+            <div className="border-b border-gray-200 flex items-center justify-between pr-6">
               <nav className="flex">
                 <button
                   onClick={() => setActiveTab('todo')}
@@ -277,17 +277,16 @@ export default function Assignments() {
                   Missing
                 </button>
               </nav>
-            </div>
-
-            <div className="p-6">
-              <div className="mb-6">
+              
+              <div className="flex-shrink-0">
                 <select
                   value={selectedClassroom}
                   onChange={(e) => setSelectedClassroom(e.target.value)}
-                  className="w-full max-w-md px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                  className="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all hover:border-[#1B5E20]"
                   style={{
-                    borderColor: '#1B5E20',
-                    color: '#212121'
+                    borderColor: '#E0E0E0',
+                    color: '#212121',
+                    minWidth: '200px'
                   }}
                 >
                   <option value="all">All classes</option>
@@ -298,6 +297,9 @@ export default function Assignments() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="p-6">
 
               <AssignmentList
                 assignments={getCurrentTabAssignments()}
