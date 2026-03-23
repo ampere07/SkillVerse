@@ -36,6 +36,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isNewStudent, setIsNewStudent] = useState(false);
+  
+  const getBaseUrl = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+    return apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
+  };
 
   const healUser = (u: User): User => {
     if (!u) return u;
@@ -78,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Periodically refresh user data from server to get latest profile fields
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+          const response = await fetch(`${getBaseUrl()}/auth/me`, {
             headers: { 'Authorization': `Bearer ${storedToken}` }
           });
           if (response.ok) {
@@ -98,7 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+    const response = await fetch(`${getBaseUrl()}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -126,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const register = async (email: string, password: string, name: string, role: 'teacher' | 'student', verificationCode: string) => {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/register`, {
+    const response = await fetch(`${getBaseUrl()}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, name, role, verificationCode })

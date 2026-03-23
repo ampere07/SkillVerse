@@ -1,6 +1,11 @@
 // API utility functions for classroom and assignment management
 
-const API_URL = import.meta.env.VITE_API_URL;
+const getApiUrl = () => {
+  const url = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+  return url.endsWith('/api') ? url : `${url}/api`;
+};
+
+const API_URL = getApiUrl();
 
 // Get auth token from localStorage
 const getAuthHeader = () => {
