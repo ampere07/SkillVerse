@@ -369,7 +369,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '36500d' } // effectively lifetime (100 years)
     );
 
     console.log(`New user registered: ${user.email} as ${user.role}`);
@@ -436,10 +436,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not defined in environment variables on the server');
+    }
+
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '36500d' } // effectively lifetime (100 years)
     );
 
     console.log(`User logged in: ${user.email}`);
