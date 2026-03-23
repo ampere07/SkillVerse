@@ -258,19 +258,30 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
         const leaderboard = await BugHuntLeaderboard.find()
             .sort({ totalScore: -1 })
             .limit(10)
-            .populate('userId', 'name firstName lastName')
+            .populate('userId', 'name firstName lastName email')
             .lean();
 
+        console.log(`[Leaderboard] Found ${leaderboard.length} entries`);
+
         // Format the response to match what the frontend expects
-        const formattedLeaderboard = leaderboard.map(entry => ({
-            _id: entry.userId?._id,
-            name: entry.userId?.name || `${entry.userId?.firstName || ''} ${entry.userId?.lastName || ''}`.trim(),
-            totalScore: entry.totalScore,
-            sessionsCompleted: entry.sessionsCompleted,
-            sessionsSurrendered: entry.sessionsSurrendered,
-            totalBugsFixed: entry.totalBugsFixed,
-            bestScore: entry.bestScore
-        }));
+        const formattedLeaderboard = leaderboard
+            .filter(entry => entry.userId) // Ensure user exists
+            .map(entry => {
+                const user = entry.userId;
+                const name = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Anonymous Master';
+                
+                return {
+                    _id: user._id,
+                    name: name,
+                    totalScore: entry.totalScore || 0,
+                    sessionsCompleted: entry.sessionsCompleted || 0,
+                    sessionsSurrendered: entry.sessionsSurrendered || 0,
+                    totalBugsFixed: entry.totalBugsFixed || 0,
+                    bestScore: entry.bestScore || 0
+                };
+            });
+
+        console.log(`[Leaderboard] Processed ${formattedLeaderboard.length} valid entries`);
 
         res.json({ success: true, leaderboard: formattedLeaderboard });
     } catch (error) {

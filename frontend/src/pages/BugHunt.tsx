@@ -78,6 +78,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
             const data = await response.json();
             if (data.success) {
+                console.log('[BugHunt] Received leaderboard:', data.leaderboard);
                 setLeaderboard(data.leaderboard);
             }
         } catch (error) {
@@ -132,8 +133,9 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 setCurrentIndex(0);
                 const firstCode = data.challenges[0].buggyCode;
                 console.log('[BugHunt] First challenge raw code:', firstCode);
-                // Final safety check: if it's an object, stringify it
-                const finalCode = typeof firstCode === 'string' ? firstCode : JSON.stringify(firstCode, null, 2);
+                const finalCode = typeof firstCode === 'string'
+                    ? firstCode.replace(/\\n/g, '\n')
+                    : JSON.stringify(firstCode, null, 2);
                 setCode(finalCode);
                 setGameState('playing');
                 setTimer(0);
@@ -207,7 +209,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                     if (currentIndex < challenges.length - 1) {
                         const nextIndex = currentIndex + 1;
                         setCurrentIndex(nextIndex);
-                        setCode(challenges[nextIndex].buggyCode);
+                        setCode(challenges[nextIndex].buggyCode.replace(/\\n/g, '\n'));
                         setFeedback(null);
                         setShowHint(false);
                         setAiHint(null);
