@@ -154,7 +154,7 @@ export default function Register({ onToggle }: RegisterProps) {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
+    <div className="h-screen flex overflow-hidden lg:overflow-visible" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden items-center justify-center flex-shrink-0">
 
@@ -183,8 +183,8 @@ export default function Register({ onToggle }: RegisterProps) {
       </div>
 
       {/* Right Panel - Register Form */}
-      <div className="w-full lg:w-7/12 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-lg px-6 sm:px-8 py-8">
+      <div className="w-full lg:w-7/12 flex flex-col overflow-y-auto p-4 sm:p-8 h-full">
+        <div className="w-full max-w-lg px-6 sm:px-8 py-8 my-auto mx-auto">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-6">
             <div className="flex justify-center mb-3">
