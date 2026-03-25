@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { FileText, Clock, AlertCircle, CheckCircle, Calendar, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { classroomAPI } from '../utils/api';
 import StudentClassroomDetail from './StudentClassroomDetail';
 
@@ -231,7 +231,7 @@ export default function Assignments() {
   }
 
   return (
-    <div className="p-6" style={{ backgroundColor: '#FAFAFA', minHeight: '100vh' }}>
+    <div className="flex flex-col min-h-screen w-full bg-white">
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-6">
           <p className="text-sm text-red-700">{error}</p>
@@ -250,12 +250,12 @@ export default function Assignments() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="border-b border-gray-200 flex items-center justify-between pr-6">
-              <nav className="flex">
+          <div className="bg-white overflow-hidden flex-1">
+            <div className="border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between">
+              <nav className="flex overflow-x-auto no-scrollbar scrollbar-hide">
                 <button
                   onClick={() => setActiveTab('todo')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'todo'
+                  className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'todo'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
                     }`}
@@ -268,7 +268,7 @@ export default function Assignments() {
                 </button>
                 <button
                   onClick={() => setActiveTab('dueToday')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dueToday'
+                  className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'dueToday'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
                     }`}
@@ -281,7 +281,7 @@ export default function Assignments() {
                 </button>
                 <button
                   onClick={() => setActiveTab('missing')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'missing'
+                  className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'missing'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
                     }`}
@@ -294,7 +294,7 @@ export default function Assignments() {
                 </button>
               </nav>
               
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 p-3 sm:p-0 sm:pr-6">
                 <select
                   value={selectedClassroom}
                   onChange={(e) => setSelectedClassroom(e.target.value)}

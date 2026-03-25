@@ -232,8 +232,8 @@ export default function Register({ onToggle }: RegisterProps) {
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Full Name
                 </label>
-                <div className="flex flex-col sm:grid sm:grid-cols-12 gap-2">
-                  <div className="sm:col-span-5 relative group">
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-9 sm:col-span-5 relative group">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                     <input
                       id="register-firstName"
@@ -248,7 +248,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       placeholder="First Name"
                     />
                   </div>
-                  <div className="sm:col-span-2">
+                  <div className="col-span-3 sm:col-span-2">
                     <input
                       id="register-middleInitial"
                       type="text"
@@ -262,7 +262,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       placeholder="M.I."
                     />
                   </div>
-                  <div className="sm:col-span-5">
+                  <div className="col-span-12 sm:col-span-5">
                     <input
                       id="register-lastName"
                       type="text"
