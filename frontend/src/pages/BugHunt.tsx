@@ -49,6 +49,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const [isCompiling, setIsCompiling] = useState(false);
     const [score, setScore] = useState(0);
     const [feedback, setFeedback] = useState<string | null>(null);
+    const [isLastFixSuccessful, setIsLastFixSuccessful] = useState<boolean>(false);
     const [showHint, setShowHint] = useState(false);
     const [aiHint, setAiHint] = useState<string | null>(null);
     const [isRequestingHint, setIsRequestingHint] = useState(false);
@@ -184,6 +185,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
         setIsCompiling(true);
         setFeedback(null);
+        setIsLastFixSuccessful(false);
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/validate`, {
                 method: 'POST',
@@ -210,6 +212,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 }
                 
                 setScore(data.totalScore || score);
+                setIsLastFixSuccessful(true);
                 setFeedback(data.feedback || "Bug Caught! Excellent work.");
 
                 setTimeout(() => {
@@ -218,6 +221,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                         setCurrentIndex(nextIndex);
                         setCode(challenges[nextIndex].buggyCode.replace(/\\n/g, '\n'));
                         setFeedback(null);
+                        setIsLastFixSuccessful(false);
                         setShowHint(false);
                         setAiHint(null);
                     } else {
@@ -534,7 +538,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                             </div>
                         </div>
                         {feedback && (
-                            <div className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${feedback.includes('Caught') ? 'bg-[#C8E6C9] text-[#2E7D32]' : 'bg-[#FFCDD2] text-[#D32F2F]'} animate-in fade-in slide-in-from-top-2`}>
+                            <div className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${isLastFixSuccessful ? 'bg-[#C8E6C9] text-[#2E7D32]' : 'bg-[#FFCDD2] text-[#D32F2F]'} animate-in fade-in slide-in-from-top-2`}>
                                 {feedback}
                             </div>
                         )}
