@@ -52,6 +52,9 @@ router.get('/generate-session', authenticateToken, async (req, res) => {
 router.post('/validate', authenticateToken, async (req, res) => {
     try {
         const { sessionId, challengeIndex, code, timeTaken } = req.body;
+        let leveledUp = false;
+        let newLevel = 1;
+        let user = null;
 
         // 1. Fetch the session
         const session = await BugHuntSession.findById(sessionId);
@@ -97,9 +100,7 @@ router.post('/validate', authenticateToken, async (req, res) => {
                 session.completedAt = new Date();
 
                 // Reward XP to user
-                const user = await User.findById(req.user.userId);
-                let leveledUp = false;
-                let newLevel = user?.level || 1;
+                user = await User.findById(req.user.userId);
                 if (user) {
                     const xpReward = Math.floor(session.totalScore / 5);
                     const totalXp = (user.xp || 0) + xpReward;
@@ -145,8 +146,8 @@ router.post('/validate', authenticateToken, async (req, res) => {
             ...result,
             sessionStatus: session.status,
             totalScore: session.totalScore,
-            leveledUp: typeof leveledUp !== 'undefined' ? leveledUp : false,
-            newLevel: typeof newLevel !== 'undefined' ? newLevel : (user?.level || 1)
+            leveledUp: leveledUp,
+            newLevel: newLevel || (user?.level || 1)
         });
     } catch (error) {
         console.error('[BugHunt Route] Validation error:', error);
