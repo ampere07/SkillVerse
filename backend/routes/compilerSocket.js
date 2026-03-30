@@ -139,6 +139,9 @@ export function setupCompilerSocket(io) {
           }
         }
 
+        console.log(`[Compiler] Starting execution for session ${sessionId}. Language: ${language}`);
+        console.log(`[JDoodle] Check: ID=${process.env.JDOODLE_CLIENT_ID ? 'SET' : 'EMPTY'}, SECRET=${process.env.JDOODLE_CLIENT_SECRET ? 'SET' : 'EMPTY'}`);
+
         // Check if JDoodle should be used
         if (process.env.JDOODLE_CLIENT_ID && process.env.JDOODLE_CLIENT_SECRET) {
           socket.emit('output', { type: 'info', data: 'Compiling and Running online with JDoodle...\n' });
