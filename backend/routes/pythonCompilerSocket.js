@@ -70,8 +70,7 @@ function parsePythonErrors(stderr) {
 
 export function setupPythonCompilerSocket(io) {
   io.on('connection', (socket) => {
-
-    socket.on('compile-and-run-python', async (data) => {
+    const handlePythonCompile = async (data) => {
       const { code, sessionId, token, language } = data;
 
       // Authenticate user and get userId
@@ -80,6 +79,8 @@ export function setupPythonCompilerSocket(io) {
         if (token) {
           const decoded = jwt.verify(token, process.env.JWT_SECRET);
           userId = decoded.userId;
+        } else if (data.userId) {
+          userId = data.userId;
         }
       } catch (error) {
         console.error('Authentication error in Python compiler socket:', error);
@@ -94,9 +95,10 @@ export function setupPythonCompilerSocket(io) {
 
       try {
         // Track code execution in progress
-        if (userId && language === 'python') {
+        if (userId && (language === 'python' || !language)) {
           try {
             // Find all progress records for this student
+            const Progress = (await import('../models/Progress.js')).default;
             const progressRecords = await Progress.find({ student: userId });
             
             // Update each progress record
@@ -134,14 +136,16 @@ export function setupPythonCompilerSocket(io) {
         }
 
         console.log(`[Python Compiler] Starting execution for session ${sessionId}.`);
-        console.log(`[JDoodle] Check: ID=${process.env.JDOODLE_CLIENT_ID ? 'SET' : 'EMPTY'}, SECRET=${process.env.JDOODLE_CLIENT_SECRET ? 'SET' : 'EMPTY'}`);
+        
+        const jdClientId = process.env.JDOODLE_CLIENT_ID;
+        const jdClientSecret = process.env.JDOODLE_CLIENT_SECRET;
 
         // Check if JDoodle should be used
-        if (process.env.JDOODLE_CLIENT_ID && process.env.JDOODLE_CLIENT_SECRET) {
+        if (jdClientId && jdClientSecret && jdClientId.trim() !== '' && jdClientSecret.trim() !== '') {
           socket.emit('output', { type: 'info', data: 'Running online with JDoodle Python...\n' });
           
           try {
-            const result = await jdoodleService.execute(code, 'python3', '');
+            const result = await jdoodleService.execute(code, 'python3', data.input || '');
             if (result.success) {
               socket.emit('output', { type: 'stdout', data: result.output });
               socket.emit('output', { 
@@ -231,7 +235,10 @@ export function setupPythonCompilerSocket(io) {
         });
         socket.emit('execution-complete');
       }
-    });
+    };
+
+    socket.on('compile-and-run-python', handlePythonCompile);
+    socket.on('run-python', handlePythonCompile);
 
     socket.on('stdin-input-python', (data) => {
       const { sessionId, input } = data;
@@ -254,12 +261,6 @@ export function setupPythonCompilerSocket(io) {
         });
         socket.emit('execution-complete');
       }
-    });
-
-    socket.on('run-python', async (data) => {
-      // Alias for compile-and-run-python, used by BugHunt
-      if (!data.language) data.language = 'python';
-      socket.emit('compile-and-run-python', data);
     });
 
     socket.on('disconnect', () => {

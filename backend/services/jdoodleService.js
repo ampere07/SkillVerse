@@ -1,10 +1,4 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const JDOODLE_CLIENT_ID = process.env.JDOODLE_CLIENT_ID;
-const JDOODLE_CLIENT_SECRET = process.env.JDOODLE_CLIENT_SECRET;
 
 /**
  * Service for interacting with the JDoodle API to compile and execute code online.
@@ -18,7 +12,10 @@ class JDoodleService {
    * @returns {Promise<Object>} The API response from JDoodle.
    */
   async execute(script, language, stdin = '') {
-    if (!JDOODLE_CLIENT_ID || !JDOODLE_CLIENT_SECRET) {
+    const clientId = process.env.JDOODLE_CLIENT_ID;
+    const clientSecret = process.env.JDOODLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
       throw new Error('JDoodle API credentials are not configured in .env file.');
     }
 
@@ -36,8 +33,8 @@ class JDoodleService {
 
     try {
       const response = await axios.post('https://api.jdoodle.com/v1/execute', {
-        clientId: JDOODLE_CLIENT_ID,
-        clientSecret: JDOODLE_CLIENT_SECRET,
+        clientId: clientId,
+        clientSecret: clientSecret,
         script: script,
         stdin: stdin,
         language: config.language,
@@ -64,14 +61,17 @@ class JDoodleService {
    * Check how many credits are remaining on the JDoodle account.
    */
   async getCreditUsage() {
-    if (!JDOODLE_CLIENT_ID || !JDOODLE_CLIENT_SECRET) {
+    const clientId = process.env.JDOODLE_CLIENT_ID;
+    const clientSecret = process.env.JDOODLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
       throw new Error('JDoodle API credentials are not configured.');
     }
 
     try {
       const response = await axios.post('https://api.jdoodle.com/v1/credit-spent', {
-        clientId: JDOODLE_CLIENT_ID,
-        clientSecret: JDOODLE_CLIENT_SECRET,
+        clientId: clientId,
+        clientSecret: clientSecret,
       });
       return response.data;
     } catch (error) {

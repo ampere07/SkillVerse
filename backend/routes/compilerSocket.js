@@ -76,8 +76,7 @@ function parseCompilationErrors(stderr, className) {
 
 export function setupCompilerSocket(io) {
   io.on('connection', (socket) => {
-
-    socket.on('compile-and-run', async (data) => {
+    const handleJavaCompile = async (data) => {
       const { code, sessionId, token, language } = data;
 
       // Authenticate user and get userId
@@ -86,6 +85,9 @@ export function setupCompilerSocket(io) {
         if (token) {
           const decoded = jwt.verify(token, process.env.JWT_SECRET);
           userId = decoded.userId;
+        } else if (data.userId) {
+          // Compatibility with BugHunt which sends userId directly
+          userId = data.userId;
         }
       } catch (error) {
         console.error('Authentication error in compiler socket:', error);
@@ -100,9 +102,10 @@ export function setupCompilerSocket(io) {
 
       try {
         // Track code execution in progress
-        if (userId && language === 'java') {
+        if (userId && (language === 'java' || !language)) {
           try {
             // Find all progress records for this student
+            const Progress = (await import('../models/Progress.js')).default;
             const progressRecords = await Progress.find({ student: userId });
             
             // Update each progress record
@@ -139,15 +142,17 @@ export function setupCompilerSocket(io) {
           }
         }
 
-        console.log(`[Compiler] Starting execution for session ${sessionId}. Language: ${language}`);
-        console.log(`[JDoodle] Check: ID=${process.env.JDOODLE_CLIENT_ID ? 'SET' : 'EMPTY'}, SECRET=${process.env.JDOODLE_CLIENT_SECRET ? 'SET' : 'EMPTY'}`);
+        console.log(`[Compiler] Starting execution for session ${sessionId}. Language: ${language || 'java'}`);
+        
+        const jdClientId = process.env.JDOODLE_CLIENT_ID;
+        const jdClientSecret = process.env.JDOODLE_CLIENT_SECRET;
 
         // Check if JDoodle should be used
-        if (process.env.JDOODLE_CLIENT_ID && process.env.JDOODLE_CLIENT_SECRET) {
+        if (jdClientId && jdClientSecret && jdClientId.trim() !== '' && jdClientSecret.trim() !== '') {
           socket.emit('output', { type: 'info', data: 'Compiling and Running online with JDoodle...\n' });
           
           try {
-            const result = await jdoodleService.execute(code, 'java', '');
+            const result = await jdoodleService.execute(code, 'java', data.input || '');
             if (result.success) {
               socket.emit('output', { type: 'stdout', data: result.output });
               socket.emit('output', { 
@@ -277,7 +282,10 @@ export function setupCompilerSocket(io) {
         });
         socket.emit('execution-complete');
       }
-    });
+    };
+
+    socket.on('compile-and-run', handleJavaCompile);
+    socket.on('compile-java', handleJavaCompile);
 
     socket.on('stdin-input', (data) => {
       const { sessionId, input } = data;
@@ -300,12 +308,6 @@ export function setupCompilerSocket(io) {
         });
         socket.emit('execution-complete');
       }
-    });
-
-    socket.on('compile-java', async (data) => {
-      // Alias for compile-and-run, mainly used by BugHunt
-      if (!data.language) data.language = 'java';
-      socket.emit('compile-and-run', data);
     });
 
     socket.on('disconnect', () => {
