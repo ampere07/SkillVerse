@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import Progress from '../models/Progress.js';
+import jdoodleService from '../services/jdoodleService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,6 +133,29 @@ export function setupPythonCompilerSocket(io) {
           }
         }
 
+        // Check if JDoodle should be used
+        if (process.env.JDOODLE_CLIENT_ID && process.env.JDOODLE_CLIENT_SECRET) {
+          socket.emit('output', { type: 'info', data: 'Running online with JDoodle Python...\n' });
+          
+          try {
+            const result = await jdoodleService.execute(code, 'python3', '');
+            if (result.success) {
+              socket.emit('output', { type: 'stdout', data: result.output });
+              socket.emit('output', { 
+                type: 'info', 
+                data: `\nExecution complete (Memory: ${result.memory}KB, CPU: ${result.cpuTime}s)\n` 
+              });
+            } else {
+              socket.emit('output', { type: 'error', data: `JDoodle Error: ${result.error}` });
+            }
+          } catch (error) {
+            socket.emit('output', { type: 'error', data: `Error calling JDoodle: ${error.message}` });
+          }
+          
+          socket.emit('execution-complete');
+          return;
+        }
+
         const timestamp = Date.now();
         const userDir = path.join(TEMP_DIR, `python_session_${sessionId}_${timestamp}`);
         const pythonFilePath = path.join(userDir, 'main.py');
@@ -227,6 +251,12 @@ export function setupPythonCompilerSocket(io) {
         });
         socket.emit('execution-complete');
       }
+    });
+
+    socket.on('run-python', async (data) => {
+      // Alias for compile-and-run-python, used by BugHunt
+      if (!data.language) data.language = 'python';
+      socket.emit('compile-and-run-python', data);
     });
 
     socket.on('disconnect', () => {

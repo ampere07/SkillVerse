@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import Progress from '../models/Progress.js';
+import jdoodleService from '../services/jdoodleService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,6 +137,29 @@ export function setupCompilerSocket(io) {
           } catch (progressError) {
             console.error('Error updating progress:', progressError);
           }
+        }
+
+        // Check if JDoodle should be used
+        if (process.env.JDOODLE_CLIENT_ID && process.env.JDOODLE_CLIENT_SECRET) {
+          socket.emit('output', { type: 'info', data: 'Compiling and Running online with JDoodle...\n' });
+          
+          try {
+            const result = await jdoodleService.execute(code, 'java', '');
+            if (result.success) {
+              socket.emit('output', { type: 'stdout', data: result.output });
+              socket.emit('output', { 
+                type: 'info', 
+                data: `\nExecution complete (Memory: ${result.memory}KB, CPU: ${result.cpuTime}s)\n` 
+              });
+            } else {
+              socket.emit('output', { type: 'error', data: `JDoodle Error: ${result.error}` });
+            }
+          } catch (error) {
+            socket.emit('output', { type: 'error', data: `Error calling JDoodle: ${error.message}` });
+          }
+          
+          socket.emit('execution-complete');
+          return;
         }
 
         const classNameMatch = code.match(/public\s+class\s+(\w+)/);
@@ -273,6 +297,12 @@ export function setupCompilerSocket(io) {
         });
         socket.emit('execution-complete');
       }
+    });
+
+    socket.on('compile-java', async (data) => {
+      // Alias for compile-and-run, mainly used by BugHunt
+      if (!data.language) data.language = 'java';
+      socket.emit('compile-and-run', data);
     });
 
     socket.on('disconnect', () => {
