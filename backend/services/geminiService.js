@@ -1,86 +1,40 @@
-import { Ollama } from 'ollama';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import OLLAMA_CONFIG from '../config/ollamaConfig.js';
-import axios from 'axios';
+import GEMINI_CONFIG from '../config/geminiConfig.js';
 
-const MODEL_NAME = OLLAMA_CONFIG.model;
-const OLLAMA_URL = OLLAMA_CONFIG.url;
-const MAX_RETRIES = OLLAMA_CONFIG.maxRetries || 3;
-const TIMEOUT = OLLAMA_CONFIG.timeout || 180000;
+const MODEL_NAME = GEMINI_CONFIG.model;
+const MAX_RETRIES = GEMINI_CONFIG.maxRetries || 3;
 
-const isKaggleMode = OLLAMA_URL.includes('ngrok');
-
-let ollama;
 let genAI;
 let geminiModel;
 
-if (process.env.AI_PROVIDER === 'gemini') {
+if (!process.env.GEMINI_API_KEY) {
+  console.warn('WARNING: GEMINI_API_KEY is not set in environment variables');
+} else {
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-} else if (!isKaggleMode) {
-  ollama = new Ollama({ host: OLLAMA_URL });
+  geminiModel = genAI.getGenerativeModel({ model: MODEL_NAME });
+  console.log('Gemini Service Initialized');
+  console.log('Model:', MODEL_NAME);
 }
 
-console.log('Ollama Service Initialized');
-console.log('Mode:', isKaggleMode ? 'Kaggle (ngrok)' : 'Direct');
-console.log('Model:', MODEL_NAME);
-console.log('URL:', OLLAMA_URL);
-
-const generateWithKaggle = async (prompt, options = {}) => {
-  const requestData = {
-    prompt: prompt,
-    max_tokens: options.num_predict || 1000
-  };
-
-  const response = await axios.post(
-    `${OLLAMA_URL}/api/generate`,
-    requestData,
-    {
-      timeout: TIMEOUT,
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-        'User-Agent': 'SkillVerse-Backend'
-      }
-    }
-  );
-
-  if (!response.data.success) {
-    throw new Error(response.data.error || 'Kaggle generation failed');
-  }
-
-  return {
-    message: {
-      content: response.data.response
-    }
-  };
-};
-
-export const generateWithRetry = async (prompt, options = {}) => {
+export const generateWithRetry = async (prompt, _options = {}) => {
   let lastError;
+
+  if (!geminiModel) {
+     throw new Error('Gemini API is not configured. Missing GEMINI_API_KEY.');
+  }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       console.log(`AI Generation attempt ${attempt}/${MAX_RETRIES}`);
       const startTime = Date.now();
 
-      let response;
-      if (process.env.AI_PROVIDER === 'gemini') {
-        const result = await geminiModel.generateContent(prompt);
-        response = {
-          message: {
-            content: result.response.text()
-          }
-        };
-      } else if (isKaggleMode) {
-        response = await generateWithKaggle(prompt, options);
-      } else {
-        response = await ollama.chat({
-          model: MODEL_NAME,
-          messages: [{ role: 'user', content: prompt }],
-          options: options
-        });
-      }
+      const result = await geminiModel.generateContent(prompt);
+      
+      const response = {
+        message: {
+          content: result.response.text()
+        }
+      };
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`Generation completed in ${duration} seconds`);
@@ -391,40 +345,28 @@ export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
   };
 };
 
-export const checkOllamaConnection = async () => {
+export const checkGeminiConnection = async () => {
   try {
-    if (process.env.AI_PROVIDER === 'gemini') {
-      return {
-        connected: !!genAI,
-        model: 'gemini-1.5-flash',
-        mode: 'Gemini'
-      };
+    if (geminiModel) {
+       // Just doing a simple fast query to ensure API key is valid
+       const result = await geminiModel.generateContent("hello");
+       if (result) {
+         return {
+           connected: true,
+           model: MODEL_NAME,
+           mode: 'Gemini'
+         };
+       }
     }
-    if (isKaggleMode) {
-      const response = await axios.get(`${OLLAMA_URL}/health`, { timeout: 5000 });
-      return {
-        connected: true,
-        model: MODEL_NAME,
-        mode: 'Kaggle',
-        status: response.data.status
-      };
-    } else {
-      await ollama.list();
-      return {
-        connected: true,
-        model: MODEL_NAME,
-        mode: 'Direct'
-      };
-    }
+    throw new Error("Unable to connect to Gemini via SDK");
   } catch (error) {
     console.error('AI connection failed:', error.message);
     return {
       connected: false,
       error: error.message,
-      mode: isKaggleMode ? 'Kaggle' : 'Direct'
+      mode: 'Gemini'
     };
   }
 };
 
-// Export Ollama config for other services
-export { MODEL_NAME, OLLAMA_URL, isKaggleMode };
+export { MODEL_NAME };

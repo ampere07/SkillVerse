@@ -1,14 +1,14 @@
-import { generateWithRetry } from './ollamaService.js';
-import OLLAMA_CONFIG from '../config/ollamaConfig.js';
+import { generateWithRetry } from './geminiService.js';
+import GEMINI_CONFIG from '../config/geminiConfig.js';
 
-console.log(`Project Grading Service using centralized Ollama service`);
+console.log(`Project Grading Service using centralized Gemini service`);
 
 export const gradeProject = async (projectDetails, submittedCode) => {
   try {
     console.log(`[Grading] Evaluating project: ${projectDetails.title}`);
     console.log(`[Grading] Code length: ${submittedCode.length} characters`);
     console.log(`[Grading] Language: ${projectDetails.language}`);
-    console.log(`[Grading] Model: ${OLLAMA_CONFIG.model}`);
+    console.log(`[Grading] Model: ${GEMINI_CONFIG.model}`);
 
     const prompt = constructGradingPrompt(projectDetails, submittedCode);
 

@@ -882,7 +882,7 @@ router.post('/skill-gap-analysis/:classroomId', authenticateToken, async (req, r
 router.post('/skill-weakness-analysis', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { generateWithRetry } = await import('../services/ollamaService.js');
+    const { generateWithRetry } = await import('../services/geminiService.js');
     const MiniProject = (await import('../models/MiniProject.js')).default;
 
     // Gather all progress records

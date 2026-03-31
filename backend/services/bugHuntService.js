@@ -1,4 +1,4 @@
-import { generateWithRetry } from './ollamaService.js';
+import { generateWithRetry } from './geminiService.js';
 
 /**
  * Utility to parse AI-generated JSON more robustly.

@@ -1,11 +1,11 @@
-import { generateWithRetry } from './ollamaService.js';
-import OLLAMA_CONFIG from '../config/ollamaConfig.js';
+import { generateWithRetry } from './geminiService.js';
+import GEMINI_CONFIG from '../config/geminiConfig.js';
 import Progress from '../models/Progress.js';
 import User from '../models/User.js';
 import Survey from '../models/Survey.js';
 
 console.log(`AI Progress Service using shared AI service`);
-console.log(`Model: ${OLLAMA_CONFIG.model}`);
+console.log(`Model: ${GEMINI_CONFIG.model}`);
 
 /**
  * Generate AI-powered progress insights for a student
