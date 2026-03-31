@@ -1,6 +1,6 @@
 export const GEMINI_CONFIG = {
-  // Use gemini-3-flash for the fastest, most generous free tier in 2026
-  model: process.env.GEMINI_MODEL_NAME || 'gemini-3-flash',
+  // Using gemini-3-flash-preview for the core 2026 Gemini 3 model
+  model: process.env.GEMINI_MODEL_NAME || 'gemini-3-flash-preview',
   maxRetries: 3,
   timeout: 180000 
 };
