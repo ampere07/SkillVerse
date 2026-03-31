@@ -32,7 +32,7 @@ const app = express();
 const httpServer = createServer(app);
 
 const allowedOrigins = [
-  'https://skillverse-eta.vercel.app',
+  'https://skill-verse-smoky.vercel.app',
   'http://localhost:5173',
   'http://localhost:5174',
   process.env.FRONTEND_URL
