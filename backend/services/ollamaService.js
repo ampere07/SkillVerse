@@ -1,4 +1,5 @@
 import { Ollama } from 'ollama';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import OLLAMA_CONFIG from '../config/ollamaConfig.js';
 import axios from 'axios';
 
@@ -10,8 +11,13 @@ const TIMEOUT = OLLAMA_CONFIG.timeout || 180000;
 const isKaggleMode = OLLAMA_URL.includes('ngrok');
 
 let ollama;
+let genAI;
+let geminiModel;
 
-if (!isKaggleMode) {
+if (process.env.AI_PROVIDER === 'gemini') {
+  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+} else if (!isKaggleMode) {
   ollama = new Ollama({ host: OLLAMA_URL });
 }
 
@@ -59,7 +65,14 @@ export const generateWithRetry = async (prompt, options = {}) => {
       const startTime = Date.now();
 
       let response;
-      if (isKaggleMode) {
+      if (process.env.AI_PROVIDER === 'gemini') {
+        const result = await geminiModel.generateContent(prompt);
+        response = {
+          message: {
+            content: result.response.text()
+          }
+        };
+      } else if (isKaggleMode) {
         response = await generateWithKaggle(prompt, options);
       } else {
         response = await ollama.chat({
@@ -380,6 +393,13 @@ export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
 
 export const checkOllamaConnection = async () => {
   try {
+    if (process.env.AI_PROVIDER === 'gemini') {
+      return {
+        connected: !!genAI,
+        model: 'gemini-1.5-flash',
+        mode: 'Gemini'
+      };
+    }
     if (isKaggleMode) {
       const response = await axios.get(`${OLLAMA_URL}/health`, { timeout: 5000 });
       return {

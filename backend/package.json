@@ -13,6 +13,7 @@
     "cron-standalone": "node scripts/studentProgressCronStandalone.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",

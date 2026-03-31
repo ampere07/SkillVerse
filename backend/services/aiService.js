@@ -6,9 +6,9 @@ console.log(`AI Service Provider: ${AI_PROVIDER}`);
 
 let activeService;
 
-if (AI_PROVIDER === 'ollama') {
+if (AI_PROVIDER === 'ollama' || AI_PROVIDER === 'gemini') {
   activeService = ollamaService;
-  console.log('Using Ollama (Local AI)');
+  console.log(`Using ${AI_PROVIDER === 'ollama' ? 'Ollama (Local AI)' : 'Gemini AI'}`);
 } else {
   console.log('Error: Unsupported AI provider configured.');
 }
