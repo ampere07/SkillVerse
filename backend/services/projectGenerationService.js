@@ -171,7 +171,11 @@ export const generateWeeklyProjects = async (userId) => {
       throw new Error(`No user or primaryLanguage found for user ${userId}`);
     }
 
-    const projects = await generateProjectsForLanguage(userId, user.primaryLanguage);
+    const MiniProject = (await import('../models/MiniProject.js')).default;
+    const miniProjectDoc = await MiniProject.findOne({ userId });
+    const userPhase = miniProjectDoc?.currentPhase || 1;
+
+    const projects = await generateProjectsForLanguage(userId, user.primaryLanguage, userPhase);
 
     if (!projects || projects.length === 0) {
       throw new Error('AI failed to generate projects');
@@ -196,15 +200,19 @@ export const generateProjectsForBothLanguages = async (userId) => {
     console.log(`[ProjectGen] ========== GENERATING PROJECTS FOR BOTH LANGUAGES ==========`);
     console.log(`[ProjectGen] User ID: ${userId}`);
 
-    console.log(`[ProjectGen] Calling generateProjectsForLanguage for JAVA...`);
-    const javaProjects = await generateProjectsForLanguage(userId, 'java');
+    const MiniProject = (await import('../models/MiniProject.js')).default;
+    const miniProjectDoc = await MiniProject.findOne({ userId });
+    const userPhase = miniProjectDoc?.currentPhase || 1;
+
+    console.log(`[ProjectGen] Calling generateProjectsForLanguage for JAVA (Phase ${userPhase})...`);
+    const javaProjects = await generateProjectsForLanguage(userId, 'java', userPhase);
     console.log(`[ProjectGen] Java projects generated:`, javaProjects.length);
     if (javaProjects.length > 0) {
       console.log(`[ProjectGen] Sample Java project:`, { title: javaProjects[0].title, language: javaProjects[0].language });
     }
 
-    console.log(`[ProjectGen] Calling generateProjectsForLanguage for PYTHON...`);
-    const pythonProjects = await generateProjectsForLanguage(userId, 'python');
+    console.log(`[ProjectGen] Calling generateProjectsForLanguage for PYTHON (Phase ${userPhase})...`);
+    const pythonProjects = await generateProjectsForLanguage(userId, 'python', userPhase);
     console.log(`[ProjectGen] Python projects generated:`, pythonProjects.length);
     if (pythonProjects.length > 0) {
       console.log(`[ProjectGen] Sample Python project:`, { title: pythonProjects[0].title, language: pythonProjects[0].language });
@@ -221,7 +229,7 @@ export const generateProjectsForBothLanguages = async (userId) => {
   }
 };
 
-export const generateProjectsForLanguage = async (userId, language) => {
+export const generateProjectsForLanguage = async (userId, language, userPhase = 1) => {
   try {
     const User = (await import('../models/User.js')).default;
     const user = await User.findById(userId);
@@ -257,6 +265,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
     console.log(`[ProjectGen] User ID: ${userId}`);
     console.log(`[ProjectGen] Language: ${language.toUpperCase()}`);
     console.log(`[ProjectGen] Skill Level: ${skillLevel}`);
+    console.log(`[ProjectGen] Requested Phase: ${userPhase}`);
     console.log(`[ProjectGen] Roadmap Phase 1: ${survey.learningRoadmap.phase1.join(', ')}`);
     console.log(`[ProjectGen] Roadmap Phase 2: ${survey.learningRoadmap.phase2.join(', ')}`);
     console.log(`[ProjectGen] Roadmap Phase 3: ${survey.learningRoadmap.phase3.join(', ')}`);
@@ -267,7 +276,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
       primaryLanguage: language
     };
 
-    const prompt = constructRoadmapBasedPrompt(languageSpecificSurvey);
+    const prompt = constructRoadmapBasedPrompt(languageSpecificSurvey, userPhase);
 
     console.log(`[ProjectGen] Prompt length: ${prompt.length} characters`);
     console.log(`[ProjectGen] Has AI Analysis: ${!!languageSpecificSurvey.aiAnalysis}`);
@@ -317,7 +326,7 @@ export const generateProjectsForLanguage = async (userId, language) => {
   }
 };
 
-const constructRoadmapBasedPrompt = (survey) => {
+const constructRoadmapBasedPrompt = (survey, userPhase = 1) => {
   const { primaryLanguage, learningRoadmap, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions, aiAnalysis } = survey;
 
   const language = primaryLanguage
@@ -326,10 +335,25 @@ const constructRoadmapBasedPrompt = (survey) => {
 
   const skillLevel = determineSkillLevel(javaExpertise, pythonExpertise, javaQuestions?.score, pythonQuestions?.score);
 
-  const phase1Items = learningRoadmap.phase1 || [];
+  // Map userPhase to the actual roadmap phases
+  let currentPhaseItems = [];
+  let currentPhaseLabel = "Phase 1 - Foundation";
+  
+  if (userPhase <= 1) {
+    currentPhaseItems = learningRoadmap.phase1 || [];
+    currentPhaseLabel = "Phase 1 - Foundation";
+  } else if (userPhase === 2) {
+    currentPhaseItems = learningRoadmap.phase2 || [];
+    currentPhaseLabel = "Phase 2 - Building Skills";
+  } else {
+    currentPhaseItems = learningRoadmap.phase3 || [];
+    currentPhaseLabel = "Phase 3 - Advanced Practice";
+  }
 
-  if (phase1Items.length < 3) {
-    throw new Error(`Phase 1 must have at least 3 items, found ${phase1Items.length}`);
+  // Fallback if the requested phase is empty
+  if (currentPhaseItems.length < 3) {
+    currentPhaseItems = learningRoadmap.phase1 || [];
+    currentPhaseLabel = "Phase 1 - Foundation (Fallback)";
   }
 
   const aiAnalysisSection = aiAnalysis
@@ -356,11 +380,11 @@ Language: ${language}
 Level: ${skillLevel}${aiAnalysisSection}
 
 GENERATION:
-All 3 projects from Phase 1 only.
-One project per Phase 1 item:
-- Project 1: Based on Phase 1, Item 1 (${phase1Items[0]})
-- Project 2: Based on Phase 1, Item 2 (${phase1Items[1]})
-- Project 3: Based on Phase 1, Item 3 (${phase1Items[2]})
+All 3 projects from the current ${currentPhaseLabel} phase only.
+One project per item:
+- Project 1: Based on ${currentPhaseLabel}, Item 1 (${currentPhaseItems[0]})
+- Project 2: Based on ${currentPhaseLabel}, Item 2 (${currentPhaseItems[1]})
+- Project 3: Based on ${currentPhaseLabel}, Item 3 (${currentPhaseItems[2]})
 
 Each project MUST:
 1. Teach the SPECIFIC roadmap concept
@@ -396,7 +420,7 @@ Requirements:
 Rubrics:
 [4-5 criteria, 100 pts total]
 
-Generate 3 projects, ONE for EACH of the first 3 Phase 1 roadmap items in order:`;
+Generate 3 projects, ONE for EACH of the first 3 ${currentPhaseLabel} roadmap items in order:`;
 };
 
 const determineSkillLevel = (javaExpertise, pythonExpertise, javaScore, pythonScore) => {

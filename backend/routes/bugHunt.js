@@ -182,8 +182,13 @@ router.post('/hint', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid challenge' });
         }
 
-        // Deduct points for hint? (Optional, let's keep it simple for now)
+        // Deduct points for hint
+        if (session.totalScore < 0) {
+            return res.status(403).json({ success: false, message: 'Insufficient score for hints' });
+        }
+
         session.hintsUsed = (session.hintsUsed || 0) + 1;
+        session.totalScore = (session.totalScore || 0) - 10;
         await session.save();
 
         const hint = await generateSubtleHint(

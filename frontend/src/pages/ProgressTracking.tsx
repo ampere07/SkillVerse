@@ -14,7 +14,8 @@ import {
   Flame,
   RefreshCw,
   ShieldAlert,
-  Lightbulb
+  Lightbulb,
+  ChevronRight
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -135,6 +136,26 @@ interface ProgressData {
     }>;
     analyzedAt: string;
   };
+  detailedAiAnalysis?: {
+    problemSolving: string;
+    codeQuality: string;
+    efficiency: string;
+    collaboration: string;
+    consistency: string;
+    overall: string;
+    weaknessAnalysis: string;
+    recommendation: string;
+    javaProficiency?: number;
+    pythonProficiency?: number;
+    problemSolvingScore?: number;
+    codeQualityScore?: number;
+    efficiencyScore?: number;
+    collaborationScore?: number;
+    consistencyScore?: number;
+    overallScore?: number;
+    phaseProgress?: number;
+    generatedAt: string;
+  };
 }
 
 interface Classroom {
@@ -155,9 +176,8 @@ export default function ProgressTracking() {
   const viewingStudentId = sessionStorage.getItem('studentId');
   const viewingStudentName = sessionStorage.getItem('studentName');
 
-  // AI Weakness Analysis state
-  const [weaknessAnalysis, setWeaknessAnalysis] = useState<any>(null);
-  const [weaknessLoading, setWeaknessLoading] = useState(false);
+  // Detailed AI Analysis state
+  const [detailedAiLoading, setDetailedAiLoading] = useState(false);
 
   // Instructor-only states
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
@@ -361,22 +381,47 @@ export default function ProgressTracking() {
     }
   };
 
-  const fetchWeaknessAnalysis = async () => {
-    setWeaknessLoading(true);
+  const generateDetailedAiAnalysis = async () => {
+    setDetailedAiLoading(true);
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/progress/skill-weakness-analysis`,
+        `${import.meta.env.VITE_API_URL}/progress/detailed-ai-analysis`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (response.data.success) {
-        setWeaknessAnalysis(response.data);
+      if (response.data.success && progressData) {
+        setProgressData({
+          ...progressData,
+          detailedAiAnalysis: response.data.analysis
+        });
       }
     } catch (error) {
-      console.error('Error fetching weakness analysis:', error);
+      console.error('Error generating detailed AI analysis:', error);
     } finally {
-      setWeaknessLoading(false);
+      setDetailedAiLoading(false);
+    }
+  };
+
+  const handleNextPhase = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/progress/next-phase`,
+        { studentId: viewingStudentId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        alert(`Congratulations! You have advanced to Phase ${response.data.newPhase}. Your new mini-projects are waiting for you!`);
+        // Refresh progress data to reflect new phase
+        fetchStudentProgress(viewingStudentId);
+      }
+    } catch (error) {
+      console.error('Error advancing to next phase:', error);
+      alert('Failed to advance phase. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -443,16 +488,28 @@ export default function ProgressTracking() {
   return (
     <>
       {/* Header */}
-      <div className="mb-6 px-4 lg:px-0">
-        <h1 className="text-[24px] lg:text-[28px] font-semibold text-[#212121]">
-          {isViewingStudent ? `${viewingStudentName}'s Progress` : 'Progress Tracking'}
-        </h1>
-        <p className="text-[14px] lg:text-[15px] text-[#757575]">
-          {isViewingStudent
-            ? `Monitoring ${viewingStudentName}'s learning journey and job readiness`
-            : 'Monitor your learning journey and job readiness'
-          }
-        </p>
+      <div className="mb-6 px-4 lg:px-0 flex justify-between items-start">
+        <div>
+          <h1 className="text-[24px] lg:text-[28px] font-semibold text-[#212121]">
+            {isViewingStudent ? `${viewingStudentName}'s Progress` : 'Progress Tracking'}
+          </h1>
+          <p className="text-[14px] lg:text-[15px] text-[#757575]">
+            {isViewingStudent
+              ? `Monitoring ${viewingStudentName}'s learning journey and job readiness`
+              : 'Monitor your learning journey and job readiness'
+            }
+          </p>
+        </div>
+        {user?.role === 'student' && progressData && (
+          <button
+            onClick={generateDetailedAiAnalysis}
+            disabled={detailedAiLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${detailedAiLoading ? 'animate-spin' : ''}`} />
+            {detailedAiLoading ? 'Generating...' : 'Generate AI Analysis'}
+          </button>
+        )}
       </div>
 
       {/* Responsive Layout Wrapper */}
@@ -464,6 +521,7 @@ export default function ProgressTracking() {
               level={progressData.level || user?.level || 1}
               jobReadiness={progressData.jobReadiness.overallScore}
               progressData={progressData}
+              onNextPhase={handleNextPhase}
             />
           </div>
         </div>
@@ -591,13 +649,13 @@ export default function ProgressTracking() {
                           language="Java"
                           exercises={progressData.skills.java.exercisesCompleted}
                           projects={progressData.skills.java.projectsCompleted}
-                          score={progressData.skills.java.averageScore}
+                          score={progressData.detailedAiAnalysis?.javaProficiency !== undefined ? progressData.detailedAiAnalysis.javaProficiency : progressData.skills.java.averageScore}
                         />
                         <LanguageProgress
                           language="Python"
                           exercises={progressData.skills.python.exercisesCompleted}
                           projects={progressData.skills.python.projectsCompleted}
-                          score={progressData.skills.python.averageScore}
+                          score={progressData.detailedAiAnalysis?.pythonProficiency !== undefined ? progressData.detailedAiAnalysis.pythonProficiency : progressData.skills.python.averageScore}
                         />
                       </div>
                     </div>
@@ -612,10 +670,12 @@ export default function ProgressTracking() {
                     <SkillDetails
                       language="Java"
                       data={progressData.skills.java}
+                      aiProficiency={progressData.detailedAiAnalysis?.javaProficiency}
                     />
                     <SkillDetails
                       language="Python"
                       data={progressData.skills.python}
+                      aiProficiency={progressData.detailedAiAnalysis?.pythonProficiency}
                     />
                   </div>
 
@@ -740,33 +800,33 @@ export default function ProgressTracking() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                       <JobReadinessMetric
                         title="Problem Solving"
-                        score={progressData.jobReadiness.problemSolving}
-                        description="Ability to solve complex programming problems"
+                        score={progressData.detailedAiAnalysis?.problemSolvingScore !== undefined ? progressData.detailedAiAnalysis.problemSolvingScore : progressData.jobReadiness.problemSolving}
+                        description={progressData.detailedAiAnalysis?.problemSolving || "Ability to solve complex programming problems"}
                       />
                       <JobReadinessMetric
                         title="Code Quality"
-                        score={progressData.jobReadiness.codeQuality}
-                        description="Writing clean, efficient, and maintainable code"
+                        score={progressData.detailedAiAnalysis?.codeQualityScore !== undefined ? progressData.detailedAiAnalysis.codeQualityScore : progressData.jobReadiness.codeQuality}
+                        description={progressData.detailedAiAnalysis?.codeQuality || "Writing clean, efficient, and maintainable code"}
                       />
                       <JobReadinessMetric
                         title="Efficiency"
-                        score={progressData.jobReadiness.efficiency}
-                        description="Completing tasks on time and managing workload"
+                        score={progressData.detailedAiAnalysis?.efficiencyScore !== undefined ? progressData.detailedAiAnalysis.efficiencyScore : progressData.jobReadiness.efficiency}
+                        description={progressData.detailedAiAnalysis?.efficiency || "Completing tasks on time and managing workload"}
                       />
                       <JobReadinessMetric
-                        title="Collaboration"
-                        score={progressData.jobReadiness.collaboration}
-                        description="Working effectively in team environments"
+                        title="Project Mastery"
+                        score={progressData.detailedAiAnalysis?.collaborationScore !== undefined ? progressData.detailedAiAnalysis.collaborationScore : progressData.jobReadiness.collaboration}
+                        description={progressData.detailedAiAnalysis?.collaboration || "Success in completing varied projects and exercises"}
                       />
                       <JobReadinessMetric
                         title="Consistency"
-                        score={progressData.jobReadiness.consistency}
-                        description="Regular practice and continuous learning"
+                        score={progressData.detailedAiAnalysis?.consistencyScore !== undefined ? progressData.detailedAiAnalysis.consistencyScore : progressData.jobReadiness.consistency}
+                        description={progressData.detailedAiAnalysis?.consistency || "Regular practice and continuous learning"}
                       />
                       <JobReadinessMetric
                         title="Overall Score"
-                        score={progressData.jobReadiness.overallScore}
-                        description="Combined assessment of all skills"
+                        score={progressData.detailedAiAnalysis?.overallScore !== undefined ? progressData.detailedAiAnalysis.overallScore : progressData.jobReadiness.overallScore}
+                        description={progressData.detailedAiAnalysis?.overall || "Combined assessment of all skills"}
                         isOverall
                       />
                     </div>
@@ -778,115 +838,49 @@ export default function ProgressTracking() {
                       <div className="flex items-center gap-2">
                         <ShieldAlert className="w-5 h-5 text-[#D32F2F]" />
                         <h3 className="text-[18px] font-semibold text-[#212121]">AI Weakness Analysis</h3>
-                        {weaknessAnalysis?.generatedAt && (
+                        {progressData.detailedAiAnalysis?.generatedAt && (
                           <span className="text-xs text-[#757575] ml-1">
-                            Generated {new Date(weaknessAnalysis.generatedAt).toLocaleDateString()}
+                            Generated {new Date(progressData.detailedAiAnalysis.generatedAt).toLocaleDateString()}
                           </span>
                         )}
                       </div>
-                      <button
-                        onClick={fetchWeaknessAnalysis}
-                        disabled={weaknessLoading}
-                        className="flex items-center gap-1.5 text-xs text-[#1B5E20] hover:text-[#2E7D32] font-medium disabled:opacity-50"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${weaknessLoading ? 'animate-spin' : ''}`} />
-                        {weaknessLoading ? 'Analyzing...' : weaknessAnalysis ? 'Refresh' : 'Analyze'}
-                      </button>
                     </div>
 
-                    {weaknessLoading && !weaknessAnalysis && (
-                      <div className="flex flex-col items-center justify-center py-10">
-                        <div className="w-10 h-10 border-4 border-[#1B5E20] border-t-transparent rounded-full animate-spin mb-4"></div>
-                        <p className="text-sm text-[#757575] font-medium">AI is analyzing your skills...</p>
-                        <p className="text-xs text-[#999] mt-1">This may take a moment</p>
-                      </div>
-                    )}
-
-                    {!weaknessAnalysis && !weaknessLoading && (
+                    {!progressData.detailedAiAnalysis?.weaknessAnalysis && (
                       <div className="flex flex-col items-center justify-center py-10 text-center">
                         <ShieldAlert className="w-12 h-12 text-[#CCC] mb-3" />
                         <p className="text-sm font-medium text-[#757575]">No analysis yet</p>
-                        <p className="text-xs text-[#999] mt-1 mb-4">Click "Analyze" to get AI-powered insights on your weaknesses and how to improve.</p>
-                        <button
-                          onClick={fetchWeaknessAnalysis}
-                          className="px-5 py-2.5 bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-sm font-medium rounded-lg transition-colors"
-                        >
-                          Run AI Analysis
-                        </button>
+                        <p className="text-xs text-[#999] mt-1 mb-4">Click "Generate AI Analysis" at the top to get AI-powered insights on your weaknesses and how to improve.</p>
                       </div>
                     )}
 
-                    {weaknessAnalysis?.analysis && (
+                    {progressData.detailedAiAnalysis?.weaknessAnalysis && (
                       <div className="space-y-6">
-                        {/* Summary */}
-                        {weaknessAnalysis.analysis.summary && (
-                          <div className="p-4 bg-[#F3F4F6] rounded-xl border border-[#E5E7EB]">
-                            <p className="text-sm text-[#374151] leading-relaxed italic">
-                              "{weaknessAnalysis.analysis.summary}"
-                            </p>
-                          </div>
-                        )}
+                        <div className="p-4 bg-[#FEF2F2] border border-[#FECACA] rounded-xl">
+                          <h4 className="text-sm font-semibold text-[#212121] mb-2 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-[#D32F2F]" />
+                            Primary Weaknesses
+                          </h4>
+                          <p className="text-sm text-[#374151] leading-relaxed">
+                            {progressData.detailedAiAnalysis.weaknessAnalysis}
+                          </p>
+                        </div>
 
-                        {/* Weaknesses */}
-                        {weaknessAnalysis.analysis.weaknesses?.length > 0 && (
-                          <div>
-                            <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4 text-[#D32F2F]" />
-                              Identified Weaknesses
-                            </h4>
-                            <div className="space-y-2">
-                              {weaknessAnalysis.analysis.weaknesses.map((w: any, i: number) => (
-                                <div key={i} className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-lg">
-                                  <div className="flex items-start justify-between mb-1">
-                                    <span className="text-sm font-medium text-[#212121]">{w.area}</span>
-                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${w.severity === 'High' ? 'bg-red-100 text-red-700' :
-                                      w.severity === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                                        'bg-green-100 text-green-700'
-                                      }`}>
-                                      {w.severity}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-[#6B7280] leading-relaxed">{w.description}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Improvements */}
-                        {weaknessAnalysis.analysis.improvements?.length > 0 && (
-                          <div>
-                            <h4 className="text-sm font-semibold text-[#212121] mb-3 flex items-center gap-2">
+                        {progressData.detailedAiAnalysis?.recommendation && (
+                          <div className="p-4 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl">
+                            <h4 className="text-sm font-semibold text-[#212121] mb-2 flex items-center gap-2">
                               <Lightbulb className="w-4 h-4 text-[#F59E0B]" />
-                              Ways to Improve
+                              Recommendations to Improve
                             </h4>
-                            <div className="space-y-2">
-                              {weaknessAnalysis.analysis.improvements.map((imp: any, i: number) => (
-                                <div key={i} className="p-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-lg">
-                                  <div className="flex items-start justify-between mb-1">
-                                    <span className="text-sm font-medium text-[#212121]">{imp.title}</span>
-                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${imp.priority === 'High' ? 'bg-red-100 text-red-700' :
-                                      imp.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                                        'bg-green-100 text-green-700'
-                                      }`}>
-                                      {imp.priority}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-[#6B7280] leading-relaxed mb-1.5">{imp.description}</p>
-                                  {imp.estimatedTime && (
-                                    <div className="flex items-center gap-1 text-xs text-[#1B5E20]">
-                                      <Clock className="w-3 h-3" />
-                                      <span>{imp.estimatedTime}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                            <p className="text-sm text-[#374151] leading-relaxed">
+                              {progressData.detailedAiAnalysis.recommendation}
+                            </p>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
+
 
                   <RecommendationsSection
                     score={progressData.jobReadiness.overallScore}
@@ -899,6 +893,21 @@ export default function ProgressTracking() {
           )}
         </div>
       </div>
+
+      {detailedAiLoading && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center">
+            <div className="relative w-24 h-24 mx-auto mb-6">
+              <div className="absolute inset-0 border-4 border-[#E8F5E9] rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-[#1B5E20] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-[#212121] mb-2">Analyzing Your Progress</h3>
+            <p className="text-[#757575] text-sm leading-relaxed mb-6">
+              Our AI is carefully evaluating your coding performance, problem-solving skills, and consistency to provide tailored insights.
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1262,40 +1271,56 @@ function StudentAnalyticsDetails({ studentAnalytics, onClose }: any) {
   );
 }
 
+interface PhaseInfo {
+  phase: string;
+  nextPhase: string;
+  color: string;
+  description: string;
+  ready: boolean;
+  currentProgress: number;
+}
+
 // Level Hexagon Component
-function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jobReadiness: number; progressData?: any }) {
-  const getPhaseInfo = (level: number, jobReadiness: number): { phase: string; nextPhase: string; color: string; description: string; ready: boolean } => {
-    if (level <= 3) {
+function LevelHexagon({ level, jobReadiness, progressData, onNextPhase }: any) {
+  const getPhaseInfo = (levelNum: number, overallScore: number): PhaseInfo => {
+    const aiProgress = progressData?.detailedAiAnalysis?.phaseProgress;
+    const currentProgress = aiProgress !== undefined ? aiProgress : overallScore;
+
+    if (levelNum <= 3) {
       return {
         phase: 'Beginner',
-        nextPhase: 'Intermediate',
-        color: '#4CAF50',
-        description: 'Learning the basics',
-        ready: jobReadiness >= 100
+        nextPhase: levelNum < 3 ? `Level ${levelNum + 1}` : 'Intermediate',
+        color: '#2E7D32',
+        description: 'Learning Fundamentals',
+        ready: currentProgress >= 100,
+        currentProgress
       };
-    } else if (level <= 7) {
+    } else if (levelNum <= 6) {
       return {
         phase: 'Intermediate',
-        nextPhase: 'Advanced',
-        color: '#388E3C',
-        description: 'Building core skills',
-        ready: jobReadiness >= 100
+        nextPhase: levelNum < 6 ? `Level ${levelNum + 1}` : 'Advanced',
+        color: '#1976D2',
+        description: 'Building Core Skills',
+        ready: currentProgress >= 100,
+        currentProgress
       };
-    } else if (level <= 12) {
+    } else if (levelNum <= 9) {
       return {
         phase: 'Advanced',
-        nextPhase: 'Expert',
-        color: '#2E7D32',
-        description: 'Mastering concepts',
-        ready: jobReadiness >= 100
+        nextPhase: levelNum < 9 ? `Level ${levelNum + 1}` : 'Expert',
+        color: '#7B1FA2',
+        description: 'Mastering Patterns',
+        ready: currentProgress >= 100,
+        currentProgress
       };
     } else {
       return {
         phase: 'Expert',
-        nextPhase: 'Expert',
+        nextPhase: 'Professional',
         color: '#1B5E20',
-        description: 'Job ready!',
-        ready: true
+        description: 'Industry Mastery',
+        ready: true,
+        currentProgress: 100
       };
     }
   };
@@ -1331,8 +1356,8 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
       exercises: progressData?.activities?.assignments?.onTime || 0
     },
     {
-      label: 'Collaboration',
-      value: progressData?.jobReadiness?.collaboration || 0,
+      label: 'Project Mastery',
+      value: progressData?.detailedAiAnalysis?.collaborationScore !== undefined ? progressData.detailedAiAnalysis.collaborationScore : progressData?.jobReadiness?.collaboration || 0,
       exercises: progressData?.streaks?.currentStreak || 0
     }
   ];
@@ -1479,22 +1504,31 @@ function LevelHexagon({ level, jobReadiness, progressData }: { level: number; jo
         <p className="text-gray-500 text-sm mb-3">Keep up the great work!</p>
 
         {phaseInfo.ready ? (
-          <div className="flex items-center justify-center gap-2 text-green-600">
-            <CheckCircle className="w-4 h-4" />
-            <span className="font-semibold text-sm">Ready to advance!</span>
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-2 text-green-600">
+              <CheckCircle className="w-4 h-4" />
+              <span className="font-semibold text-sm">Ready to advance!</span>
+            </div>
+            <button
+              onClick={onNextPhase}
+              className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
+            >
+              <ChevronRight className="w-5 h-5" />
+              Next Phase
+            </button>
           </div>
         ) : (
           <div className="space-y-2">
             <div className="flex items-baseline justify-center gap-2">
               <span className="text-3xl font-bold" style={{ color: phaseInfo.color }}>
-                {jobReadiness}%
+                {phaseInfo.currentProgress}%
               </span>
               <span className="text-gray-400 text-sm">to next phase</span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5">
+            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
               <div
                 className="h-1.5 rounded-full transition-all duration-700"
-                style={{ width: `${Math.min(100, jobReadiness)}%`, backgroundColor: phaseInfo.color }}
+                style={{ width: `${Math.min(100, phaseInfo.currentProgress)}%`, backgroundColor: phaseInfo.color }}
               />
             </div>
           </div>
@@ -1567,20 +1601,22 @@ function LanguageProgress({ language, exercises, projects, score }: any) {
   );
 }
 
-function SkillDetails({ language, data }: any) {
+function SkillDetails({ language, data, aiProficiency }: any) {
+  const proficiencyScore = aiProficiency !== undefined ? aiProficiency : data.averageScore;
+
   return (
     <div className="bg-white border border-[#E0E0E0] rounded-xl p-4 lg:p-6 shadow-sm">
       <h3 className="text-[16px] font-semibold text-[#212121] mb-4">{language} Skills</h3>
       <div className="space-y-4">
         <div>
           <div className="flex justify-between text-sm mb-1">
-            <span className="text-[#757575]">Proficiency</span>
-            <span className="font-medium">{Math.round(data.averageScore)}%</span>
+            <span className="text-[#757575]">Proficiency {aiProficiency !== undefined && '(AI Estimated)'}</span>
+            <span className="font-medium">{Math.round(proficiencyScore)}%</span>
           </div>
           <div className="w-full bg-[#F5F5F5] rounded-full h-2">
             <div
               className="bg-[#1B5E20] h-2 rounded-full transition-all"
-              style={{ width: `${data.averageScore}%` }}
+              style={{ width: `${proficiencyScore}%` }}
             />
           </div>
         </div>

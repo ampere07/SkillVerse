@@ -168,9 +168,9 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
     // Survey is completed but no projects exist
     console.log(`[Available-Projects] Survey completed for ${currentLanguage} but no projects exist`);
     
-    // ONLY generate if request is from survey completion
-    if (!isFromSurvey) {
-      console.log(`[Available-Projects] NOT from survey - returning empty projects`);
+    // Generate if it's from survey OR if generation was explicitly enabled (e.g. by advancing to next phase)
+    if (!isFromSurvey && !miniProject.generationEnabled) {
+      console.log(`[Available-Projects] Generation NOT triggered - returning empty projects`);
       return res.json({
         availableProjects: [],
         completedThisWeek: 0,

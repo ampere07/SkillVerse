@@ -113,6 +113,27 @@ const progressSchema = new mongoose.Schema({
     analyzedAt: { type: Date }
   },
 
+  detailedAiAnalysis: {
+    problemSolving: { type: String },
+    codeQuality: { type: String },
+    efficiency: { type: String },
+    collaboration: { type: String },
+    consistency: { type: String },
+    overall: { type: String },
+    weaknessAnalysis: { type: String },
+    recommendation: { type: String },
+    javaProficiency: { type: Number },
+    pythonProficiency: { type: Number },
+    problemSolvingScore: { type: Number },
+    codeQualityScore: { type: Number },
+    efficiencyScore: { type: Number },
+    collaborationScore: { type: Number },
+    consistencyScore: { type: Number },
+    overallScore: { type: Number },
+    phaseProgress: { type: Number },
+    generatedAt: { type: Date }
+  },
+
   // Job readiness metrics
   jobReadiness: {
     overallScore: { type: Number, default: 0, min: 0, max: 100 },

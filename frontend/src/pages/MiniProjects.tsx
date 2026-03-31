@@ -512,13 +512,15 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
           </div>
           <div className="text-right">
             {(() => {
-              const getXpRequiredForLevel = (level: number) => {
-                if (level <= 1) return 0;
-                return (level - 1) * 500;
+              // Calculate level locally to ensure consistency with total XP
+              const level = Math.floor(currentXP / 1000) + 1;
+              const getXpRequiredForLevel = (lvl: number) => {
+                if (lvl <= 1) return 0;
+                return (lvl - 1) * 1000;
               };
 
-              const currentLevelXp = getXpRequiredForLevel(currentLevel);
-              const nextLevelTotalXp = getXpRequiredForLevel(currentLevel + 1);
+              const currentLevelXp = getXpRequiredForLevel(level);
+              const nextLevelTotalXp = getXpRequiredForLevel(level + 1);
               const xpProgress = currentXP - currentLevelXp;
               const xpNeededForLevel = nextLevelTotalXp - currentLevelXp;
               const xpToNextLevel = nextLevelTotalXp - currentXP;
@@ -526,7 +528,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
               return (
                 <>
                   <p className="text-sm font-semibold" style={{ color: '#212121' }}>{xpProgress} / {xpNeededForLevel} XP</p>
-                  <p className="text-xs" style={{ color: '#757575' }}>{xpToNextLevel} XP to Level {currentLevel + 1}</p>
+                  <p className="text-xs" style={{ color: '#757575' }}>{xpToNextLevel} XP to Level {level + 1}</p>
                 </>
               );
             })()}
@@ -539,12 +541,13 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
               className="h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden"
               style={{
                 width: `${(() => {
-                  const getXpRequiredForLevel = (level: number) => {
-                    if (level <= 1) return 0;
-                    return (level - 1) * 500;
+                  const level = Math.floor(currentXP / 1000) + 1;
+                  const getXpRequiredForLevel = (lvl: number) => {
+                    if (lvl <= 1) return 0;
+                    return (lvl - 1) * 1000;
                   };
-                  const currentLevelXp = getXpRequiredForLevel(currentLevel);
-                  const nextLevelTotalXp = getXpRequiredForLevel(currentLevel + 1);
+                  const currentLevelXp = getXpRequiredForLevel(level);
+                  const nextLevelTotalXp = getXpRequiredForLevel(level + 1);
                   const progress = ((currentXP - currentLevelXp) / (nextLevelTotalXp - currentLevelXp)) * 100;
                   return Math.min(100, Math.max(0, progress));
                 })()}%`,

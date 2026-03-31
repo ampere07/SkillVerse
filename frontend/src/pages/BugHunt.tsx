@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
     Play,
     Menu,
@@ -47,6 +47,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const [hintsCount, setHintsCount] = useState(0);
     const [output, setOutput] = useState('');
     const [isCompiling, setIsCompiling] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
     const [score, setScore] = useState(0);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [isLastFixSuccessful, setIsLastFixSuccessful] = useState<boolean>(false);
@@ -56,15 +57,9 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
     const socketRef = useRef<Socket | null>(null);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<any>(null);
 
-    useEffect(() => {
-        if (gameState === 'start') {
-            fetchLeaderboard();
-        }
-    }, [gameState]);
-
-    const fetchLeaderboard = async () => {
+    const fetchLeaderboard = useCallback(async () => {
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/leaderboard`, {
                 headers: {
@@ -85,7 +80,13 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
         } catch (error) {
             console.error('Failed to fetch leaderboard:', error);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (gameState === 'start') {
+            fetchLeaderboard();
+        }
+    }, [gameState, fetchLeaderboard]);
 
     useEffect(() => {
         // Setup socket for code execution
@@ -93,17 +94,41 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
         const socket = io(baseUrl);
         socketRef.current = socket;
 
-        socket.on('output', (data: string) => {
-            setOutput(prev => prev + data);
+        socket.on('output', (payload: any) => {
+            const data = typeof payload === 'string' ? payload : payload.data;
+            const type = typeof payload === 'string' ? 'stdout' : payload.type;
+            
+            if (type === 'error' || type === 'stderr') {
+                setOutput(prev => prev + `\n[ERROR] ${data}`);
+            } else if (type === 'info') {
+                setOutput(prev => prev + `\n[INFO] ${data}`);
+            } else {
+                setOutput(prev => prev + data);
+            }
         });
 
-        socket.on('error', (data: string) => {
-            setOutput(prev => prev + `\nError: ${data}`);
+        socket.on('compilation-error', (data: any) => {
+            if (data.errors && data.errors.length > 0) {
+                const errorDetails = data.errors.map((err: any) => 
+                    `Line ${err.line}: ${err.message}${err.context ? `\n  > ${err.context}` : ''}`
+                ).join('\n\n');
+                setOutput(prev => prev + `\n\nCOMPILATION FAILED:\n${errorDetails}`);
+            }
         });
 
-        socket.on('exit', (code: number) => {
+        socket.on('error', (payload: any) => {
+            const data = typeof payload === 'string' ? payload : payload.data;
+            setOutput(prev => prev + `\n\n[SYSTEM ERROR] ${data}`);
+        });
+
+        socket.on('exit', (payload: any) => {
+            const code = typeof payload === 'number' ? payload : payload.code;
             setIsCompiling(false);
-            setOutput(prev => prev + `\n\nProgram exited with code ${code}`);
+            setOutput(prev => prev + `\n\n[PROCESS] Program exited with code ${code}`);
+        });
+
+        socket.on('execution-complete', () => {
+            setIsCompiling(false);
         });
 
         return () => {
@@ -172,18 +197,22 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
         const lang = challenges[currentIndex].language;
         const event = lang === 'java' ? 'compile-java' : 'run-python';
+        const token = localStorage.getItem('token');
 
         socketRef.current.emit(event, {
             code,
             userId: user?.id,
+            sessionId: sessionId || `bughunt_${Date.now()}`,
+            token,
+            language: lang,
             input: ''
         });
     };
 
     const submitFix = async () => {
-        if (isCompiling || !sessionId) return;
+        if (isValidating || isCompiling || !sessionId) return;
 
-        setIsCompiling(true);
+        setIsValidating(true);
         setFeedback(null);
         setIsLastFixSuccessful(false);
         try {
@@ -235,12 +264,12 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
         } catch (error) {
             setFeedback("Something went wrong testing your code.");
         } finally {
-            setIsCompiling(false);
+            setIsValidating(false);
         }
     };
 
     const requestHint = async () => {
-        if (!sessionId || isRequestingHint) return;
+        if (!sessionId || isRequestingHint || score < 0) return;
 
         setIsRequestingHint(true);
         try {
@@ -261,7 +290,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 setAiHint(data.hint);
                 setShowHint(true);
                 // Reduce score for hint
-                setScore(prev => Math.max(0, prev - 10));
+                setScore(prev => prev - 10);
                 setHintsCount(prev => prev + 1);
             }
         } catch (error) {
@@ -560,8 +589,8 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                     <div className="h-20 flex items-center justify-between px-8 bg-[#F8F9FA] border-t border-[#E0E0E0]">
                         <button
                             onClick={requestHint}
-                            disabled={isRequestingHint || showHint}
-                            className={`flex items-center gap-2 text-xs font-black tracking-widest transition-all ${showHint ? 'text-[#F57C00] cursor-default' : 'text-[#999] hover:text-[#F57C00] disabled:opacity-50'}`}
+                            disabled={isRequestingHint || showHint || score < 0}
+                            className={`flex items-center gap-2 text-xs font-black tracking-widest transition-all ${showHint ? 'text-[#F57C00] cursor-default' : (score < 0 ? 'text-[#D32F2F] opacity-50 cursor-not-allowed' : 'text-[#999] hover:text-[#F57C00] disabled:opacity-50')}`}
                         >
                             {isRequestingHint ? (
                                 <div className="w-5 h-5 border-2 border-[#F57C00] border-t-transparent rounded-full animate-spin"></div>
@@ -574,18 +603,22 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                         <div className="flex gap-4">
                             <button
                                 onClick={runCode}
-                                disabled={isCompiling}
-                                className="px-6 py-3 bg-white hover:bg-[#F5F5F5] text-[11px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all border border-[#E0E0E0] text-[#444] active:scale-95 shadow-sm"
+                                disabled={isCompiling || isValidating}
+                                className="px-6 py-3 bg-white hover:bg-[#F5F5F5] text-[11px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all border border-[#E0E0E0] text-[#444] active:scale-95 shadow-sm disabled:opacity-50"
                             >
-                                <Play className="w-4 h-4" />
+                                {isCompiling ? (
+                                    <div className="w-4 h-4 border-2 border-[#2E7D32] border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <Play className="w-4 h-4" />
+                                )}
                                 EXECUTE
                             </button>
                             <button
                                 onClick={submitFix}
-                                disabled={isCompiling}
+                                disabled={isValidating || isCompiling}
                                 className="px-10 py-3 bg-[#2E7D32] hover:bg-[#1B5E20] text-[11px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all shadow-[0_4px_12px_rgba(46,125,50,0.2)] text-white active:scale-95 disabled:opacity-50"
                             >
-                                {isCompiling ? (
+                                {isValidating ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
                                     <Send className="w-4 h-4" />

@@ -2,19 +2,11 @@ import User from '../models/User.js';
 
 /**
  * Calculate user level based on XP
- * Level formula: each level requires 100 * level XP
- * Level 1: 0-99 XP, Level 2: 100-299 XP, Level 3: 300-599 XP, etc.
+ * Level formula: each level requires 1000 XP
+ * Level 1: 0-999 XP, Level 2: 1000-1999 XP, etc.
  */
 export function calculateLevel(xp) {
-  let level = 1;
-  let xpNeeded = 0;
-  
-  while (xp >= xpNeeded) {
-    level++;
-    xpNeeded += level * 100;
-  }
-  
-  return level - 1;
+  return Math.floor(xp / 1000) + 1;
 }
 
 /**

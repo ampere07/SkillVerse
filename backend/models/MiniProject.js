@@ -141,6 +141,10 @@ const miniProjectSchema = new mongoose.Schema({
   weeklyProjectHistory: {
     type: [weeklyProjectHistorySchema],
     default: []
+  },
+  currentPhase: {
+    type: Number,
+    default: 1
   }
 }, {
   timestamps: true

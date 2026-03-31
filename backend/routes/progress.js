@@ -176,8 +176,9 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     // Students can only view their own progress
     // Teachers can view their own progress or their students' progress
 
-    // Import MiniProject model to read real mini-project data
+    // Import models to read real data
     const MiniProject = (await import('../models/MiniProject.js')).default;
+    const BugHuntSession = (await import('../models/BugHuntSession.js')).default;
 
     // Get all progress records for the student across all classrooms
     const progressRecords = await Progress.find({ student: studentId })
@@ -187,6 +188,21 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     // Get real mini-project data directly from MiniProject model
     const miniProjectDoc = await MiniProject.findOne({ userId: studentId });
     const completedTasks = miniProjectDoc?.completedTasks || [];
+
+    // Get real bug hunt data by aggregating sessions
+    const bugHuntSessions = await BugHuntSession.find({ userId: studentId });
+    
+    const bugHuntStats = {
+      participated: bugHuntSessions.length,
+      bugsFound: bugHuntSessions.reduce((total, session) => {
+        const fixedInSession = (session.challenges || []).filter(c => c.isFixed).length;
+        return total + fixedInSession;
+      }, 0),
+      bestScore: Math.max(0, ...bugHuntSessions.map(s => s.totalScore || 0)),
+      lastParticipated: bugHuntSessions.length > 0 
+        ? bugHuntSessions.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0].startedAt 
+        : null
+    };
 
 
     // Accept any non-paused task as completed
@@ -254,14 +270,20 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
           codeExecutions: { total: 0, java: 0, python: 0, lastExecution: null },
           assignments: { totalSubmitted: 0, onTime: 0, late: 0, averageScore: 0, lastSubmission: null },
           miniProjects: { completed: submittedTasks.length, inProgress: 0, averageScore: avgProjectScore, lastCompleted: submittedTasks[submittedTasks.length - 1]?.completedAt || null },
-          bugHunt: { participated: 0, bugsFound: 0, bestScore: 0, lastParticipated: null }
+          bugHunt: { 
+            participated: bugHuntStats.participated, 
+            bugsFound: bugHuntStats.bugsFound, 
+            bestScore: bugHuntStats.bestScore, 
+            lastParticipated: bugHuntStats.lastParticipated
+          }
         },
         jobReadiness: { overallScore: 0, problemSolving: 0, codeQuality: 0, efficiency: 0, collaboration: 0, consistency: 0, lastCalculated: new Date() },
         streaks: { currentStreak: 0, longestStreak: 0, lastActiveDate: null, totalActiveDays: 0 },
         timeSpent: { totalMinutes: 0, thisWeek: 0, thisMonth: 0, averagePerDay: 0, lastUpdated: new Date() },
         aiInteractions: { hintsRequested: 0, feedbackReceived: 0, lastHintAt: null, lastFeedbackAt: null },
         totalXp,
-        level: userDoc?.level || 1
+        level: userDoc?.level || 1,
+        detailedAiAnalysis: null
       };
 
       defaultProgress.jobReadiness = Progress.calculateJobReadiness(defaultProgress);
@@ -308,7 +330,8 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
         thisMonth: 0,
         averagePerDay: 0,
         lastUpdated: new Date()
-      }
+      },
+      detailedAiAnalysis: null
     };
 
     // Aggregate all the data
@@ -338,11 +361,11 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       aggregatedProgress.activities.miniProjects.completed += progress.activities.miniProjects.completed;
       aggregatedProgress.activities.miniProjects.inProgress += progress.activities.miniProjects.inProgress;
 
-      aggregatedProgress.activities.bugHunt.participated += progress.activities.bugHunt.participated;
-      aggregatedProgress.activities.bugHunt.bugsFound += progress.activities.bugHunt.bugsFound;
-      if (progress.activities.bugHunt.bestScore > aggregatedProgress.activities.bugHunt.bestScore) {
-        aggregatedProgress.activities.bugHunt.bestScore = progress.activities.bugHunt.bestScore;
-      }
+      // Use real bug hunt data from specialized model instead of just aggregating classroom records
+      aggregatedProgress.activities.bugHunt.participated = bugHuntStats.participated;
+      aggregatedProgress.activities.bugHunt.bugsFound = bugHuntStats.bugsFound;
+      aggregatedProgress.activities.bugHunt.bestScore = bugHuntStats.bestScore;
+      aggregatedProgress.activities.bugHunt.lastParticipated = bugHuntStats.lastParticipated;
 
       // Aggregate AI interactions
       if (progress.aiInteractions) {
@@ -392,6 +415,13 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       aggregatedProgress.timeSpent.totalMinutes += progress.timeSpent.totalMinutes;
       aggregatedProgress.timeSpent.thisWeek += progress.timeSpent.thisWeek;
       aggregatedProgress.timeSpent.thisMonth += progress.timeSpent.thisMonth;
+
+      // Keep latest detailed AI analysis
+      if (progress.detailedAiAnalysis?.generatedAt &&
+        (!aggregatedProgress.detailedAiAnalysis?.generatedAt ||
+          new Date(progress.detailedAiAnalysis.generatedAt) > new Date(aggregatedProgress.detailedAiAnalysis.generatedAt))) {
+        aggregatedProgress.detailedAiAnalysis = progress.detailedAiAnalysis;
+      }
     });
 
     // Calculate average scores
@@ -462,6 +492,8 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
 
     // Calculate overall job readiness
     aggregatedProgress.jobReadiness = Progress.calculateJobReadiness(aggregatedProgress);
+
+    console.log(`[Progress] Returning aggregated progress for user ${studentId}. Analysis found: ${!!aggregatedProgress.detailedAiAnalysis}`);
 
     res.json({
       success: true,
@@ -1007,6 +1039,249 @@ Return 3-5 weaknesses and 3-5 improvements. Focus on the LOWEST scoring areas. B
       success: false,
       message: 'Failed to generate skill weakness analysis',
       error: error.message
+    });
+  }
+});
+
+// Detailed AI Analysis
+router.post('/detailed-ai-analysis', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { generateWithRetry } = await import('../services/geminiService.js');
+    const MiniProject = (await import('../models/MiniProject.js')).default;
+
+    // Gather all progress records
+    const progressRecords = await Progress.find({ student: userId });
+    const userDoc = await User.findById(userId).select('xp level name firstName lastName primaryLanguage');
+    const miniProjectDoc = await MiniProject.findOne({ userId });
+
+    // Build aggregated stats
+    const submittedTasks = (miniProjectDoc?.completedTasks || []).filter(t => t.status !== 'paused');
+    const avgProjectScore = submittedTasks.length > 0
+      ? submittedTasks.reduce((sum, t) => sum + (t.score || 0), 0) / submittedTasks.length
+      : 0;
+
+    let jobReadiness = { overallScore: 0, problemSolving: 0, codeQuality: 0, efficiency: 0, collaboration: 0, consistency: 0 };
+    let totalCodeExecutions = 0;
+    let totalAssignments = 0;
+    let assignmentsOnTime = 0;
+    let currentStreak = 0;
+    let totalActiveDays = 0;
+    let totalMinutes = 0;
+    let bugHuntParticipated = 0;
+    let bugsFound = 0;
+
+    let latestJavaScore = 0;
+    let latestPythonScore = 0;
+    let javaProjects = 0;
+    let pythonProjects = 0;
+
+    if (progressRecords.length > 0) {
+      progressRecords.forEach(p => {
+        totalCodeExecutions += p.activities?.codeExecutions?.total || 0;
+        totalAssignments += p.activities?.assignments?.totalSubmitted || 0;
+        assignmentsOnTime += p.activities?.assignments?.onTime || 0;
+        bugHuntParticipated += p.activities?.bugHunt?.participated || 0;
+        bugsFound += p.activities?.bugHunt?.bugsFound || 0;
+        totalActiveDays += p.streaks?.totalActiveDays || 0;
+        totalMinutes += p.timeSpent?.totalMinutes || 0;
+        if (p.streaks?.currentStreak > currentStreak) currentStreak = p.streaks.currentStreak;
+      });
+      const latestWithJR = progressRecords.find(p => p.jobReadiness?.overallScore > 0);
+      if (latestWithJR) jobReadiness = latestWithJR.jobReadiness;
+
+      // Get latest skill metrics
+      const latestProgress = progressRecords[progressRecords.length - 1];
+      if (latestProgress?.skills) {
+        latestJavaScore = latestProgress.skills.java?.averageScore || 0;
+        javaProjects = latestProgress.skills.java?.projectsCompleted || 0;
+        latestPythonScore = latestProgress.skills.python?.averageScore || 0;
+        pythonProjects = latestProgress.skills.python?.projectsCompleted || 0;
+      }
+    }
+
+    const studentName = userDoc?.name || `${userDoc?.firstName || ''} ${userDoc?.lastName || ''}`.trim() || 'Student';
+    const prompt = `You are an AI learning coach. Analyze this student's programming learning data based on their assignments, miniprojects, bughunt, and performance overall. Provide a CONCISE textual analysis (2-3 sentences max) for each of their core job readiness areas and an overall summary.
+Additionally, calculate a realistic "True Proficiency" score (0-100) for Java and Python. A student at Level 1 or 2 with high assignment scores should NOT have 90%+ true proficiency, but rather a scaled percentage based on their progression level and tasks completed.
+
+STUDENT: ${studentName}
+PRIMARY LANGUAGE: ${userDoc?.primaryLanguage || 'Not set'}
+LEVEL: ${userDoc?.level || 1} (XP: ${userDoc?.xp || 0})
+MINI PROJECT PHASE: Phase ${miniProjectDoc?.currentPhase || 1}
+GENERATION ENABLED: ${miniProjectDoc?.generationEnabled ? 'Yes' : 'No'}
+
+SKILLS ASSESSMENT SCORES (Tab 4):
+- Problem Solving: ${Math.round(jobReadiness.problemSolving)}%
+- Code Quality: ${Math.round(jobReadiness.codeQuality)}%
+- Efficiency: ${Math.round(jobReadiness.efficiency)}%
+- Project Mastery (previously Collaboration): ${Math.round(jobReadiness.collaboration)}%
+- Consistency: ${Math.round(jobReadiness.consistency)}%
+- Overall Score: ${Math.round(jobReadiness.overallScore)}%
+
+LANGUAGE PROGRESS (Tab 2):
+- Java: ${javaProjects} projects completed, Raw Average Score: ${Math.round(latestJavaScore)}%
+- Python: ${pythonProjects} projects completed, Raw Average Score: ${Math.round(latestPythonScore)}%
+
+ACTIVITY DATA (Tab 3):
+- Code Executions: ${totalCodeExecutions}
+- Assignments Submitted: ${totalAssignments} (${assignmentsOnTime} on time)
+- Mini Projects Completed: ${submittedTasks.length} (Avg Score: ${Math.round(avgProjectScore)}%)
+- Bug Hunt Participations: ${bugHuntParticipated} (Total Bugs Found: ${bugsFound})
+
+OVERVIEW DATA (Tab 1):
+- Current Streak: ${currentStreak} days
+- Total Active Days: ${totalActiveDays}
+- Total Time Spent: ${totalMinutes} minutes
+
+You are an AI learning coach. Perform a deep correlation analysis across ALL these data points (Overview, Skills, Activities, and Skills Assessment). For example, compare "Code Executions" vs "Project Scores" to see if the student iterates enough, or "Streak" vs "Consistency Score".
+Provide a CONCISE textual analysis (2-3 sentences max) for each area.
+
+Respond in STRICT JSON format ONLY:
+{
+  "detailedAiAnalysis": {
+    "problemSolving": "A short (2-3 sentences) analysis of problem solving.",
+    "codeQuality": "A short (2-3 sentences) analysis of code quality.",
+    "efficiency": "A short (2-3 sentences) analysis of efficiency.",
+    "collaboration": "A short (2-3 sentences) analysis of project mastery (success in completing varied projects and exercises).",
+    "consistency": "A short (2-3 sentences) analysis of consistency.",
+    "overall": "A short (2-3 sentences) overall summary.",
+    "weaknessAnalysis": "A short (2-3 sentences) detail of their weaknesses.",
+    "recommendation": "A short (2-3 sentences) actionable recommendation.",
+    "javaProficiency": <number from 0 to 100 based on level + java stats>,
+    "pythonProficiency": <number from 0 to 100 based on level + python stats>,
+    "problemSolvingScore": <number from 0 to 100 based on activity>,
+    "codeQualityScore": <number from 0 to 100 based on activity>,
+    "efficiencyScore": <number from 0 to 100 based on activity>,
+    "collaborationScore": <number from 0 to 100 based on project completion success>,
+    "consistencyScore": <number from 0 to 100 based on activity>,
+    "overallScore": <number from 0 to 100 overall assessment>,
+    "phaseProgress": <number from 0 to 100 representing readiness to move to next curriculum phase (Learning the basics -> Advanced Concepts -> Project Development, etc.)>
+  }
+}
+Return ONLY the JSON. No markdown backticks.`;
+
+    const response = await generateWithRetry(prompt, { temperature: 0.4, num_predict: 1200 });
+    const content = response.message.content;
+
+    const startIdx = content.indexOf('{');
+    const endIdx = content.lastIndexOf('}');
+    let analysisData = null;
+
+    if (startIdx !== -1 && endIdx !== -1) {
+      try {
+        const jsonStr = content.substring(startIdx, endIdx + 1);
+        const parsed = JSON.parse(jsonStr);
+        analysisData = parsed.detailedAiAnalysis;
+      } catch (parseErr) {
+        console.error('[Progress] Failed to parse detailed AI analysis JSON:', parseErr.message);
+        try {
+          let cleaned = content.substring(startIdx, endIdx + 1)
+            .replace(/\`\`\`json\n?|\`\`\`/g, '')
+            .replace(/[\x00-\x1F\x7F]/g, ' ');
+          let parsed = JSON.parse(cleaned);
+          analysisData = parsed.detailedAiAnalysis;
+        } catch (e2) {
+          console.error('[Progress] Second parse attempt failed');
+        }
+      }
+    }
+    
+    if (analysisData) {
+      analysisData.generatedAt = new Date();
+      // save to the progress records
+      if (progressRecords.length > 0) {
+        console.log(`[Progress] Saving AI analysis to ${progressRecords.length} records for user ${userId}`);
+        for (let p of progressRecords) {
+          p.detailedAiAnalysis = analysisData;
+          p.markModified('detailedAiAnalysis');
+          await p.save();
+        }
+      } else {
+        console.warn(`[Progress] No progress records found for user ${userId}. Creating default record in available classroom.`);
+        // Try to find any classroom the student is in
+        const userClassrooms = await Classroom.find({
+          $or: [
+            { students: userId },
+            { isDefault: true }
+          ]
+        });
+
+        if (userClassrooms.length > 0) {
+          const newProgress = new Progress({
+            student: userId,
+            classroom: userClassrooms[0]._id,
+            detailedAiAnalysis: analysisData
+          });
+          newProgress.markModified('detailedAiAnalysis');
+          await newProgress.save();
+          console.log(`[Progress] Created new progress record in classroom ${userClassrooms[0].name} specifically to store AI analysis.`);
+        } else {
+          console.error(`[Progress] Student ${userId} is not in any classrooms. AI analysis cannot be persisted.`);
+        }
+      }
+    } else {
+        return res.status(500).json({ success: false, message: 'Failed to generate proper JSON from AI.' });
+    }
+
+    res.json({
+      success: true,
+      analysis: analysisData,
+      generatedAt: analysisData.generatedAt
+    });
+  } catch (error) {
+    console.error('[Progress] Error generating detailed AI analysis:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate detailed AI analysis',
+      error: error.message
+    });
+  }
+});
+
+// Advance to the next curriculum phase
+router.post('/next-phase', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const MiniProject = (await import('../models/MiniProject.js')).default;
+    
+    // Find MiniProject and increment phase
+    let miniProject = await MiniProject.findOne({ userId });
+    if (!miniProject) {
+      miniProject = new MiniProject({ userId });
+    }
+    
+    const oldPhase = miniProject.currentPhase || 1;
+    miniProject.currentPhase = oldPhase + 1;
+    
+    // Increment week number to ensure we start a fresh "Current Week" in the history
+    miniProject.currentWeekNumber = (miniProject.currentWeekNumber || 0) + 1;
+    
+    // Force immediate new project generation for next phase
+    miniProject.lastGenerationDate = null;
+    miniProject.generationEnabled = true;
+
+    await miniProject.save();
+    
+    // Update all progress records for this student to reflect the new phase
+    const progressRecords = await Progress.find({ student: userId });
+    for (const p of progressRecords) {
+      if (p.detailedAiAnalysis) {
+        p.detailedAiAnalysis.phaseProgress = 0; // Reset progress for the new phase
+        p.markModified('detailedAiAnalysis');
+        await p.save();
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Successfully advanced to phase ${miniProject.currentPhase}`,
+      newPhase: miniProject.currentPhase
+    });
+  } catch (error) {
+    console.error('[Progress] Error advancing to next phase:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to advance to next phase'
     });
   }
 });
