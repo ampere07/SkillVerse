@@ -69,7 +69,7 @@ export default function TeacherGradingCompiler({
   }, [code]);
 
   useEffect(() => {
-    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-1.onrender.com');
+    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-ogv1.onrender.com');
 
     newSocket.on('output', (data: { type: string; data: string }) => {
       setOutput(prev => prev + data.data);

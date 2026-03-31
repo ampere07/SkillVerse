@@ -1,7 +1,7 @@
 // API utility functions for classroom and assignment management
 
 const getApiUrl = () => {
-  const url = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+  const url = import.meta.env.VITE_API_URL || 'https://skillverse-ogv1.onrender.com/api';
   return url.endsWith('/api') ? url : `${url}/api`;
 };
 

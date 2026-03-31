@@ -80,7 +80,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
     setSuccess('');
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-ogv1.onrender.com/api';
       const baseUrl = apiUrl.endsWith('/api')
         ? apiUrl
         : `${apiUrl}/api`;
@@ -138,7 +138,7 @@ export default function ForgotPassword({ onBack }: ForgotPasswordProps) {
     setLoading(true);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-ogv1.onrender.com/api';
       const baseUrl = apiUrl.endsWith('/api')
         ? apiUrl
         : `${apiUrl}/api`;

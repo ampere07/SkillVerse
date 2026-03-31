@@ -3,7 +3,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 're
 import axios from 'axios';
 import Compiler from './Compiler';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://skillverse-ogv1.onrender.com/api';
 
 interface ProjectDetails {
   title: string;

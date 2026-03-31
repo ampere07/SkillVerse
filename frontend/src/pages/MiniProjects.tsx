@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://skillverse-ogv1.onrender.com.com/api';
 
 interface MiniProjectsProps {
   onHasUnsavedChanges?: (hasChanges: boolean) => void;

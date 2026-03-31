@@ -84,7 +84,7 @@ export default function Register({ onToggle }: RegisterProps) {
     setError('');
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-ogv1.onrender.com/api';
       const baseUrl = apiUrl.endsWith('/api')
         ? apiUrl
         : `${apiUrl}/api`;

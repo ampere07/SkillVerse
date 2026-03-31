@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isNewStudent, setIsNewStudent] = useState(false);
   
   const getBaseUrl = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-1.onrender.com/api';
+    const apiUrl = import.meta.env.VITE_API_URL || 'https://skillverse-ogv1.onrender.com/api';
     return apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
   };
 
