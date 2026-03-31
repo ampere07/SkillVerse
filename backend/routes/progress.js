@@ -190,7 +190,10 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     const completedTasks = miniProjectDoc?.completedTasks || [];
 
     // Get real bug hunt data by aggregating sessions
-    const bugHuntSessions = await BugHuntSession.find({ userId: studentId });
+    const bugHuntSessions = await BugHuntSession.find({ 
+      userId: studentId,
+      status: { $in: ['completed', 'surrendered'] }
+    });
     
     const bugHuntStats = {
       participated: bugHuntSessions.length,

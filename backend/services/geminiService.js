@@ -1,34 +1,39 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import GEMINI_CONFIG from '../config/geminiConfig.js';
 
-const MODEL_NAME = GEMINI_CONFIG.model;
+const MODELS = [
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.5-flash'
+];
+
 const MAX_RETRIES = GEMINI_CONFIG.maxRetries || 3;
 
 let genAI;
-let geminiModel;
 
 if (!process.env.GEMINI_API_KEY) {
   console.warn('WARNING: GEMINI_API_KEY is not set in environment variables');
 } else {
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  geminiModel = genAI.getGenerativeModel({ model: MODEL_NAME });
   console.log('Gemini Service Initialized');
-  console.log('Model:', MODEL_NAME);
 }
 
 export const generateWithRetry = async (prompt, _options = {}) => {
   let lastError;
+  let currentModelIndex = 0;
 
-  if (!geminiModel) {
+  if (!genAI) {
      throw new Error('Gemini API is not configured. Missing GEMINI_API_KEY.');
   }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const modelName = MODELS[currentModelIndex] || MODELS[0];
     try {
-      console.log(`AI Generation attempt ${attempt}/${MAX_RETRIES}`);
+      console.log(`AI Generation attempt ${attempt}/${MAX_RETRIES} using model: ${modelName}`);
       const startTime = Date.now();
 
-      const result = await geminiModel.generateContent(prompt);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
       
       const response = {
         message: {
@@ -37,23 +42,43 @@ export const generateWithRetry = async (prompt, _options = {}) => {
       };
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-      console.log(`Generation completed in ${duration} seconds`);
+      console.log(`Generation completed in ${duration} seconds using ${modelName}`);
 
       return response;
 
     } catch (error) {
       lastError = error;
-      console.error(`Attempt ${attempt} failed:`, error.message);
+      const errorMessage = error.message.toLowerCase();
+      console.error(`Attempt ${attempt} (${modelName}) failed:`, error.message);
+
+      // If it's a quota error (429), exhausted error, or overloaded (503)
+      const isQuotaError = 
+        errorMessage.includes('429') || 
+        errorMessage.includes('quota') || 
+        errorMessage.includes('exhausted') || 
+        errorMessage.includes('overloaded') || 
+        errorMessage.includes('limit') ||
+        error.status === 429 ||
+        (error.response && error.response.status === 429);
+
+      if (isQuotaError) {
+        if (currentModelIndex < MODELS.length - 1) {
+          currentModelIndex++;
+          console.log(`Quota reached/Overloaded for ${modelName}. Falling back to ${MODELS[currentModelIndex]}...`);
+          attempt--; 
+          continue;
+        }
+      }
 
       if (attempt < MAX_RETRIES) {
         const delay = 2000 * attempt;
-        console.log(`Retrying in ${delay}ms...`);
+        console.log(`Retrying SAME model in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
 
-  throw new Error(`AI generation failed after ${MAX_RETRIES} attempts: ${lastError.message}`);
+  throw new Error(`AI generation failed after ${MAX_RETRIES} attempts and model fallbacks: ${lastError.message}`);
 };
 
 export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => {
@@ -347,13 +372,15 @@ export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
 
 export const checkGeminiConnection = async () => {
   try {
-    if (geminiModel) {
-       // Just doing a simple fast query to ensure API key is valid
-       const result = await geminiModel.generateContent("hello");
+    if (genAI) {
+       // Just doing a simple fast query to ensure API key is valid using the primary model
+       const model = genAI.getGenerativeModel({ model: MODELS[0] });
+       const result = await model.generateContent("hello");
        if (result) {
          return {
            connected: true,
-           model: MODEL_NAME,
+           model: MODELS[0],
+           availableModels: MODELS,
            mode: 'Gemini'
          };
        }
@@ -369,4 +396,4 @@ export const checkGeminiConnection = async () => {
   }
 };
 
-export { MODEL_NAME };
+export { MODELS as MODEL_NAMES };

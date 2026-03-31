@@ -57,19 +57,31 @@ export async function awardXp(userId, xpAmount, reason, xpType = 'general') {
       user.dailyXp.set(todayKey, dailyXp);
     }
     
-    // Award XP
+    // Calculations for the update
+    const updateData = {
+      $inc: { xp: xpAmount },
+      $set: {
+        dailyXp: Object.fromEntries(user.dailyXp) // Convert Map to object for $set if needed normally, but $set works with Map too in newer Mongoose
+      }
+    };
+
+    // Award XP and calculate new level
     const oldLevel = user.level;
-    user.xp += xpAmount;
-    
-    // Calculate new level
-    const newLevel = calculateLevel(user.xp);
-    if (newLevel > user.level) {
-      user.level = newLevel;
-      console.log(`User ${userId} leveled up from ${oldLevel} to ${newLevel}!`);
+    const newXpTotal = user.xp + xpAmount;
+    const newLevelCalculated = calculateLevel(newXpTotal);
+
+    if (newLevelCalculated > oldLevel) {
+      updateData.$set.level = newLevelCalculated;
+      console.log(`User ${userId} leveled up from ${oldLevel} to ${newLevelCalculated}!`);
     }
-    
-    await user.save();
-    
+
+    // Atomic update to avoid validation issues with other fields (like firstName/lastName)
+    await User.findByIdAndUpdate(userId, updateData, { runValidators: false });
+
+    // Update the local object for current response
+    user.xp = newXpTotal;
+    user.level = newLevelCalculated > oldLevel ? newLevelCalculated : oldLevel;
+
     console.log(`Awarded ${xpAmount} XP to user ${userId} for ${reason}. New total: ${user.xp}`);
     
     return {

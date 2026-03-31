@@ -32,24 +32,26 @@ const safeJsonParse = (str) => {
 export const generateBugHuntChallenge = async (language, level = 'Beginner', attempt = 1) => {
     try {
         const prompt = `Create a "Bug Hunt" challenge for a student at ${level} level in ${language.toUpperCase()}.
-A Bug Hunt challenge consists of a small piece of code that has exactly 2-3 intentional bugs.
+A Bug Hunt challenge consists of a small piece of code (10-20 lines) that has exactly 2-3 intentional bugs.
 
 IMPORTANT: 
-- The code must be in "buggyCode" and "correctCode" fields.
-- Use ONLY standard escaped newlines (\\n) for line breaks inside JSON strings. 
-- Do NOT use actual line breaks inside the "buggyCode" or "correctCode" values.
-- Escape all double quotes inside the code with a backslash (\\").
+- Provide a clear and educational challenge.
+- The code MUST be well-formatted with proper indentation and REAL newlines.
+- Ensure the bugs are logical or syntax-based (e.g., off-by-one errors, missing null checks, wrong operator).
+- DO NOT use minified or single-line code.
 
 RESPONSE FORMAT (JSON ONLY):
 {
   "title": "Short catchy title",
-  "description": "What the code is supposed to do",
-  "buggyCode": "The full code with bugs",
-  "correctCode": "The full code after fixing bugs",
+  "description": "What the code is supposed to do, mention the bugs subtly.",
+  "buggyCode": "The full code with bugs. Use \\n for newlines and ensure proper indentation.",
+  "correctCode": "The full code after fixing bugs. Use \\n for newlines.",
   "hints": ["Hint 1", "Hint 2"],
   "difficulty": "${level}",
   "language": "${language}"
 }
+
+Example buggyCode format: "public class Main {\\n  public static void main(String[] args) {\\n    System.out.println(\\\"Hello\\\");\\n  }\\n}"
 
 Return ONLY the JSON.`;
 
@@ -87,6 +89,8 @@ Return ONLY the JSON.`;
 
         challenge.buggyCode = ensureString(challenge.buggyCode);
         challenge.correctCode = ensureString(challenge.correctCode);
+
+
 
         // Final check: if the code is too short, retry
         if (challenge.buggyCode.length < 20 && attempt < 3) {

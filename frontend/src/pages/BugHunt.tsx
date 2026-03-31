@@ -55,6 +55,9 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const [aiHint, setAiHint] = useState<string | null>(null);
     const [isRequestingHint, setIsRequestingHint] = useState(false);
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
+    const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+    const [isProcessingSurrender, setIsProcessingSurrender] = useState(false);
+    const [compilationErrors, setCompilationErrors] = useState<any[]>([]);
 
     const socketRef = useRef<Socket | null>(null);
     const timerRef = useRef<any>(null);
@@ -109,10 +112,13 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
         socket.on('compilation-error', (data: any) => {
             if (data.errors && data.errors.length > 0) {
+                setCompilationErrors(data.errors);
                 const errorDetails = data.errors.map((err: any) => 
                     `Line ${err.line}: ${err.message}${err.context ? `\n  > ${err.context}` : ''}`
                 ).join('\n\n');
-                setOutput(prev => prev + `\n\nCOMPILATION FAILED:\n${errorDetails}`);
+                setOutput(prev => prev + `\n\n[COMPILATION FAILED]\n${errorDetails}`);
+            } else {
+                setCompilationErrors([]);
             }
         });
 
@@ -159,9 +165,16 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 setCurrentIndex(0);
                 const firstCode = data.challenges[0].buggyCode;
                 console.log('[BugHunt] First challenge raw code:', firstCode);
-                const finalCode = typeof firstCode === 'string'
-                    ? firstCode.replace(/\\n/g, '\n')
-                    : JSON.stringify(firstCode, null, 2);
+                
+                // Enhanced newline cleaning
+                let finalCode = typeof firstCode === 'string' ? firstCode : JSON.stringify(firstCode, null, 2);
+                
+                // Replace escaped newlines (both single and double backslash)
+                finalCode = finalCode
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\r/g, '')
+                    .replace(/\\"/g, '"');
+                
                 setCode(finalCode);
                 setGameState('playing');
                 setTimer(0);
@@ -193,6 +206,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const runCode = () => {
         if (!socketRef.current || !challenges[currentIndex]) return;
         setOutput('');
+        setCompilationErrors([]);
         setIsCompiling(true);
 
         const lang = challenges[currentIndex].language;
@@ -248,7 +262,16 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                     if (currentIndex < challenges.length - 1) {
                         const nextIndex = currentIndex + 1;
                         setCurrentIndex(nextIndex);
-                        setCode(challenges[nextIndex].buggyCode.replace(/\\n/g, '\n'));
+                        const nextCode = challenges[nextIndex].buggyCode;
+                        
+                        let finalNextCode = typeof nextCode === 'string' ? nextCode : JSON.stringify(nextCode, null, 2);
+                        finalNextCode = finalNextCode
+                            .replace(/\\n/g, '\n')
+                            .replace(/\\r/g, '')
+                            .replace(/\\"/g, '"');
+                            
+                        setCode(finalNextCode);
+                        setCompilationErrors([]);
                         setFeedback(null);
                         setIsLastFixSuccessful(false);
                         setShowHint(false);
@@ -301,9 +324,9 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     };
 
     const handleSurrender = async () => {
-        if (!window.confirm("Are you sure you want to surrender? Your current progress and intel will be recorded.")) return;
-
-        if (!sessionId) return;
+        if (!sessionId || isProcessingSurrender) return;
+        
+        setIsProcessingSurrender(true);
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/surrender`, {
                 method: 'POST',
@@ -328,8 +351,16 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
             setIsSurrendered(true);
             setGameState('completed');
+            setShowSurrenderModal(false);
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
         } catch (error) {
             console.error('Failed to surrender:', error);
+            alert('Emergency transmission failed. The bugs have blocked the signal.');
+        } finally {
+            setIsProcessingSurrender(false);
         }
     };
 
@@ -541,7 +572,10 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <button onClick={handleSurrender} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#FFEBEE] text-[#D32F2F] font-black text-[10px] uppercase tracking-widest rounded-lg border border-transparent hover:border-[#FFCDD2] transition-all">
+                    <button 
+                        onClick={() => setShowSurrenderModal(true)} 
+                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#FFEBEE] text-[#D32F2F] font-black text-[10px] uppercase tracking-widest rounded-lg border border-transparent hover:border-[#FFCDD2] transition-all"
+                    >
                         <Flag className="w-3.5 h-3.5" />
                         Surrender
                     </button>
@@ -582,7 +616,10 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                             wrap="off"
                         />
                         <div className="absolute inset-0 w-full h-full p-8 whitespace-pre overflow-auto pointer-events-none leading-relaxed">
-                            {currentChallenge?.language === 'java' ? highlightJavaCode(code) : highlightPythonCode(code)}
+                            {currentChallenge?.language === 'java' 
+                                ? highlightJavaCode(code, compilationErrors) 
+                                : highlightPythonCode(code, compilationErrors)
+                            }
                         </div>
                     </div>
 
@@ -618,7 +655,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                                 disabled={isValidating || isCompiling}
                                 className="px-10 py-3 bg-[#2E7D32] hover:bg-[#1B5E20] text-[11px] font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all shadow-[0_4px_12px_rgba(46,125,50,0.2)] text-white active:scale-95 disabled:opacity-50"
                             >
-                                {isValidating ? (
+                                {(isValidating || isCompiling) ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
                                     <Send className="w-4 h-4" />
@@ -694,6 +731,41 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                     </div>
                 </div>
             </div>
+
+            {/* Surrender Confirmation Modal */}
+            {showSurrenderModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-sm rounded-xl p-8 border border-[#E0E0E0] shadow-2xl space-y-6 animate-in zoom-in slide-in-from-bottom-5 duration-400">
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-bold tracking-tight text-[#2D2D2D]">Surrender Mission?</h2>
+                            <p className="text-sm text-[#666] leading-relaxed">
+                                Are you sure you want to surrender? Your current progress and intel will be recorded as-is.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                onClick={() => setShowSurrenderModal(false)}
+                                disabled={isProcessingSurrender}
+                                className="px-4 py-2 text-sm font-semibold text-[#666] hover:bg-[#F5F5F5] rounded-lg transition-all disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSurrender}
+                                disabled={isProcessingSurrender}
+                                className="px-4 py-2 text-sm font-semibold text-white bg-[#D32F2F] hover:bg-[#B71C1C] rounded-lg transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isProcessingSurrender ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                ) : (
+                                    "Confirm Surrender"
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };
