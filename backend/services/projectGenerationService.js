@@ -32,27 +32,6 @@ const createFallbackProjects = (language, skillLevel, roadmap) => {
           language: 'Java',
           requirements: `- Accept score input (0-100)\n- Validate score range\n- Convert to letter grade (A, B, C, D, F)\n- Display grade with pass/fail status`,
           rubrics: `- Conditional Logic (30pts): Correct grade ranges\n- Input Validation (25pts): Score range checked\n- Grade Conversion (25pts): Accurate results\n- Output (15pts): Clear display\n- Code Quality (5pts): Readable structure`
-        },
-        {
-          title: 'Loops - Number Pattern Generator',
-          description: 'Master for and while loops by creating various number patterns. Generate sequences and shapes using loops.',
-          language: 'Java',
-          requirements: `- Generate multiplication table (1-10)\n- Create number pyramid pattern\n- Calculate sum of numbers 1 to N\n- Menu to choose pattern type`,
-          rubrics: `- For Loop Usage (25pts): Multiplication table\n- While Loop Usage (25pts): Sum calculation\n- Nested Loops (25pts): Pyramid pattern\n- Menu System (15pts): Pattern selection\n- Output Format (10pts): Clean display`
-        },
-        {
-          title: 'Arrays - Class Roster Manager',
-          description: 'Learn array operations by managing a class roster. Store student names and perform basic operations.',
-          language: 'Java',
-          requirements: `- Array to store 5 student names\n- Add students to roster\n- Display all students\n- Search for specific student`,
-          rubrics: `- Array Declaration (25pts): Proper initialization\n- Add Operation (25pts): Stores names correctly\n- Display Operation (20pts): Shows all students\n- Search Operation (20pts): Finds students\n- Code Organization (10pts): Clear structure`
-        },
-        {
-          title: 'Methods - Temperature Converter',
-          description: 'Practice creating and calling methods by building a temperature conversion utility. Convert between Celsius, Fahrenheit, and Kelvin.',
-          language: 'Java',
-          requirements: `- Method for Celsius to Fahrenheit\n- Method for Fahrenheit to Celsius\n- Method for Celsius to Kelvin\n- Main menu to select conversion type`,
-          rubrics: `- Method Creation (30pts): All conversions correct\n- Parameters (20pts): Proper parameter usage\n- Return Values (20pts): Correct returns\n- Menu Integration (20pts): Method calls work\n- Code Quality (10pts): Clean, modular design`
         }
       ];
     } else {
@@ -77,27 +56,6 @@ const createFallbackProjects = (language, skillLevel, roadmap) => {
           language: 'Python',
           requirements: `- Accept score (0-100)\n- Validate input range\n- Classify as Excellent/Good/Average/Poor\n- Display classification with emoji`,
           rubrics: `- Conditional Logic (30pts): Correct ranges\n- Input Validation (25pts): Range checking\n- Classification (25pts): Accurate results\n- Output (15pts): Clear with emojis\n- Code Quality (5pts): Clean code`
-        },
-        {
-          title: 'Loops - Pattern Creator',
-          description: 'Master for and while loops by creating various patterns. Generate sequences and shapes.',
-          language: 'Python',
-          requirements: `- Generate times table using for loop\n- Create star pyramid with nested loops\n- Calculate factorial using while loop\n- Menu to select pattern`,
-          rubrics: `- For Loops (25pts): Times table works\n- While Loops (25pts): Factorial correct\n- Nested Loops (25pts): Pyramid pattern\n- Menu (15pts): Selection works\n- Output (10pts): Clean display`
-        },
-        {
-          title: 'Lists - Task Manager',
-          description: 'Learn list operations by building a simple task manager. Store and manipulate a list of tasks.',
-          language: 'Python',
-          requirements: `- List to store tasks\n- Add new tasks\n- Display all tasks\n- Remove completed tasks\n- Show task count`,
-          rubrics: `- List Operations (25pts): Add/remove work\n- Display Function (20pts): Shows all tasks\n- Remove Function (25pts): Deletion works\n- Task Counter (20pts): Count accurate\n- Code Structure (10pts): Organization`
-        },
-        {
-          title: 'Functions - Unit Converter',
-          description: 'Practice creating functions by building a unit conversion tool. Convert between different measurement units.',
-          language: 'Python',
-          requirements: `- Function for km to miles\n- Function for kg to pounds\n- Function for celsius to fahrenheit\n- Menu to choose conversion`,
-          rubrics: `- Function Definitions (30pts): All conversions\n- Parameters (20pts): Proper usage\n- Return Values (20pts): Correct returns\n- Menu System (20pts): Integration works\n- Code Quality (10pts): Clean, modular`
         }
       ];
     }
@@ -124,27 +82,6 @@ const createFallbackProjects = (language, skillLevel, roadmap) => {
           language: 'Java',
           requirements: `- ArrayList to store log entries in memory\n- Try-catch for invalid input\n- Custom LogException class\n- Validate log levels (INFO, WARN, ERROR)\n- Display logs with filtering`,
           rubrics: `- Exception Handling (30pts): Try-catch correct\n- Custom Exception (25pts): LogException proper\n- Validation (20pts): Level checking works\n- Log Storage (15pts): ArrayList usage\n- Code Quality (10pts): Error handling`
-        },
-        {
-          title: 'Generics - Data Container',
-          description: 'Learn generics and type safety by creating a generic container class. Store and retrieve different data types safely.',
-          language: 'Java',
-          requirements: `- Generic Box<T> class\n- Methods: add(), get(), isEmpty()\n- Test with Integer, String, Double\n- Demonstrate type safety`,
-          rubrics: `- Generic Class (30pts): Proper syntax\n- Type Parameter (25pts): T usage correct\n- Methods (25pts): All work correctly\n- Type Safety (15pts): Demonstrated\n- Code Quality (5pts): Clean implementation`
-        },
-        {
-          title: 'Lambda - List Processor',
-          description: 'Master lambda expressions by creating a list processing utility. Filter, map, and reduce operations using lambdas.',
-          language: 'Java',
-          requirements: `- ArrayList of integers\n- Lambda to filter even numbers\n- Lambda to square numbers\n- Lambda to find sum\n- Demonstrate forEach with lambda`,
-          rubrics: `- Filter Lambda (25pts): Filters correctly\n- Map Lambda (25pts): Squares numbers\n- Reduce Lambda (20pts): Sum works\n- forEach Usage (20pts): Display works\n- Code Quality (10pts): Clean lambdas`
-        },
-        {
-          title: 'Streams - Student Analyzer',
-          description: 'Learn Stream API by analyzing student data. Perform filtering, mapping, and statistical operations.',
-          language: 'Java',
-          requirements: `- Student class with name and grade\n- ArrayList of students\n- Stream to filter passing students\n- Stream to calculate average grade\n- Stream to find top student`,
-          rubrics: `- Stream Creation (20pts): From collection\n- Filter Operation (25pts): Filters correctly\n- Average Calculation (25pts): Accurate result\n- Max Operation (20pts): Finds top student\n- Code Quality (10pts): Clean stream usage`
         }
       ];
     } else {
@@ -169,27 +106,6 @@ const createFallbackProjects = (language, skillLevel, roadmap) => {
           language: 'Python',
           requirements: `- @timer decorator to measure execution\n- @logger decorator to log calls\n- @validator decorator to check parameters\n- Apply decorators to sample functions`,
           rubrics: `- Timer Decorator (30pts): Measures time\n- Logger Decorator (25pts): Logs calls\n- Validator Decorator (25pts): Validates input\n- Application (15pts): Works on functions\n- Code Quality (5pts): Clean decorator code`
-        },
-        {
-          title: 'Context Managers - Resource Handler',
-          description: 'Learn context managers with the with statement. Manage resources safely and efficiently.',
-          language: 'Python',
-          requirements: `- Custom context manager class\n- Implement __enter__ and __exit__\n- Simulate resource management\n- Handle exceptions in context\n- Demonstrate with statement usage`,
-          rubrics: `- Context Manager Class (30pts): Proper structure\n- Enter Method (20pts): Setup works\n- Exit Method (25pts): Cleanup works\n- Exception Handling (15pts): Errors handled\n- Code Quality (10pts): Clean implementation`
-        },
-        {
-          title: 'API Simulation - Weather Service',
-          description: 'Simulate working with APIs by creating a mock weather service. Parse data and handle responses.',
-          language: 'Python',
-          requirements: `- Dictionary to simulate API responses\n- Function to get weather by city\n- Parse and format weather data\n- Handle missing city errors\n- Display formatted forecast`,
-          rubrics: `- Data Structure (25pts): Response format\n- Query Function (25pts): City lookup\n- Data Parsing (25pts): Extract info\n- Error Handling (15pts): Missing cities\n- Output Format (10pts): Clean display`
-        },
-        {
-          title: 'Regular Expressions - Text Validator',
-          description: 'Master regex patterns by creating a text validation utility. Validate emails, phones, and passwords.',
-          language: 'Python',
-          requirements: `- Regex pattern for email validation\n- Regex pattern for phone numbers\n- Regex pattern for strong passwords\n- Test function for each pattern\n- Display validation results`,
-          rubrics: `- Email Regex (30pts): Accurate pattern\n- Phone Regex (25pts): Validates correctly\n- Password Regex (25pts): Strength check\n- Test Functions (15pts): All work\n- Code Quality (5pts): Clean patterns`
         }
       ];
     }
@@ -216,27 +132,6 @@ const createFallbackProjects = (language, skillLevel, roadmap) => {
           language: 'Java',
           requirements: `- Implement bubble sort, quick sort\n- Measure execution time for each\n- Compare performance with different data sizes\n- Calculate Big-O complexity\n- Display performance comparison`,
           rubrics: `- Algorithm Implementation (30pts): Both correct\n- Time Measurement (25pts): Accurate timing\n- Performance Analysis (25pts): Proper comparison\n- Complexity Analysis (15pts): Big-O correct\n- Code Quality (5pts): Clean implementation`
-        },
-        {
-          title: 'Security - Authentication System',
-          description: 'Implement secure authentication with password hashing and validation. Apply security best practices.',
-          language: 'Java',
-          requirements: `- User class with hashed passwords\n- Hash passwords using simulated algorithm\n- Verify credentials securely\n- Implement password strength validation\n- Prevent timing attacks in verification`,
-          rubrics: `- Password Hashing (30pts): Secure implementation\n- Credential Verification (25pts): Secure comparison\n- Strength Validation (20pts): Requirements enforced\n- Security Practices (20pts): Best practices followed\n- Code Quality (5pts): Professional code`
-        },
-        {
-          title: 'Architectural Pattern - MVC Calculator',
-          description: 'Implement Model-View-Controller architecture for a console-based calculator. Demonstrate separation of concerns.',
-          language: 'Java',
-          requirements: `- Model class for calculation logic\n- View class for console I/O\n- Controller class coordinating both\n- Support multiple operations\n- Demonstrate loose coupling`,
-          rubrics: `- Model Layer (25pts): Business logic\n- View Layer (25pts): I/O handling\n- Controller Layer (25pts): Coordination\n- Separation (15pts): Clear boundaries\n- Code Quality (10pts): MVC principles`
-        },
-        {
-          title: 'Advanced Collections - LRU Cache',
-          description: 'Implement a Least Recently Used cache data structure. Demonstrate advanced data structure knowledge.',
-          language: 'Java',
-          requirements: `- LRU Cache with fixed capacity\n- get() and put() operations in O(1)\n- LinkedHashMap for ordering\n- Evict least recently used on overflow\n- Demonstrate cache behavior`,
-          rubrics: `- Cache Implementation (30pts): Correct logic\n- Time Complexity (30pts): O(1) operations\n- Eviction Policy (20pts): LRU works correctly\n- Data Structure (15pts): LinkedHashMap usage\n- Code Quality (5pts): Efficient implementation`
         }
       ];
     } else {
@@ -261,27 +156,6 @@ const createFallbackProjects = (language, skillLevel, roadmap) => {
           language: 'Python',
           requirements: `- Async task class with coroutine\n- Scheduler managing multiple tasks\n- Simulate async I/O operations\n- Handle task dependencies\n- Demonstrate concurrent execution`,
           rubrics: `- Async/Await Usage (30pts): Proper syntax\n- Task Management (25pts): Scheduler works\n- Concurrency (25pts): Parallel execution\n- Dependencies (15pts): Order enforced\n- Code Quality (5pts): Clean async code`
-        },
-        {
-          title: 'Performance - Memory Profiler',
-          description: 'Create a memory profiling utility to analyze object memory usage. Optimize data structure performance.',
-          language: 'Python',
-          requirements: `- Function to measure object size\n- Compare memory usage of different structures\n- Profile generator expressions vs lists\n- Analyze memory patterns\n- Provide optimization recommendations`,
-          rubrics: `- Memory Measurement (30pts): Accurate sizing\n- Structure Comparison (25pts): Multiple types\n- Generator Analysis (25pts): Proper comparison\n- Recommendations (15pts): Valid suggestions\n- Code Quality (5pts): Professional code`
-        },
-        {
-          title: 'Security - Encryption System',
-          description: 'Implement a secure encryption and decryption system. Apply cryptographic principles correctly.',
-          language: 'Python',
-          requirements: `- Implement Caesar cipher with key\n- Add salt for additional security\n- Secure key storage simulation\n- Encrypt and decrypt messages\n- Prevent common attacks`,
-          rubrics: `- Encryption Algorithm (30pts): Works correctly\n- Security Features (30pts): Salt and key handling\n- Decryption (20pts): Reverses properly\n- Attack Prevention (15pts): Secure implementation\n- Code Quality (5pts): Professional code`
-        },
-        {
-          title: 'Architecture - Plugin System',
-          description: 'Design an extensible plugin architecture. Demonstrate software architecture principles.',
-          language: 'Python',
-          requirements: `- Plugin base class with interface\n- Dynamic plugin loading mechanism\n- Plugin registry for management\n- Multiple plugin implementations\n- Demonstrate plugin execution`,
-          rubrics: `- Plugin Interface (25pts): Clear contract\n- Dynamic Loading (30pts): Works correctly\n- Registry System (20pts): Manages plugins\n- Plugin Examples (15pts): Multiple working\n- Code Quality (10pts): Extensible design`
         }
       ];
     }

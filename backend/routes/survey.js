@@ -366,40 +366,49 @@ router.post('/generate-projects/:userId', async (req, res) => {
       return res.status(404).json({ message: 'MiniProject not found for user' });
     }
 
-    // Check if projects already exist
-    if (miniProject.availableProjects && miniProject.availableProjects.length > 0) {
-      console.log(`[GenerateProjects] Projects already exist for user ${userId}`);
-      return res.status(200).json({
-        message: 'Projects already generated',
-        projectCount: miniProject.availableProjects.length
-      });
-    }
-
     const completedLanguages = user.surveyCompletedLanguages || [];
     console.log(`[GenerateProjects] Completed surveys for languages: ${completedLanguages.join(', ')}`);
-    
-    let projects = [];
-    
-    if (completedLanguages.includes('java') && completedLanguages.includes('python')) {
-      console.log(`[GenerateProjects] Both surveys completed, generating projects for both languages`);
-      const { generateProjectsForBothLanguages } = await import('../services/projectGenerationService.js');
-      projects = await generateProjectsForBothLanguages(userId);
-    } else if (completedLanguages.length > 0) {
-      const language = completedLanguages[0];
-      console.log(`[GenerateProjects] Generating projects for ${language} only`);
-      const { generateProjectsForLanguage } = await import('../services/projectGenerationService.js');
-      projects = await generateProjectsForLanguage(userId, language);
-    } else {
+
+    if (completedLanguages.length === 0) {
       return res.status(400).json({ message: 'No completed surveys found for user' });
     }
+
+    // Only generate for languages that don't already have projects
+    const { generateProjectsForLanguage } = await import('../services/projectGenerationService.js');
+    let projects = [];
+
+    for (const lang of completedLanguages) {
+      const existingProjects = miniProject.getProjectsByLanguage(lang);
+      if (existingProjects.length > 0) {
+        console.log(`[GenerateProjects] ${lang} projects already exist (${existingProjects.length}), skipping`);
+        continue;
+      }
+      console.log(`[GenerateProjects] Generating projects for ${lang}`);
+      const langProjects = await generateProjectsForLanguage(userId, lang);
+      projects.push(...langProjects);
+    }
+
+    if (projects.length === 0) {
+      // All languages already have projects
+      const currentLangProjects = miniProject.getProjectsByLanguage(user.primaryLanguage || completedLanguages[0]);
+      console.log(`[GenerateProjects] All languages already have projects for user ${userId}`);
+      return res.status(200).json({
+        message: 'Projects already generated',
+        projectCount: currentLangProjects.length
+      });
+    }
     
-    const weekStartDate = new Date();
+    const weekStartDate = miniProject.weekStartDate || new Date();
     const weekEndDate = new Date(weekStartDate);
     weekEndDate.setDate(weekEndDate.getDate() + 7);
     
-    const weekNumber = miniProject.currentWeekNumber + 1;
+    // Use current week if it exists, only create new week if none exists
+    const weekNumber = miniProject.currentWeekNumber || 1;
     miniProject.addWeeklyGeneratedProjects(projects, weekNumber, weekStartDate, weekEndDate);
-    miniProject.weekStartDate = weekStartDate;
+    
+    if (!miniProject.weekStartDate) {
+      miniProject.weekStartDate = weekStartDate;
+    }
     
     await miniProject.save();
     

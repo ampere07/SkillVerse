@@ -33,6 +33,9 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
   const [currentLevel, setCurrentLevel] = useState(1);
   const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   const [consecutiveDays, setConsecutiveDays] = useState(0);
+  const [totalCompletedCount, setTotalCompletedCount] = useState(0);
+  const [totalHighScores, setTotalHighScores] = useState(0);
+  const [totalPerfectScores, setTotalPerfectScores] = useState(0);
 
   const compilerRef = useRef<any>(null);
 
@@ -206,20 +209,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
   ];
 
   const calculateBadgeStats = () => {
-    const completedCount = projects.filter(p => {
-      const status = getProjectStatus(p.title);
-      return status === 'completed' || status === 'submitted';
-    }).length;
-
-    const highScoreCount = Array.from(projectScores.values()).filter(score => score >= 90).length;
-    const perfectScoreCount = Array.from(projectScores.values()).filter(score => score === 100).length;
-
     return {
-      completed: completedCount,
+      completed: totalCompletedCount,
       total: projects.length,
       consecutiveDays: consecutiveDays,
-      highScores: highScoreCount,
-      perfectScores: perfectScoreCount
+      highScores: totalHighScores,
+      perfectScores: totalPerfectScores
     };
   };
 
@@ -286,14 +281,25 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
       const statusMap = new Map<string, string>();
       const scoreMap = new Map<string, number>();
       const feedbackMap = new Map<string, string>();
+      let allCompletedCount = 0;
+      let allHighScores = 0;
+      let allPerfectScores = 0;
       response.data.completedTasks.forEach((task: any) => {
         statusMap.set(task.projectTitle.toLowerCase(), task.status);
         scoreMap.set(task.projectTitle.toLowerCase(), task.score || 0);
         feedbackMap.set(task.projectTitle.toLowerCase(), task.aiAnalyization || '');
+        if (task.status === 'completed' || task.status === 'submitted') {
+          allCompletedCount++;
+        }
+        if (task.score >= 90) allHighScores++;
+        if (task.score === 100) allPerfectScores++;
       });
       setProjectStatuses(statusMap);
       setProjectScores(scoreMap);
       setProjectFeedback(feedbackMap);
+      setTotalCompletedCount(allCompletedCount);
+      setTotalHighScores(allHighScores);
+      setTotalPerfectScores(allPerfectScores);
 
       // Fetch XP and badges from backend
       await fetchUserProgress();
@@ -448,31 +454,9 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                       setShowLanguageMenu(false);
                       const otherLanguage = currentLanguage === 'java' ? 'python' : 'java';
 
-                      // Check if projects exist or survey is done for target language
-                      try {
-                        const token = localStorage.getItem('token');
-                        const response = await axios.get(`${API_URL}/mini-projects/check-language-projects`, {
-                          params: { language: otherLanguage },
-                          headers: { Authorization: `Bearer ${token}` }
-                        });
-
-                        const { hasProjects, surveyCompleted } = response.data;
-
-                        if (hasProjects || surveyCompleted) {
-                          // Show confirmation modal if projects exist or survey is done
-                          setPendingLanguage(otherLanguage);
-                          setShowConfirmationModal(true);
-                        } else {
-                          // No projects and no survey - go directly to survey modal
-                          setPendingLanguage(otherLanguage);
-                          setSurveyLanguage(otherLanguage);
-                          setShowSurvey(true);
-                        }
-                      } catch (error) {
-                        // On error, show confirmation modal as fallback
-                        setPendingLanguage(otherLanguage);
-                        setShowConfirmationModal(true);
-                      }
+                      // Always show confirmation modal - it will handle survey vs direct switch
+                      setPendingLanguage(otherLanguage);
+                      setShowConfirmationModal(true);
                     }}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 rounded-lg"
                   >
@@ -831,7 +815,10 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
 
               <div className="pt-2">
                 <p className="text-sm" style={{ color: '#757575' }}>
-                  You will need to complete a quick survey to assess your skills in {pendingLanguage === 'java' ? 'Java' : 'Python'}. This helps us personalize your learning experience.
+                  {surveyCompletedLanguages.includes(pendingLanguage || '')
+                    ? `Switch to ${pendingLanguage === 'java' ? 'Java' : 'Python'} and load your personalized projects.`
+                    : `You will need to complete a quick survey to assess your skills in ${pendingLanguage === 'java' ? 'Java' : 'Python'}. This helps us personalize your learning experience.`
+                  }
                 </p>
               </div>
             </div>
@@ -852,8 +839,8 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                   setShowConfirmationModal(false);
 
                   // Check if student has completed survey for target language
-                  if (surveyCompletedLanguages.includes(pendingLanguage)) {
-                    // Direct switch without survey - use update-language endpoint
+                  if (surveyCompletedLanguages.includes(pendingLanguage || '')) {
+                    // Survey already done - switch language and load/generate projects
                     try {
                       setLoading(true);
                       const token = localStorage.getItem('token');
@@ -863,10 +850,12 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                         { headers: { Authorization: `Bearer ${token}` } }
                       );
 
-                      setCurrentLanguage(pendingLanguage);
+                      setCurrentLanguage(pendingLanguage!);
 
-                      await fetchProjects();
+                      // Use fromSurvey=true so backend will generate projects if none exist
+                      await fetchProjects(true);
                       await fetchCompletedTasks();
+                      await fetchUserLanguage();
                       setLoading(false);
                       setPendingLanguage(undefined);
                     } catch (error) {
@@ -874,7 +863,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(({ onHasUnsavedChanges, 
                       setPendingLanguage(undefined);
                     }
                   } else {
-                    // Show survey modal if not completed
+                    // No survey for this language - show survey modal
                     setSurveyLanguage(pendingLanguage);
                     setShowSurvey(true);
                     setPendingLanguage(undefined);

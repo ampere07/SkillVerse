@@ -137,7 +137,7 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
         availableProjects: languageProjects || [],
         completedThisWeek: completedThisWeek.length,
         weekStartDate: miniProject.weekStartDate,
-        allCompleted: completedThisWeek.length >= 6
+        allCompleted: completedThisWeek.length >= 3
       };
 
       console.log(`[Available-Projects] ===== FINAL RESPONSE (FROM DB) =====`);
@@ -259,7 +259,7 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
       availableProjects: updatedLanguageProjects || [],
       completedThisWeek: completedThisWeek.length,
       weekStartDate: updatedProject.weekStartDate,
-      allCompleted: completedThisWeek.length >= 6
+      allCompleted: completedThisWeek.length >= 3
     });
   } catch (error) {
     console.error('[Available-Projects] Error:', error);
@@ -292,9 +292,9 @@ router.post('/complete-task', authenticateToken, async (req, res) => {
       return taskDate >= weekStart && task.status === 'submitted';
     });
 
-    if (completedThisWeek.length >= 6) {
+    if (completedThisWeek.length >= 3) {
       return res.status(400).json({ 
-        message: 'You have already completed all 6 projects for this week. New projects will be available next Monday.' 
+        message: 'You have already completed all 3 projects for this week. New projects will be available next Monday.' 
       });
     }
 
@@ -358,7 +358,7 @@ router.post('/complete-task', authenticateToken, async (req, res) => {
     res.status(201).json({
       message: 'Task completed successfully',
       completedThisWeek: newCompletedCount,
-      allCompleted: newCompletedCount >= 6,
+      allCompleted: newCompletedCount >= 3,
       xpAwarded: xpResult.awarded ? Math.round(score * 10) : 0,
       newTotalXp: xpResult.newXp,
       newLevel: xpResult.newLevel,
