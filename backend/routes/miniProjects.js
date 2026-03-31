@@ -851,14 +851,20 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
     }
 
     // Award XP based on score (even if not in a classroom)
+    let leveledUp = false;
+    let newLevel = user?.level || 1;
     try {
       const { awardXp } = await import('../services/xpService.js');
-      await awardXp(
+      const xpResult = await awardXp(
         req.user.userId,
         Math.round(gradingResult.score * 10),
         `Mini project submission: ${projectTitle}`,
         'projects'
       );
+      if (xpResult) {
+        leveledUp = xpResult.leveledUp;
+        newLevel = xpResult.newLevel;
+      }
     } catch (xpError) {
       console.error('Error awarding XP for mini-project submission:', xpError);
     }
@@ -867,7 +873,9 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
       message: 'Project submitted and graded successfully',
       status: 'submitted',
       gradingResult,
-      miniProject
+      miniProject,
+      leveledUp,
+      newLevel
     });
   } catch (error) {
     console.error('Submit project error:', error);

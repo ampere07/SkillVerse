@@ -4,8 +4,9 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticateToken } from '../middleware/auth.js';
-import OLLAMA_CONFIG from '../config/ollamaConfig.js';
-import { generateWithRetry } from '../services/ollamaService.js';
+import GEMINI_CONFIG from '../config/geminiConfig.js';
+import { generateWithRetry } from '../services/geminiService.js';
+import jdoodleService from '../services/jdoodleService.js';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -14,12 +15,7 @@ const __dirname = path.dirname(__filename);
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 const LIBS_DIR = path.join(__dirname, '..', 'libs');
 
-const MODEL_NAME = OLLAMA_CONFIG.model;
-const OLLAMA_URL = OLLAMA_CONFIG.url;
-
-console.log('Compiler Route - Ollama Config:');
-console.log('Model:', MODEL_NAME);
-console.log('URL:', OLLAMA_URL);
+const MODEL_NAME = GEMINI_CONFIG.model;
 
 async function ensureDirectories() {
   try {
@@ -81,6 +77,31 @@ router.post('/compile-java', authenticateToken, async (req, res) => {
     return res.status(400).json({ message: 'Code is required' });
   }
 
+  // Check if JDoodle should be used
+  if (process.env.JDOODLE_CLIENT_ID && process.env.JDOODLE_CLIENT_SECRET) {
+    console.log('[JDoodle] Compiling Java code online...');
+    const result = await jdoodleService.execute(code, 'java', input);
+    
+    if (result.success) {
+      return res.json({
+        success: true,
+        output: result.output,
+        error: null,
+        info: {
+          memory: result.memory,
+          cpuTime: result.cpuTime
+        }
+      });
+    } else {
+      return res.json({
+        success: false,
+        output: null,
+        error: result.error
+      });
+    }
+  }
+
+  // Fallback to local execution
   const classNameMatch = code.match(/public\s+class\s+(\w+)/);
   if (!classNameMatch) {
     return res.status(400).json({
@@ -167,6 +188,81 @@ router.post('/compile-java', authenticateToken, async (req, res) => {
   }
 });
 
+router.post('/compile-python', authenticateToken, async (req, res) => {
+  const { code, input } = req.body;
+
+  if (!code) {
+    return res.status(400).json({ message: 'Code is required' });
+  }
+
+  // Check if JDoodle should be used
+  if (process.env.JDOODLE_CLIENT_ID && process.env.JDOODLE_CLIENT_SECRET) {
+    console.log('[JDoodle] Executing Python code online...');
+    const result = await jdoodleService.execute(code, 'python3', input);
+    
+    if (result.success) {
+      return res.json({
+        success: true,
+        output: result.output,
+        error: null,
+        info: {
+          memory: result.memory,
+          cpuTime: result.cpuTime
+        }
+      });
+    } else {
+      return res.json({
+        success: false,
+        output: null,
+        error: result.error
+      });
+    }
+  }
+
+  // Fallback to local python (simplified version of socket logic)
+  try {
+    const timestamp = Date.now();
+    const userDir = path.join(TEMP_DIR, `user_${req.user.userId}_${timestamp}`);
+    const pythonFilePath = path.join(userDir, 'main.py');
+
+    await fs.mkdir(userDir, { recursive: true });
+    await fs.writeFile(pythonFilePath, code);
+
+    const output = await new Promise((resolve, reject) => {
+      const childProcess = exec('python main.py', {
+        timeout: 10000,
+        cwd: userDir,
+        maxBuffer: 1024 * 1024
+      }, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+        } else {
+          resolve(stdout);
+        }
+      });
+
+      if (input && input.trim()) {
+        childProcess.stdin.write(input);
+        childProcess.stdin.end();
+      }
+    });
+
+    await fs.rm(userDir, { recursive: true, force: true });
+
+    res.json({
+      success: true,
+      output: output || 'Program executed successfully with no output',
+      error: null
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      output: null,
+      error: error.message
+    });
+  }
+});
+
 router.get('/libraries', authenticateToken, async (req, res) => {
   try {
     const files = await fs.readdir(LIBS_DIR);
@@ -238,8 +334,7 @@ Write one paragraph that:
 - Use simple, easy words
 
 IMPORTANT: Write ONLY one paragraph. Don't show any analysis, lists, or code. Use simple English. No complicated words.`;
-
-    console.log('[AI Hint] Using centralized Ollama service');
+    console.log('[AI Hint] Using centralized Gemini service');
 
     const response = await generateWithRetry(prompt, {
       temperature: 0.7,

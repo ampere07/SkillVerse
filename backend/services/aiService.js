@@ -1,25 +1,12 @@
-import * as ollamaService from './ollamaService.js';
+import * as geminiService from './geminiService.js';
 
-const AI_PROVIDER = process.env.AI_PROVIDER;
+console.log(`AI Service Provider: Gemini AI`);
 
-console.log(`AI Service Provider: ${AI_PROVIDER}`);
+export const validateLearningInputs = geminiService.validateLearningInputs;
+export const analyzeStudentSkills = geminiService.analyzeStudentSkills;
 
-let activeService;
-
-if (AI_PROVIDER === 'ollama') {
-  activeService = ollamaService;
-  console.log('Using Ollama (Local AI)');
-} else {
-  console.log('Error: Unsupported AI provider configured.');
-}
-
-export const validateLearningInputs = activeService.validateLearningInputs;
-export const analyzeStudentSkills = activeService.analyzeStudentSkills;
-
-export const getActiveProvider = () => AI_PROVIDER;
+export const getActiveProvider = () => 'gemini';
 
 export const checkConnection = async () => {
-  if (AI_PROVIDER === 'ollama') {
-    return await ollamaService.checkOllamaConnection();
-  }
+  return await geminiService.checkGeminiConnection();
 };

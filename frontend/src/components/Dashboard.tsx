@@ -10,7 +10,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { connectSocket, disconnectSocket, getSocket } from '../utils/socket';
+import LevelUpModal from './LevelUpModal';
 
 const getSafeName = (user: any) => {
   if (!user?.name || user.name.toLowerCase().includes('undefined')) {
@@ -133,67 +134,48 @@ export default function Dashboard() {
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [selectedProjectTitle, setSelectedProjectTitle] = useState<string | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [leveledLevel, setLeveledLevel] = useState(1);
+
+  useEffect(() => {
+    const handleLevelUp = (event: any) => {
+      const level = event.detail?.level;
+      if (level) {
+        setLeveledLevel(level);
+        setShowLevelUp(true);
+      }
+    };
+
+    window.addEventListener('level-up', handleLevelUp);
+    return () => window.removeEventListener('level-up', handleLevelUp);
+  }, []);
 
   // Initialize socket connection for real-time updates
+  // Initialize socket connection for real-time updates
   useEffect(() => {
-    if (user?.role === 'student') {
-      const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
-      const socket = io(`${baseUrl}/dashboard`, {
-        transports: ['websocket', 'polling']
-      });
+    const token = localStorage.getItem('token');
+    connectSocket(token);
+    const socket = getSocket();
 
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        console.log('Dashboard socket connected');
-        const token = localStorage.getItem('token');
-        if (token) {
-          socket.emit('authenticate', token);
-        }
-      });
-
-      socket.on('authenticated', () => {
-        console.log('Dashboard socket authenticated');
-      });
-
-      socket.on('mini-project-update', (data) => {
-        console.log('Mini project update received:', data);
+    const refreshStats = () => {
+      if (user?.role === 'student') {
         fetchDashboardStats();
-      });
+      }
+    };
 
-      socket.on('assignment-update', (data) => {
-        console.log('Assignment update received:', data);
-        fetchDashboardStats();
-      });
+    socket.on('mini-project-update', refreshStats);
+    socket.on('assignment-update', refreshStats);
+    socket.on('course-update', refreshStats);
+    socket.on('activity-update', refreshStats);
+    socket.on('dashboard-update', refreshStats);
 
-      socket.on('course-update', (data) => {
-        console.log('Course update received:', data);
-        fetchDashboardStats();
-      });
-
-      socket.on('activity-update', (data) => {
-        console.log('Activity update received:', data);
-        fetchDashboardStats();
-      });
-
-      socket.on('dashboard-update', (data) => {
-        console.log('Dashboard update received:', data);
-        fetchDashboardStats();
-      });
-
-      socket.on('error', (error) => {
-        console.error('Dashboard socket error:', error);
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Dashboard socket disconnected');
-      });
-
-      return () => {
-        socket.disconnect();
-      };
-    }
+    return () => {
+      socket.off('mini-project-update', refreshStats);
+      socket.off('assignment-update', refreshStats);
+      socket.off('course-update', refreshStats);
+      socket.off('activity-update', refreshStats);
+      socket.off('dashboard-update', refreshStats);
+    };
   }, [user]);
 
   useEffect(() => {
@@ -448,11 +430,6 @@ export default function Dashboard() {
     setPendingNavigation(null);
   };
 
-  const activeIndex = filteredNavigation.findIndex(item => {
-    if (activeNav === item.href) return true;
-    if (activeNav.startsWith(item.href) && item.href !== '/dashboard') return true;
-    return false;
-  });
 
   return (
     <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
@@ -479,15 +456,6 @@ export default function Dashboard() {
 
           {/* Navigation */}
           <nav className="relative flex-1 flex flex-col gap-1 overflow-y-auto">
-            {/* Sliding selection pill */}
-            <div
-              className="absolute left-0 right-0 h-[46px] bg-[#F1F8F1] border-l-4 border-[#1B5E20] transition-all duration-300 ease-in-out pointer-events-none z-0"
-              style={{
-                transform: `translateY(${activeIndex * 50}px)`,
-                top: 0,
-                opacity: activeIndex === -1 ? 0 : 1
-              }}
-            />
 
             {filteredNavigation.map((item) => {
               const isActive = activeNav === item.href || (activeNav.startsWith(item.href) && item.href !== '/dashboard');
@@ -500,8 +468,8 @@ export default function Dashboard() {
                   className={`
                     relative z-10 w-full h-[46px] flex items-center gap-3 px-6 transition-all
                     ${isActive
-                      ? 'text-[#1B5E20]'
-                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent'
+                      ? 'text-[#1B5E20] bg-[#F1F8F1] border-l-4 border-[#1B5E20]'
+                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent border-l-4 border-transparent'
                     }
                     ${isGameActive ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}
                   `}
@@ -514,7 +482,7 @@ export default function Dashboard() {
                   <img
                     src={item.icon}
                     alt={item.label}
-                    className={`w-6 h-6 object-contain transition-transform duration-300 ${isActive ? 'scale-[1.8]' : ''}`}
+                    className={`w-6 h-6 object-contain ${isActive ? 'scale-[1.8]' : ''}`}
                   />
                 </button>
               );
@@ -660,6 +628,12 @@ export default function Dashboard() {
         onSaveAndLeave={handleSaveAndNavigate}
         isSaving={false}
       />
+      {showLevelUp && (
+        <LevelUpModal
+          level={leveledLevel}
+          onClose={() => setShowLevelUp(false)}
+        />
+      )}
     </div>
   );
 }

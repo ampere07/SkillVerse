@@ -162,6 +162,8 @@ const MiniProjectDetails = forwardRef<any, MiniProjectDetailsProps>(({ onHasUnsa
           }}
           onHasUnsavedChanges={onHasUnsavedChanges}
           onSubmitSuccess={() => {
+            setStatus('submitted');
+            setShowCompiler(false);
             fetchProjectDetails();
             window.dispatchEvent(new CustomEvent('project-submitted'));
           }}

@@ -49,6 +49,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const [isCompiling, setIsCompiling] = useState(false);
     const [score, setScore] = useState(0);
     const [feedback, setFeedback] = useState<string | null>(null);
+    const [isLastFixSuccessful, setIsLastFixSuccessful] = useState<boolean>(false);
     const [showHint, setShowHint] = useState(false);
     const [aiHint, setAiHint] = useState<string | null>(null);
     const [isRequestingHint, setIsRequestingHint] = useState(false);
@@ -78,6 +79,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
             const data = await response.json();
             if (data.success) {
+                console.log('[BugHunt] Received leaderboard:', data.leaderboard);
                 setLeaderboard(data.leaderboard);
             }
         } catch (error) {
@@ -132,8 +134,9 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 setCurrentIndex(0);
                 const firstCode = data.challenges[0].buggyCode;
                 console.log('[BugHunt] First challenge raw code:', firstCode);
-                // Final safety check: if it's an object, stringify it
-                const finalCode = typeof firstCode === 'string' ? firstCode : JSON.stringify(firstCode, null, 2);
+                const finalCode = typeof firstCode === 'string'
+                    ? firstCode.replace(/\\n/g, '\n')
+                    : JSON.stringify(firstCode, null, 2);
                 setCode(finalCode);
                 setGameState('playing');
                 setTimer(0);
@@ -182,6 +185,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
         setIsCompiling(true);
         setFeedback(null);
+        setIsLastFixSuccessful(false);
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/validate`, {
                 method: 'POST',
@@ -200,15 +204,24 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
             const data = await response.json();
 
             if (data.success && data.fixed) {
+                // Check for Level Up
+                if (data.leveledUp) {
+                    window.dispatchEvent(new CustomEvent('level-up', { 
+                        detail: { level: data.newLevel } 
+                    }));
+                }
+                
                 setScore(data.totalScore || score);
+                setIsLastFixSuccessful(true);
                 setFeedback(data.feedback || "Bug Caught! Excellent work.");
 
                 setTimeout(() => {
                     if (currentIndex < challenges.length - 1) {
                         const nextIndex = currentIndex + 1;
                         setCurrentIndex(nextIndex);
-                        setCode(challenges[nextIndex].buggyCode);
+                        setCode(challenges[nextIndex].buggyCode.replace(/\\n/g, '\n'));
                         setFeedback(null);
+                        setIsLastFixSuccessful(false);
                         setShowHint(false);
                         setAiHint(null);
                     } else {
@@ -263,7 +276,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
         if (!sessionId) return;
         try {
-            await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/surrender`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/bug-hunt/surrender`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -275,6 +288,15 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                     totalScore: score
                 })
             });
+            const data = await response.json();
+
+            // Check for Level Up
+            if (data.leveledUp) {
+                window.dispatchEvent(new CustomEvent('level-up', { 
+                    detail: { level: data.newLevel } 
+                }));
+            }
+
             setIsSurrendered(true);
             setGameState('completed');
         } catch (error) {
@@ -516,7 +538,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                             </div>
                         </div>
                         {feedback && (
-                            <div className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${feedback.includes('Caught') ? 'bg-[#C8E6C9] text-[#2E7D32]' : 'bg-[#FFCDD2] text-[#D32F2F]'} animate-in fade-in slide-in-from-top-2`}>
+                            <div className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${isLastFixSuccessful ? 'bg-[#C8E6C9] text-[#2E7D32]' : 'bg-[#FFCDD2] text-[#D32F2F]'} animate-in fade-in slide-in-from-top-2`}>
                                 {feedback}
                             </div>
                         )}

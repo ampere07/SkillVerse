@@ -690,7 +690,7 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                     value={formData.primaryLanguage}
                     onChange={(e) => handleLanguageSelect(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm"
-                    style={{ focusRingColor: '#1B5E20' }}
+                    style={{}}
                   >
                     <option value="">Select a language</option>
                     <option value="java">Java</option>
@@ -755,21 +755,24 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             border-radius: 9999px;
                           }
                         `}</style>
-                        <div className="relative mt-6">
-                          <div className="absolute" style={{ left: '0%', transform: 'translateX(0%)', top: '0' }}>
-                            <span className={`text-xs ${formData.javaExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>No experience</span>
+                        <div className="flex justify-between mt-6 px-1">
+                          <div className="flex-1 flex justify-start">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                              <span className="sm:hidden">No exp</span>
+                              <span className="hidden sm:inline">No experience</span>
+                            </span>
                           </div>
-                          <div className="absolute" style={{ left: '25%', transform: 'translateX(-50%)', top: '0' }}>
-                            <span className={`text-xs ${formData.javaExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
+                          <div className="flex-1 flex justify-center">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
                           </div>
-                          <div className="absolute" style={{ left: '50%', transform: 'translateX(-50%)', top: '0' }}>
-                            <span className={`text-xs ${formData.javaExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
+                          <div className="flex-1 flex justify-center">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
                           </div>
-                          <div className="absolute" style={{ left: '75%', transform: 'translateX(-50%)', top: '0' }}>
-                            <span className={`text-xs ${formData.javaExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
+                          <div className="flex-1 flex justify-center text-center">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
                           </div>
-                          <div className="absolute" style={{ left: '100%', transform: 'translateX(-100%)', top: '0' }}>
-                            <span className={`text-xs ${formData.javaExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>
+                          <div className="flex-1 flex justify-end">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>
                           </div>
                         </div>
                       </div>
@@ -834,21 +837,24 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                             border-radius: 9999px;
                           }
                         `}</style>
-                        <div className="relative mt-6">
-                          <div className="absolute" style={{ left: '0%', transform: 'translateX(0%)', top: '0' }}>
-                            <span className={`text-xs ${formData.pythonExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>No experience</span>
+                        <div className="flex justify-between mt-6 px-1">
+                          <div className="flex-1 flex justify-start">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                              <span className="sm:hidden">No exp</span>
+                              <span className="hidden sm:inline">No experience</span>
+                            </span>
                           </div>
-                          <div className="absolute" style={{ left: '25%', transform: 'translateX(-50%)', top: '0' }}>
-                            <span className={`text-xs ${formData.pythonExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
+                          <div className="flex-1 flex justify-center">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
                           </div>
-                          <div className="absolute" style={{ left: '50%', transform: 'translateX(-50%)', top: '0' }}>
-                            <span className={`text-xs ${formData.pythonExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
+                          <div className="flex-1 flex justify-center">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
                           </div>
-                          <div className="absolute" style={{ left: '75%', transform: 'translateX(-50%)', top: '0' }}>
-                            <span className={`text-xs ${formData.pythonExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
+                          <div className="flex-1 flex justify-center text-center">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
                           </div>
-                          <div className="absolute" style={{ left: '100%', transform: 'translateX(-100%)', top: '0' }}>
-                            <span className={`text-xs ${formData.pythonExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>
+                          <div className="flex-1 flex justify-end">
+                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>
                           </div>
                         </div>
                       </div>

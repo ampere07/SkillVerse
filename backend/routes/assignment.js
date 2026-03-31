@@ -4,6 +4,8 @@ import Classroom from '../models/Classroom.js';
 import Progress from '../models/Progress.js';
 import { authenticateToken, authorizeRole } from '../middleware/auth.js';
 import axios from 'axios';
+import { getIO } from '../utils/socket.js';
+import { emitClassroomAssignmentUpdate } from './dashboardSocket.js';
 
 const router = express.Router();
 
@@ -255,6 +257,18 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
 
     console.log(`New assignment created: ${assignment.title} in ${classroom.name} by ${req.user.email}`);
 
+    // Emit real-time update
+    try {
+        const io = getIO();
+        emitClassroomAssignmentUpdate(io, classroomId, {
+            type: 'created',
+            assignmentId: assignment._id,
+            title: assignment.title
+        });
+    } catch (ioError) {
+        console.error('Socket emission error:', ioError);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Assignment created successfully',
@@ -316,6 +330,18 @@ router.put('/:id', authenticateToken, authorizeRole('teacher'), async (req, res)
 
     console.log(`Assignment updated: ${assignment.title} by ${req.user.email}`);
 
+    // Emit real-time update
+    try {
+        const io = getIO();
+        emitClassroomAssignmentUpdate(io, assignment.classroom._id || assignment.classroom, {
+            type: 'updated',
+            assignmentId: assignment._id,
+            title: assignment.title
+        });
+    } catch (ioError) {
+        console.error('Socket emission error:', ioError);
+    }
+
     res.json({
       success: true,
       message: 'Assignment updated successfully',
@@ -354,6 +380,18 @@ router.delete('/:id', authenticateToken, authorizeRole('teacher'), async (req, r
     await assignment.deleteOne();
 
     console.log(`Assignment deleted: ${assignment.title} by ${req.user.email}`);
+
+    // Emit real-time update
+    try {
+        const io = getIO();
+        emitClassroomAssignmentUpdate(io, assignment.classroom._id || assignment.classroom, {
+            type: 'deleted',
+            assignmentId: assignment._id,
+            title: assignment.title
+        });
+    } catch (ioError) {
+        console.error('Socket emission error:', ioError);
+    }
 
     res.json({
       success: true,

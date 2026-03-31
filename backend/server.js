@@ -17,7 +17,6 @@ import activityRoutes from './routes/activity.js';
 import moduleRoutes from './routes/module.js';
 import uploadRoutes from './routes/upload.js';
 import miniProjectsRoutes from './routes/miniProjects.js';
-import ollamaTestRoutes from './routes/ollamaTest.js';
 import demoRoutes from './routes/demo.js';
 import progressRoutes from './routes/progress.js';
 import healthRoutes from './routes/health.js';
@@ -26,6 +25,8 @@ import { setupCompilerSocket } from './routes/compilerSocket.js';
 import { setupPythonCompilerSocket } from './routes/pythonCompilerSocket.js';
 import { setupDashboardSocket } from './routes/dashboardSocket.js';
 import { initializeCronJobs } from './services/cronService.js';
+
+import { setIO } from './utils/socket.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -43,6 +44,8 @@ const io = new Server(httpServer, {
     methods: ['GET', 'POST']
   }
 });
+
+setIO(io);
 
 const PORT = process.env.PORT || 5000;
 
@@ -62,7 +65,6 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/mini-projects', miniProjectsRoutes);
-app.use('/api/ollama', ollamaTestRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/progress', progressRoutes);
 app.use('/api/health', healthRoutes);
@@ -89,7 +91,7 @@ app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({
     message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    error: err.message || 'Unknown error'
   });
 });
 

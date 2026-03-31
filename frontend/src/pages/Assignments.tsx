@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { FileText, Clock, AlertCircle, CheckCircle, Calendar, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { classroomAPI } from '../utils/api';
 import StudentClassroomDetail from './StudentClassroomDetail';
 
@@ -35,6 +35,8 @@ interface Classroom {
 
 type TabType = 'todo' | 'dueToday' | 'missing';
 
+import { getSocket } from '../utils/socket';
+
 export default function Assignments() {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -48,6 +50,20 @@ export default function Assignments() {
 
   useEffect(() => {
     fetchData();
+
+    // Listen for real-time updates
+    const socket = getSocket();
+    const handleUpdate = () => {
+      fetchData();
+    };
+
+    socket.on('assignment-update', handleUpdate);
+    socket.on('classroom-update', handleUpdate);
+
+    return () => {
+      socket.off('assignment-update', handleUpdate);
+      socket.off('classroom-update', handleUpdate);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -215,7 +231,7 @@ export default function Assignments() {
   }
 
   return (
-    <div className="p-6" style={{ backgroundColor: '#FAFAFA', minHeight: '100vh' }}>
+    <div className="flex flex-col min-h-screen w-full bg-white">
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-6">
           <p className="text-sm text-red-700">{error}</p>
@@ -234,12 +250,12 @@ export default function Assignments() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="border-b border-gray-200">
-              <nav className="flex">
+          <div className="bg-white overflow-hidden flex-1">
+            <div className="border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between">
+              <nav className="flex overflow-x-auto no-scrollbar scrollbar-hide">
                 <button
                   onClick={() => setActiveTab('todo')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'todo'
+                  className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'todo'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
                     }`}
@@ -252,7 +268,7 @@ export default function Assignments() {
                 </button>
                 <button
                   onClick={() => setActiveTab('dueToday')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'dueToday'
+                  className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'dueToday'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
                     }`}
@@ -265,7 +281,7 @@ export default function Assignments() {
                 </button>
                 <button
                   onClick={() => setActiveTab('missing')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'missing'
+                  className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'missing'
                       ? 'text-white'
                       : 'border-transparent hover:border-gray-300'
                     }`}
@@ -277,17 +293,16 @@ export default function Assignments() {
                   Missing
                 </button>
               </nav>
-            </div>
-
-            <div className="p-6">
-              <div className="mb-6">
+              
+              <div className="flex-shrink-0 p-3 sm:p-0 sm:pr-6">
                 <select
                   value={selectedClassroom}
                   onChange={(e) => setSelectedClassroom(e.target.value)}
-                  className="w-full max-w-md px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                  className="px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all hover:border-[#1B5E20]"
                   style={{
-                    borderColor: '#1B5E20',
-                    color: '#212121'
+                    borderColor: '#E0E0E0',
+                    color: '#212121',
+                    minWidth: '200px'
                   }}
                 >
                   <option value="all">All classes</option>
@@ -298,6 +313,9 @@ export default function Assignments() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="p-6">
 
               <AssignmentList
                 assignments={getCurrentTabAssignments()}

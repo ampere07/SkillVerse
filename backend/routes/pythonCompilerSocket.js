@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import Progress from '../models/Progress.js';
+import jdoodleService from '../services/jdoodleService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,8 +70,7 @@ function parsePythonErrors(stderr) {
 
 export function setupPythonCompilerSocket(io) {
   io.on('connection', (socket) => {
-
-    socket.on('compile-and-run-python', async (data) => {
+    const handlePythonCompile = async (data) => {
       const { code, sessionId, token, language } = data;
 
       // Authenticate user and get userId
@@ -79,6 +79,8 @@ export function setupPythonCompilerSocket(io) {
         if (token) {
           const decoded = jwt.verify(token, process.env.JWT_SECRET);
           userId = decoded.userId;
+        } else if (data.userId) {
+          userId = data.userId;
         }
       } catch (error) {
         console.error('Authentication error in Python compiler socket:', error);
@@ -93,9 +95,10 @@ export function setupPythonCompilerSocket(io) {
 
       try {
         // Track code execution in progress
-        if (userId && language === 'python') {
+        if (userId && (language === 'python' || !language)) {
           try {
             // Find all progress records for this student
+            const Progress = (await import('../models/Progress.js')).default;
             const progressRecords = await Progress.find({ student: userId });
             
             // Update each progress record
@@ -130,6 +133,34 @@ export function setupPythonCompilerSocket(io) {
           } catch (progressError) {
             console.error('Error updating progress:', progressError);
           }
+        }
+
+        console.log(`[Python Compiler] Starting execution for session ${sessionId}.`);
+        
+        const jdClientId = process.env.JDOODLE_CLIENT_ID;
+        const jdClientSecret = process.env.JDOODLE_CLIENT_SECRET;
+
+        // Check if JDoodle should be used
+        if (jdClientId && jdClientSecret && jdClientId.trim() !== '' && jdClientSecret.trim() !== '') {
+          socket.emit('output', { type: 'info', data: 'Running online with JDoodle Python...\n' });
+          
+          try {
+            const result = await jdoodleService.execute(code, 'python3', data.input || '');
+            if (result.success) {
+              socket.emit('output', { type: 'stdout', data: result.output });
+              socket.emit('output', { 
+                type: 'info', 
+                data: `\nExecution complete (Memory: ${result.memory}KB, CPU: ${result.cpuTime}s)\n` 
+              });
+            } else {
+              socket.emit('output', { type: 'error', data: `JDoodle Error: ${result.error}` });
+            }
+          } catch (error) {
+            socket.emit('output', { type: 'error', data: `Error calling JDoodle: ${error.message}` });
+          }
+          
+          socket.emit('execution-complete');
+          return;
         }
 
         const timestamp = Date.now();
@@ -204,7 +235,10 @@ export function setupPythonCompilerSocket(io) {
         });
         socket.emit('execution-complete');
       }
-    });
+    };
+
+    socket.on('compile-and-run-python', handlePythonCompile);
+    socket.on('run-python', handlePythonCompile);
 
     socket.on('stdin-input-python', (data) => {
       const { sessionId, input } = data;

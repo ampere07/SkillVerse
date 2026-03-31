@@ -52,6 +52,9 @@ router.get('/generate-session', authenticateToken, async (req, res) => {
 router.post('/validate', authenticateToken, async (req, res) => {
     try {
         const { sessionId, challengeIndex, code, timeTaken } = req.body;
+        let leveledUp = false;
+        let newLevel = 1;
+        let user = null;
 
         // 1. Fetch the session
         const session = await BugHuntSession.findById(sessionId);
@@ -97,14 +100,16 @@ router.post('/validate', authenticateToken, async (req, res) => {
                 session.completedAt = new Date();
 
                 // Reward XP to user
-                const user = await User.findById(req.user.userId);
+                user = await User.findById(req.user.userId);
                 if (user) {
-                    const xpReward = Math.floor(session.totalScore / 5); // 1 XP for every 5 points
-                    user.xp = (user.xp || 0) + xpReward;
-
-                    // Simple level up logic (every 500 XP)
-                    user.level = Math.floor(user.xp / 500) + 1;
-                    await user.save();
+                    const xpReward = Math.floor(session.totalScore / 5);
+                    const totalXp = (user.xp || 0) + xpReward;
+                    newLevel = Math.floor(totalXp / 500) + 1;
+                    leveledUp = newLevel > user.level;
+                    await User.findByIdAndUpdate(req.user.userId, {
+                        $inc: { xp: xpReward },
+                        $set: { level: newLevel }
+                    });
                 }
 
                 // Update BugHuntLeaderboard
@@ -140,7 +145,9 @@ router.post('/validate', authenticateToken, async (req, res) => {
             success: true,
             ...result,
             sessionStatus: session.status,
-            totalScore: session.totalScore
+            totalScore: session.totalScore,
+            leveledUp: leveledUp,
+            newLevel: newLevel || (user?.level || 1)
         });
     } catch (error) {
         console.error('[BugHunt Route] Validation error:', error);
@@ -211,11 +218,18 @@ router.post('/surrender', authenticateToken, async (req, res) => {
 
         // Give partial XP even for surrender
         const user = await User.findById(req.user.userId);
+        let leveledUp = false;
+        let newLevel = user?.level || 1;
+        const rewardScore = totalScore || session.totalScore || 0;
         if (user) {
-            const xpReward = Math.floor((totalScore || 0) / 10); // 1 XP for every 10 points on surrender
-            user.xp = (user.xp || 0) + xpReward;
-            user.level = Math.floor(user.xp / 500) + 1;
-            await user.save();
+            const xpReward = Math.floor((rewardScore || 0) / 10);
+            const totalXp = (user.xp || 0) + xpReward;
+            newLevel = Math.floor(totalXp / 500) + 1;
+            leveledUp = newLevel > (user.level || 1);
+            await User.findByIdAndUpdate(req.user.userId, {
+                $inc: { xp: xpReward },
+                $set: { level: newLevel }
+            });
         }
 
         await session.save();
@@ -225,27 +239,38 @@ router.post('/surrender', authenticateToken, async (req, res) => {
         const finalScore = totalScore || session.totalScore || 0;
         const finalTime = totalTime || session.totalTime || 0;
 
-        await BugHuntLeaderboard.findOneAndUpdate(
+        console.log(`[BugHunt Surrender] Updating leaderboard for user ${req.user.userId}...`);
+        // Ensure all values are valid numbers to prevent $inc failures
+        const incValues = {
+            totalScore: Number(finalScore) || 0,
+            totalTime: Number(finalTime) || 0,
+            sessionsSurrendered: 1,
+            totalBugsFixed: Number(bugsFixed) || 0,
+            totalHintsUsed: Number(session?.hintsUsed) || 0
+        };
+
+        const updateResult = await BugHuntLeaderboard.findOneAndUpdate(
             { userId: req.user.userId },
             {
-                $inc: {
-                    totalScore: finalScore,
-                    totalTime: finalTime,
-                    sessionsSurrendered: 1,
-                    totalBugsFixed: bugsFixed,
-                    totalHintsUsed: session.hintsUsed || 0
-                },
+                $inc: incValues,
                 $max: {
-                    bestScore: finalScore
+                    bestScore: Number(finalScore) || 0
                 },
                 $set: {
                     lastPlayedAt: new Date()
                 }
             },
-            { upsert: true, new: true }
+            { upsert: true, new: true, setDefaultsOnInsert: true }
         );
+        console.log(`[BugHunt Surrender] Leaderboard updated for ${req.user.userId}. New Score: ${updateResult?.totalScore}`);
 
-        res.json({ success: true, message: 'Mission surrendered. Intel recorded.' });
+        res.json({ 
+            success: true, 
+            message: 'Mission surrendered. Intel recorded.',
+            leveledUp,
+            newLevel,
+            totalScore: finalScore
+        });
     } catch (error) {
         console.error('[BugHunt Surrender Route] Error:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -261,16 +286,27 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
             .populate('userId', 'name firstName lastName')
             .lean();
 
+        console.log(`[Leaderboard] Found ${leaderboard.length} entries`);
+
         // Format the response to match what the frontend expects
-        const formattedLeaderboard = leaderboard.map(entry => ({
-            _id: entry.userId?._id,
-            name: entry.userId?.name || `${entry.userId?.firstName || ''} ${entry.userId?.lastName || ''}`.trim(),
-            totalScore: entry.totalScore,
-            sessionsCompleted: entry.sessionsCompleted,
-            sessionsSurrendered: entry.sessionsSurrendered,
-            totalBugsFixed: entry.totalBugsFixed,
-            bestScore: entry.bestScore
-        }));
+        const formattedLeaderboard = leaderboard
+            .filter(entry => entry.userId) // Ensure user exists
+            .map(entry => {
+                const user = entry.userId;
+                const name = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Anonymous Master';
+                
+                return {
+                    _id: user._id,
+                    name: name,
+                    totalScore: entry.totalScore || 0,
+                    sessionsCompleted: entry.sessionsCompleted || 0,
+                    sessionsSurrendered: entry.sessionsSurrendered || 0,
+                    totalBugsFixed: entry.totalBugsFixed || 0,
+                    bestScore: entry.bestScore || 0
+                };
+            });
+
+        console.log(`[Leaderboard] Processed ${formattedLeaderboard.length} valid entries`);
 
         res.json({ success: true, leaderboard: formattedLeaderboard });
     } catch (error) {

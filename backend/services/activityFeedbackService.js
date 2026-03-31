@@ -1,13 +1,13 @@
-import { generateWithRetry } from './ollamaService.js';
-import OLLAMA_CONFIG from '../config/ollamaConfig.js';
+import { generateWithRetry } from './geminiService.js';
+import GEMINI_CONFIG from '../config/geminiConfig.js';
 
-console.log(`Activity Feedback Service using centralized Ollama service`);
+console.log(`Activity Feedback Service using centralized Gemini service`);
 
 export const generateActivityFeedback = async (activityDetails, submittedCode) => {
   try {
     console.log(`[Activity Feedback] Analyzing activity: ${activityDetails.title}`);
     console.log(`[Activity Feedback] Code length: ${submittedCode.length} characters`);
-    console.log(`[Activity Feedback] Model: ${OLLAMA_CONFIG.model}`);
+    console.log(`[Activity Feedback] Model: ${GEMINI_CONFIG.model}`);
 
     const prompt = constructFeedbackPrompt(activityDetails, submittedCode);
 

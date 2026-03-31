@@ -154,7 +154,7 @@ export default function Register({ onToggle }: RegisterProps) {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
+    <div className="h-screen flex overflow-hidden lg:overflow-visible" style={{ background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 40%, #e5e7eb 100%)' }}>
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden items-center justify-center flex-shrink-0">
 
@@ -183,8 +183,8 @@ export default function Register({ onToggle }: RegisterProps) {
       </div>
 
       {/* Right Panel - Register Form */}
-      <div className="w-full lg:w-7/12 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-lg px-6 sm:px-8 py-8">
+      <div className="w-full lg:w-7/12 flex flex-col overflow-y-auto p-4 sm:p-8 h-full">
+        <div className="w-full max-w-lg px-6 sm:px-8 py-8 my-auto mx-auto">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-6">
             <div className="flex justify-center mb-3">
@@ -232,8 +232,8 @@ export default function Register({ onToggle }: RegisterProps) {
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Full Name
                 </label>
-                <div className="flex flex-col sm:grid sm:grid-cols-12 gap-2">
-                  <div className="sm:col-span-5 relative group">
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-9 sm:col-span-5 relative group">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors duration-200" />
                     <input
                       id="register-firstName"
@@ -248,7 +248,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       placeholder="First Name"
                     />
                   </div>
-                  <div className="sm:col-span-2">
+                  <div className="col-span-3 sm:col-span-2">
                     <input
                       id="register-middleInitial"
                       type="text"
@@ -262,7 +262,7 @@ export default function Register({ onToggle }: RegisterProps) {
                       placeholder="M.I."
                     />
                   </div>
-                  <div className="sm:col-span-5">
+                  <div className="col-span-12 sm:col-span-5">
                     <input
                       id="register-lastName"
                       type="text"

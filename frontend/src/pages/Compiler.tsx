@@ -1161,10 +1161,17 @@ const Compiler = forwardRef<any, CompilerProps>(({ onMenuClick, projectDetails, 
 
       const data = await response.json();
 
-      if (response.ok) {
+        if (response.ok) {
         setGradingResult(data.gradingResult);
         setShowGradingModal(true);
         setSaveMessage('');
+
+        // Check for Level Up
+        if (data.leveledUp) {
+          window.dispatchEvent(new CustomEvent('level-up', { 
+            detail: { level: data.newLevel } 
+          }));
+        }
 
         if (onSubmitSuccess) {
           onSubmitSuccess();

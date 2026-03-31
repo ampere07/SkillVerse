@@ -59,6 +59,8 @@ interface AssignmentDetailProps {
   onBack: () => void;
 }
 
+import { getSocket } from '../utils/socket';
+
 export default function AssignmentDetail({ assignmentId, onBack }: AssignmentDetailProps) {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,20 @@ export default function AssignmentDetail({ assignmentId, onBack }: AssignmentDet
 
   useEffect(() => {
     fetchAssignmentData();
+
+    // Listen for real-time updates
+    const socket = getSocket();
+    const handleUpdate = (data: any) => {
+      if (data?.assignmentId === assignmentId) {
+        fetchAssignmentData();
+      }
+    };
+
+    socket.on('assignment-update', handleUpdate);
+
+    return () => {
+      socket.off('assignment-update', handleUpdate);
+    };
   }, [assignmentId]);
 
   const fetchAssignmentData = async () => {

@@ -60,14 +60,13 @@ router.post('/add-xp', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    user.xp += amount;
+    user.xp += Number(amount);
 
-    // Check for level up
-    let leveledUp = false;
-    while (user.xp >= 500) {
-      user.xp -= 500;
-      user.level += 1;
-      leveledUp = true;
+    const newLevel = Math.floor(user.xp / 500) + 1;
+    const leveledUp = newLevel > user.level;
+    
+    if (leveledUp) {
+      user.level = newLevel;
     }
 
     await user.save();
@@ -883,7 +882,7 @@ router.post('/skill-gap-analysis/:classroomId', authenticateToken, async (req, r
 router.post('/skill-weakness-analysis', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { generateWithRetry } = await import('../services/ollamaService.js');
+    const { generateWithRetry } = await import('../services/geminiService.js');
     const MiniProject = (await import('../models/MiniProject.js')).default;
 
     // Gather all progress records

@@ -13,6 +13,7 @@
     "cron-standalone": "node scripts/studentProgressCronStandalone.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",
@@ -25,7 +26,6 @@
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
     "node-cron": "^3.0.3",
-    "ollama": "^0.6.3",
     "pdfjs-dist": "^5.4.394",
     "react-pdf": "^10.2.0",
     "resend": "^6.9.3",
