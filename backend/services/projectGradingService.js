@@ -1,5 +1,5 @@
-import { generateWithRetry } from './geminiService.js';
-import GEMINI_CONFIG from '../config/geminiConfig.js';
+import { generateWithRetry } from "./geminiService.js";
+import GEMINI_CONFIG from "../config/geminiConfig.js";
 
 console.log(`Project Grading Service using centralized Gemini service`);
 
@@ -12,18 +12,21 @@ export const gradeProject = async (projectDetails, submittedCode) => {
 
     const prompt = constructGradingPrompt(projectDetails, submittedCode);
 
-    console.log('[Grading] Sending code analysis request to AI...');
+    console.log("[Grading] Sending code analysis request to AI...");
 
     const response = await generateWithRetry(prompt, {
       temperature: 0.3,
       num_predict: 2000,
-      num_thread: 10
+      num_thread: 10,
     });
 
-    console.log('[Grading] AI analysis completed');
+    console.log("[Grading] AI analysis completed");
     const gradingText = response.message.content;
-    console.log('[Grading] AI Response length:', gradingText.length);
-    console.log('[Grading] AI Response preview:', gradingText.substring(0, 200) + '...');
+    console.log("[Grading] AI Response length:", gradingText.length);
+    console.log(
+      "[Grading] AI Response preview:",
+      gradingText.substring(0, 200) + "...",
+    );
 
     const result = parseGradingResponse(gradingText);
 
@@ -32,7 +35,7 @@ export const gradeProject = async (projectDetails, submittedCode) => {
 
     return result;
   } catch (error) {
-    console.error('[Grading] Error occurred:', error.message);
+    console.error("[Grading] Error occurred:", error.message);
     throw error;
   }
 };
@@ -93,9 +96,10 @@ Analyze the code now:`;
 
 const parseGradingResponse = (text) => {
   try {
-    console.log('[Grading] Parsing AI response...');
+    console.log("[Grading] Parsing AI response...");
 
-    const scoreMatch = text.match(/Score:\s*(\d+)\/100/i) || text.match(/Grade:\s*(\d+)\/100/i);
+    const scoreMatch =
+      text.match(/Score:\s*(\d+)\/100/i) || text.match(/Grade:\s*(\d+)\/100/i);
     const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
     const passed = score >= 70;
 
@@ -105,15 +109,25 @@ const parseGradingResponse = (text) => {
     const feedback = feedbackMatch ? feedbackMatch[1].trim() : text;
 
     const congratsMatch = feedback.match(/(Congratulations[^!.]*[!.])/i);
-    const congratsMessage = congratsMatch ? congratsMatch[0].trim() : 'Congratulations on completing your project!';
+    const congratsMessage = congratsMatch
+      ? congratsMatch[0].trim()
+      : "Congratulations on completing your project!";
 
-    const strengthsMatch = feedback.match(/What you did well:([\s\S]*?)(?=What needs improvement:|Status:|$)/i);
-    const strengths = strengthsMatch ? strengthsMatch[1].trim() : 'You completed the project successfully.';
+    const strengthsMatch = feedback.match(
+      /What you did well:([\s\S]*?)(?=What needs improvement:|Status:|$)/i,
+    );
+    const strengths = strengthsMatch
+      ? strengthsMatch[1].trim()
+      : "You completed the project successfully.";
 
-    const improvementsMatch = feedback.match(/What needs improvement:([\s\S]*?)(?=Status:|$)/i);
-    const improvements = improvementsMatch ? improvementsMatch[1].trim() : 'Continue practicing to improve your skills.';
+    const improvementsMatch = feedback.match(
+      /What needs improvement:([\s\S]*?)(?=Status:|$)/i,
+    );
+    const improvements = improvementsMatch
+      ? improvementsMatch[1].trim()
+      : "Continue practicing to improve your skills.";
 
-    const cleanFeedback = `${congratsMessage}\n\n${strengths}\n\n${improvements}\n\nGrade: ${score}/100 - ${passed ? 'You passed!' : 'Keep practicing!'}`;
+    const cleanFeedback = `${congratsMessage}\n\n${strengths}\n\n${improvements}\n\nGrade: ${score}/100 - ${passed ? "You passed!" : "Keep practicing!"}`;
 
     return {
       score,
@@ -121,11 +135,11 @@ const parseGradingResponse = (text) => {
       feedback: cleanFeedback,
       congratsMessage,
       strengths,
-      improvements
+      improvements,
     };
   } catch (error) {
-    console.error('[Grading] Error parsing AI response:', error);
-    console.error('[Grading] Response text:', text);
-    throw new Error('Failed to parse AI grading response');
+    console.error("[Grading] Error parsing AI response:", error);
+    console.error("[Grading] Response text:", text);
+    throw new Error("Failed to parse AI grading response");
   }
 };

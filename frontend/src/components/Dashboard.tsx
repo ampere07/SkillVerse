@@ -1,4 +1,4 @@
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from "../contexts/AuthContext";
 import {
   BookOpen,
   FileText,
@@ -7,132 +7,141 @@ import {
   TrendingUp,
   Clock,
   Calendar,
-  Sparkles
-} from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
-import { connectSocket, disconnectSocket, getSocket } from '../utils/socket';
-import LevelUpModal from './LevelUpModal';
+  Sparkles,
+} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { connectSocket, disconnectSocket, getSocket } from "../utils/socket";
+import LevelUpModal from "./LevelUpModal";
 
 const getSafeName = (user: any) => {
-  if (!user?.name || user.name.toLowerCase().includes('undefined')) {
-    return user?.email?.split('@')[0] || 'User';
+  if (!user?.name || user.name.toLowerCase().includes("undefined")) {
+    return user?.email?.split("@")[0] || "User";
   }
   return user.name;
 };
 
 const getGreeting = () => {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return 'Good morning';
-  if (hour >= 12 && hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 18) return "Good afternoon";
+  return "Good evening";
 };
 
-import Compiler from '../pages/Compiler';
-import Classrooms from '../pages/Classrooms';
-import MiniProjects from '../pages/MiniProjects';
-import MiniProjectDetails from '../pages/MiniProjectDetails';
-import BugHunt from '../pages/BugHunt';
-import Settings from '../pages/Settings';
-import Assignments from '../pages/Assignments';
-import CreateAssignment from '../pages/CreateAssignment';
-import CreatePost from '../pages/CreatePost';
-import Submissions from '../pages/Submissions';
-import Resources from '../pages/Resources';
-import ProgressTracking from '../pages/ProgressTracking';
-import StudentTracking from '../pages/teacher/StudentTracking';
-import UnsavedChangesModal from './UnsavedChangesModal';
-import TeacherDashboardContent from './TeacherDashboardContent';
+import Compiler from "../pages/Compiler";
+import Classrooms from "../pages/Classrooms";
+import MiniProjects from "../pages/MiniProjects";
+import MiniProjectDetails from "../pages/MiniProjectDetails";
+import BugHunt from "../pages/BugHunt";
+import Settings from "../pages/Settings";
+import Assignments from "../pages/Assignments";
+import CreateAssignment from "../pages/CreateAssignment";
+import CreatePost from "../pages/CreatePost";
+import Submissions from "../pages/Submissions";
+import Resources from "../pages/Resources";
+import ProgressTracking from "../pages/ProgressTracking";
+import StudentTracking from "../pages/teacher/StudentTracking";
+import UnsavedChangesModal from "./UnsavedChangesModal";
+import TeacherDashboardContent from "./TeacherDashboardContent";
 
 interface NavItem {
   icon: string; // Changed to string for image path
   label: string;
   href: string;
-  roles: ('student' | 'teacher')[];
+  roles: ("student" | "teacher")[];
 }
 
 const navigationItems: NavItem[] = [
   {
-    icon: '/assets/sidebar/dashboard.png',
-    label: 'Dashboard',
-    href: '/dashboard',
-    roles: ['student', 'teacher']
+    icon: "/assets/sidebar/dashboard.png",
+    label: "Dashboard",
+    href: "/dashboard",
+    roles: ["student", "teacher"],
   },
   {
-    icon: '/assets/sidebar/classroom.png',
-    label: 'My Classrooms',
-    href: '/classrooms',
-    roles: ['student', 'teacher']
+    icon: "/assets/sidebar/classroom.png",
+    label: "My Classrooms",
+    href: "/classrooms",
+    roles: ["student", "teacher"],
   },
   {
-    icon: '/assets/sidebar/assignment.png',
-    label: 'Assignments',
-    href: '/assignments',
-    roles: ['student']
+    icon: "/assets/sidebar/assignment.png",
+    label: "Assignments",
+    href: "/assignments",
+    roles: ["student"],
   },
   {
-    icon: '/assets/sidebar/assignment.png', // Using assignment icon as fallback for submissions
-    label: 'Submissions',
-    href: '/submissions',
-    roles: ['teacher']
+    icon: "/assets/sidebar/assignment.png", // Using assignment icon as fallback for submissions
+    label: "Submissions",
+    href: "/submissions",
+    roles: ["teacher"],
   },
   {
-    icon: '/assets/sidebar/compiler.png',
-    label: 'Compiler',
-    href: '/compiler',
-    roles: ['student']
+    icon: "/assets/sidebar/compiler.png",
+    label: "Compiler",
+    href: "/compiler",
+    roles: ["student"],
   },
   {
-    icon: '/assets/sidebar/miniprojects.png',
-    label: 'Mini Projects',
-    href: '/mini-projects',
-    roles: ['student']
+    icon: "/assets/sidebar/miniprojects.png",
+    label: "Mini Projects",
+    href: "/mini-projects",
+    roles: ["student"],
   },
   {
-    icon: '/assets/sidebar/bughunt.png',
-    label: 'Bug Hunt',
-    href: '/bug-hunt',
-    roles: ['student']
+    icon: "/assets/sidebar/bughunt.png",
+    label: "Bug Hunt",
+    href: "/bug-hunt",
+    roles: ["student"],
   },
   {
-    icon: '/assets/sidebar/classroom.png', // Temporary fallback icon
-    label: 'Resources',
-    href: '/resources',
-    roles: ['student']
+    icon: "/assets/sidebar/classroom.png", // Temporary fallback icon
+    label: "Resources",
+    href: "/resources",
+    roles: ["student"],
   },
   {
-    icon: '/assets/sidebar/dashboard.png', // Using dashboard icon as placeholder for progress tracking
-    label: 'Progress Tracking',
-    href: '/progress-tracking',
-    roles: ['student', 'teacher']
+    icon: "/assets/sidebar/dashboard.png", // Using dashboard icon as placeholder for progress tracking
+    label: "Progress Tracking",
+    href: "/progress-tracking",
+    roles: ["student", "teacher"],
   },
   {
-    icon: '/assets/sidebar/settings.png',
-    label: 'Settings',
-    href: '/settings',
-    roles: ['student', 'teacher']
-  }
+    icon: "/assets/sidebar/settings.png",
+    label: "Settings",
+    href: "/settings",
+    roles: ["student", "teacher"],
+  },
 ];
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState('/dashboard');
+  const [activeNav, setActiveNav] = useState("/dashboard");
   const [viewingStudent, setViewingStudent] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showNavigationWarning, setShowNavigationWarning] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(
+    null,
+  );
   const miniProjectsRef = useRef<any>(null);
   const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
   const [completedProjectsCount, setCompletedProjectsCount] = useState(0);
 
-
   const [activeAssignmentsCount, setActiveAssignmentsCount] = useState(0);
   const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
-  const [createPostClassroomId, setCreatePostClassroomId] = useState<string | null>(null);
-  const [createPostClassroomName, setCreatePostClassroomName] = useState<string | null>(null);
-  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
-  const [selectedProjectTitle, setSelectedProjectTitle] = useState<string | null>(null);
+  const [createPostClassroomId, setCreatePostClassroomId] = useState<
+    string | null
+  >(null);
+  const [createPostClassroomName, setCreatePostClassroomName] = useState<
+    string | null
+  >(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(
+    null,
+  );
+  const [selectedProjectTitle, setSelectedProjectTitle] = useState<
+    string | null
+  >(null);
   const [isGameActive, setIsGameActive] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [leveledLevel, setLeveledLevel] = useState(1);
@@ -146,52 +155,55 @@ export default function Dashboard() {
       }
     };
 
-    window.addEventListener('level-up', handleLevelUp);
-    return () => window.removeEventListener('level-up', handleLevelUp);
+    window.addEventListener("level-up", handleLevelUp);
+    return () => window.removeEventListener("level-up", handleLevelUp);
   }, []);
 
   // Initialize socket connection for real-time updates
   // Initialize socket connection for real-time updates
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     connectSocket(token);
     const socket = getSocket();
 
     const refreshStats = () => {
-      if (user?.role === 'student') {
+      if (user?.role === "student") {
         fetchDashboardStats();
       }
     };
 
-    socket.on('mini-project-update', refreshStats);
-    socket.on('assignment-update', refreshStats);
-    socket.on('course-update', refreshStats);
-    socket.on('activity-update', refreshStats);
-    socket.on('dashboard-update', refreshStats);
+    socket.on("mini-project-update", refreshStats);
+    socket.on("assignment-update", refreshStats);
+    socket.on("course-update", refreshStats);
+    socket.on("activity-update", refreshStats);
+    socket.on("dashboard-update", refreshStats);
 
     return () => {
-      socket.off('mini-project-update', refreshStats);
-      socket.off('assignment-update', refreshStats);
-      socket.off('course-update', refreshStats);
-      socket.off('activity-update', refreshStats);
-      socket.off('dashboard-update', refreshStats);
+      socket.off("mini-project-update", refreshStats);
+      socket.off("assignment-update", refreshStats);
+      socket.off("course-update", refreshStats);
+      socket.off("activity-update", refreshStats);
+      socket.off("dashboard-update", refreshStats);
     };
   }, [user]);
 
   useEffect(() => {
-    if (user?.role === 'student') {
+    if (user?.role === "student") {
       fetchDashboardStats();
     }
   }, [user]);
 
   const fetchDashboardStats = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) return;
 
-      const coursesResponse = await fetch(`${import.meta.env.VITE_API_URL}/courses/enrolled`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const coursesResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/courses/enrolled`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (coursesResponse.status === 401 || coursesResponse.status === 403) {
         logout();
@@ -203,20 +215,27 @@ export default function Dashboard() {
         setEnrolledCoursesCount(coursesData.enrolledCourses?.length || 0);
       }
 
-      const miniProjectsResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const miniProjectsResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       const miniProjectsData = await miniProjectsResponse.json();
       if (miniProjectsResponse.ok) {
-        const completedCount = miniProjectsData.completedTasks?.filter(
-          (task: any) => task.status === 'submitted'
-        ).length || 0;
+        const completedCount =
+          miniProjectsData.completedTasks?.filter(
+            (task: any) => task.status === "submitted",
+          ).length || 0;
         setCompletedProjectsCount(completedCount);
       }
 
-      const classroomsResponse = await fetch(`${import.meta.env.VITE_API_URL}/classrooms/student`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const classroomsResponse = await fetch(
+        `${import.meta.env.VITE_API_URL}/classrooms/student`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       const classroomsData = await classroomsResponse.json();
 
       if (classroomsResponse.ok && classroomsData.classrooms) {
@@ -227,21 +246,23 @@ export default function Dashboard() {
             const activitiesResponse = await fetch(
               `${import.meta.env.VITE_API_URL}/activities/classroom/${classroom._id}`,
               {
-                headers: { 'Authorization': `Bearer ${token}` }
-              }
+                headers: { Authorization: `Bearer ${token}` },
+              },
             );
 
             if (activitiesResponse.ok) {
               const activitiesData = await activitiesResponse.json();
               if (activitiesData.success && activitiesData.activities) {
-                const classroomActivities = activitiesData.activities.map((activity: any) => ({
-                  ...activity,
-                  classroom: {
-                    _id: classroom._id,
-                    name: classroom.name,
-                    code: classroom.code
-                  }
-                }));
+                const classroomActivities = activitiesData.activities.map(
+                  (activity: any) => ({
+                    ...activity,
+                    classroom: {
+                      _id: classroom._id,
+                      name: classroom.name,
+                      code: classroom.code,
+                    },
+                  }),
+                );
                 allActivities.push(...classroomActivities);
               }
             }
@@ -252,11 +273,11 @@ export default function Dashboard() {
 
         const now = new Date();
         const upcomingActivities = allActivities
-          .filter(activity => {
+          .filter((activity) => {
             if (!activity.dueDate) return false;
 
             const hasSubmitted = activity.submissions?.some(
-              (s: any) => s.student === user?.id || s.student?._id === user?.id
+              (s: any) => s.student === user?.id || s.student?._id === user?.id,
             );
             if (hasSubmitted) return false;
 
@@ -271,21 +292,21 @@ export default function Dashboard() {
             const dateB = new Date(b.dueDate).getTime();
             return dateA - dateB;
           })
-          .map(activity => {
+          .map((activity) => {
             const dueDate = new Date(activity.dueDate);
             const diffTime = dueDate.getTime() - now.getTime();
             const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             return {
               ...activity,
-              daysUntilDue
+              daysUntilDue,
             };
           })
           .slice(0, 5);
 
-        const activeCount = allActivities.filter(activity => {
+        const activeCount = allActivities.filter((activity) => {
           const hasSubmitted = activity.submissions?.some(
-            (s: any) => s.student === user?.id || s.student?._id === user?.id
+            (s: any) => s.student === user?.id || s.student?._id === user?.id,
           );
           if (hasSubmitted) return false;
 
@@ -300,23 +321,25 @@ export default function Dashboard() {
 
         // Add assignment submissions
         const recentSubmissions = allActivities
-          .filter(activity => {
+          .filter((activity) => {
             const submission = activity.submissions?.find(
-              (s: any) => s.student === user?.id || s.student?._id === user?.id
+              (s: any) => s.student === user?.id || s.student?._id === user?.id,
             );
             return submission !== undefined;
           })
-          .map(activity => {
+          .map((activity) => {
             const submission = activity.submissions?.find(
-              (s: any) => s.student === user?.id || s.student?._id === user?.id
+              (s: any) => s.student === user?.id || s.student?._id === user?.id,
             );
-            const submittedAt = submission?.submittedAt ? new Date(submission.submittedAt) : null;
+            const submittedAt = submission?.submittedAt
+              ? new Date(submission.submittedAt)
+              : null;
 
             return {
               title: `Submitted "${activity.title}"`,
-              subtitle: activity.classroom?.name || '',
+              subtitle: activity.classroom?.name || "",
               timestamp: submittedAt,
-              type: 'submission'
+              type: "submission",
             };
           });
 
@@ -324,21 +347,30 @@ export default function Dashboard() {
 
         // Sort all activities by timestamp (most recent first) and take top 5
         const sortedActivities = recentActivityList
-          .filter(activity => activity.timestamp)
+          .filter((activity) => activity.timestamp)
           .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
           .slice(0, 5)
-          .map(activity => ({
+          .map((activity) => ({
             title: activity.title,
             subtitle: activity.subtitle,
             timeAgo: getTimeAgo(activity.timestamp),
-            type: activity.type
+            type: activity.type,
           }));
 
         setActiveAssignmentsCount(activeCount);
         setUpcomingAssignments(upcomingActivities);
-        setRecentActivities(sortedActivities.length > 0 ? sortedActivities : [
-          { title: 'No recent activities', subtitle: '', timeAgo: 'Get started with your first activity!', type: 'empty' }
-        ]);
+        setRecentActivities(
+          sortedActivities.length > 0
+            ? sortedActivities
+            : [
+                {
+                  title: "No recent activities",
+                  subtitle: "",
+                  timeAgo: "Get started with your first activity!",
+                  type: "empty",
+                },
+              ],
+        );
       }
     } catch (error) {
       // Error fetching dashboard stats
@@ -353,13 +385,13 @@ export default function Dashboard() {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 60) {
-      return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
     } else if (diffHours < 24) {
-      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+      return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
     } else if (diffDays === 0) {
-      return 'Today';
+      return "Today";
     } else if (diffDays === 1) {
-      return '1 day ago';
+      return "1 day ago";
     } else {
       return `${diffDays} days ago`;
     }
@@ -369,13 +401,13 @@ export default function Dashboard() {
     return null;
   }
 
-  const filteredNavigation = navigationItems.filter(item =>
-    item.roles.includes(user.role)
+  const filteredNavigation = navigationItems.filter((item) =>
+    item.roles.includes(user.role),
   );
 
   const handleNavigation = (href: string) => {
     // Clear viewing student data when navigating away from progress-tracking
-    if (activeNav === '/progress-tracking' && href !== '/progress-tracking') {
+    if (activeNav === "/progress-tracking" && href !== "/progress-tracking") {
       setViewingStudent(false);
       // Call the clear function if it exists
       if ((window as any).clearViewingStudent) {
@@ -383,14 +415,14 @@ export default function Dashboard() {
       }
     }
 
-    if (hasUnsavedChanges && activeNav === '/mini-projects') {
+    if (hasUnsavedChanges && activeNav === "/mini-projects") {
       setPendingNavigation(href);
       setShowNavigationWarning(true);
     } else {
       // Don't reset viewingStudent when navigating to progress-tracking
-      if (href === '/progress-tracking' && activeNav !== '/progress-tracking') {
+      if (href === "/progress-tracking" && activeNav !== "/progress-tracking") {
         // Keep current viewingStudent state
-      } else if (href !== '/progress-tracking') {
+      } else if (href !== "/progress-tracking") {
         setViewingStudent(false);
         // Call the clear function if it exists
         if ((window as any).clearViewingStudent) {
@@ -430,35 +462,39 @@ export default function Dashboard() {
     setPendingNavigation(null);
   };
 
-
   return (
     <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
       {/* Sidebar */}
-      <aside className={`
+      <aside
+        className={`
         fixed lg:static inset-y-0 left-0 z-50 w-60 bg-white border-r border-[#E0E0E0] 
         transform transition-transform duration-200 ease-in-out shadow-sm
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+      `}
+      >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-center px-4 py-4 border-b border-[#E0E0E0]">
             <div className="flex flex-col items-center gap-0 w-full">
               <div className="w-[100px] h-[100px] bg-white rounded-lg flex items-center justify-center p-2">
                 <img
-                  src="/assets/skillverseLogoV2.webp"
+                  src="/assets/SvIcon.png"
                   alt="SkillVerse Logo"
                   className="w-full h-full object-contain"
                 />
               </div>
-              <span className="text-xl font-bold text-[#1B5E20]">SkillVerse</span>
+              <span className="text-xl font-bold text-[#1B5E20]">
+                SkillVerse
+              </span>
             </div>
           </div>
 
           {/* Navigation */}
           <nav className="relative flex-1 flex flex-col gap-1 overflow-y-auto">
-
             {filteredNavigation.map((item) => {
-              const isActive = activeNav === item.href || (activeNav.startsWith(item.href) && item.href !== '/dashboard');
+              const isActive =
+                activeNav === item.href ||
+                (activeNav.startsWith(item.href) && item.href !== "/dashboard");
 
               return (
                 <button
@@ -467,22 +503,24 @@ export default function Dashboard() {
                   disabled={isGameActive}
                   className={`
                     relative z-10 w-full h-[46px] flex items-center gap-3 px-6 transition-all
-                    ${isActive
-                      ? 'text-[#1B5E20] bg-[#F1F8F1] border-l-4 border-[#1B5E20]'
-                      : 'text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent border-l-4 border-transparent'
+                    ${
+                      isActive
+                        ? "text-[#1B5E20] bg-[#F1F8F1] border-l-4 border-[#1B5E20]"
+                        : "text-[#757575] hover:bg-[#F5F5F5] lg:hover:bg-transparent border-l-4 border-transparent"
                     }
-                    ${isGameActive ? 'opacity-40 cursor-not-allowed filter grayscale' : ''}
+                    ${isGameActive ? "opacity-40 cursor-not-allowed filter grayscale" : ""}
                   `}
                 >
                   <span className="text-sm font-semibold flex-1 text-left leading-none">
-                    {item.label === 'Progress Tracking' && user?.role === 'teacher'
-                      ? 'Student Tracking'
+                    {item.label === "Progress Tracking" &&
+                    user?.role === "teacher"
+                      ? "Student Tracking"
                       : item.label}
                   </span>
                   <img
                     src={item.icon}
                     alt={item.label}
-                    className={`w-6 h-6 object-contain ${isActive ? 'scale-[1.8]' : ''}`}
+                    className={`w-6 h-6 object-contain ${isActive ? "scale-[1.8]" : ""}`}
                   />
                 </button>
               );
@@ -498,8 +536,12 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-[#212121] truncate">{getSafeName(user)}</p>
-                <p className="text-[11px] text-[#757575] capitalize">{user.role}</p>
+                <p className="text-[13px] font-semibold text-[#212121] truncate">
+                  {getSafeName(user)}
+                </p>
+                <p className="text-[11px] text-[#757575] capitalize">
+                  {user.role}
+                </p>
               </div>
             </div>
 
@@ -507,7 +549,9 @@ export default function Dashboard() {
               onClick={logout}
               className="w-full flex items-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
             >
-              <span className="text-sm font-semibold flex-1 text-left">Logout</span>
+              <span className="text-sm font-semibold flex-1 text-left">
+                Logout
+              </span>
               <img
                 src="/assets/badges/logout.png"
                 alt="Logout"
@@ -534,36 +578,48 @@ export default function Dashboard() {
             onClick={() => setSidebarOpen(true)}
             className="text-[#757575] hover:text-[#212121]"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
         </div>
 
-        <main className={`flex-1 overflow-auto ${activeNav === '/compiler' || activeNav === '/bug-hunt' || activeNav === '/resources' ? '' : 'p-6'}`}>
-          {activeNav === '/compiler' ? (
+        <main
+          className={`flex-1 overflow-auto ${activeNav === "/compiler" || activeNav === "/bug-hunt" || activeNav === "/resources" ? "" : "p-6"}`}
+        >
+          {activeNav === "/compiler" ? (
             <Compiler onMenuClick={() => setSidebarOpen(true)} />
-          ) : activeNav === '/classrooms' ? (
+          ) : activeNav === "/classrooms" ? (
             <Classrooms
               selectedClassroomId={selectedClassroomId}
               onClearSelection={() => setSelectedClassroomId(null)}
             />
-          ) : activeNav.startsWith('/mini-projects/') ? (
+          ) : activeNav.startsWith("/mini-projects/") ? (
             <MiniProjectDetails
               ref={miniProjectsRef}
               onHasUnsavedChanges={setHasUnsavedChanges}
-              projectTitle={selectedProjectTitle || ''}
+              projectTitle={selectedProjectTitle || ""}
               onBack={() => {
-                setActiveNav('/mini-projects');
+                setActiveNav("/mini-projects");
                 setSelectedProjectTitle(null);
               }}
             />
-          ) : activeNav === '/bug-hunt' ? (
+          ) : activeNav === "/bug-hunt" ? (
             <BugHunt
               onMenuClick={() => !isGameActive && setSidebarOpen(true)}
               onGameStatusChange={setIsGameActive}
             />
-          ) : activeNav === '/mini-projects' ? (
+          ) : activeNav === "/mini-projects" ? (
             <MiniProjects
               ref={miniProjectsRef}
               onHasUnsavedChanges={setHasUnsavedChanges}
@@ -572,39 +628,49 @@ export default function Dashboard() {
                 setActiveNav(`/mini-projects/${encodeURIComponent(title)}`);
               }}
             />
-          ) : activeNav === '/settings' ? (
+          ) : activeNav === "/settings" ? (
             <Settings />
-          ) : activeNav === '/resources' ? (
+          ) : activeNav === "/resources" ? (
             <Resources onNavigate={handleNavigation} />
-          ) : activeNav === '/progress-tracking' ? (
-            user?.role === 'teacher' && !viewingStudent ? <StudentTracking onNavigate={handleNavigation} setViewingStudent={setViewingStudent} /> : <ProgressTracking />
-          ) : activeNav === '/assignments' ? (
+          ) : activeNav === "/progress-tracking" ? (
+            user?.role === "teacher" && !viewingStudent ? (
+              <StudentTracking
+                onNavigate={handleNavigation}
+                setViewingStudent={setViewingStudent}
+              />
+            ) : (
+              <ProgressTracking />
+            )
+          ) : activeNav === "/assignments" ? (
             <Assignments />
-          ) : activeNav === '/submissions' ? (
+          ) : activeNav === "/submissions" ? (
             <Submissions />
-          ) : activeNav === '/create-assignment' ? (
+          ) : activeNav === "/create-assignment" ? (
             <CreateAssignment />
-          ) : activeNav === '/create-post' ? (
+          ) : activeNav === "/create-post" ? (
             <CreatePost
-              classroomId={createPostClassroomId || ''}
-              classroomName={createPostClassroomName || ''}
-              onBack={() => setActiveNav('/dashboard')}
+              classroomId={createPostClassroomId || ""}
+              classroomName={createPostClassroomName || ""}
+              onBack={() => setActiveNav("/dashboard")}
               onNavigateToClassrooms={() => {
                 setSelectedClassroomId(null);
-                setActiveNav('/classrooms');
+                setActiveNav("/classrooms");
               }}
               onNavigateToClassroomDetail={() => {
                 setSelectedClassroomId(createPostClassroomId);
-                setActiveNav('/classrooms');
+                setActiveNav("/classrooms");
               }}
             />
-          ) : user.role === 'teacher' ? (
+          ) : user.role === "teacher" ? (
             <TeacherDashboardContent
               user={user}
-              onNavigateToCreatePost={(classroomId: string, classroomName: string) => {
+              onNavigateToCreatePost={(
+                classroomId: string,
+                classroomName: string,
+              ) => {
                 setCreatePostClassroomId(classroomId);
                 setCreatePostClassroomName(classroomName);
-                setActiveNav('/create-post');
+                setActiveNav("/create-post");
               }}
             />
           ) : (
@@ -615,7 +681,7 @@ export default function Dashboard() {
               completedProjectsCount={completedProjectsCount}
               upcomingAssignments={upcomingAssignments}
               recentActivities={recentActivities}
-              onMiniProjectsClick={() => handleNavigation('/mini-projects')}
+              onMiniProjectsClick={() => handleNavigation("/mini-projects")}
             />
           )}
         </main>
@@ -655,7 +721,7 @@ function StudentDashboardContent({
   completedProjectsCount,
   upcomingAssignments,
   recentActivities,
-  onMiniProjectsClick
+  onMiniProjectsClick,
 }: StudentDashboardContentProps) {
   const [projects, setProjects] = useState<any[]>([]);
   const { logout } = useAuth();
@@ -666,13 +732,16 @@ function StudentDashboardContent({
 
   const fetchMiniProjects = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) return;
 
       // Fetch available projects
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/available-projects`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/mini-projects/available-projects`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (response.status === 401 || response.status === 403) {
         logout();
@@ -683,21 +752,27 @@ function StudentDashboardContent({
       if (response.ok && data.availableProjects) {
         // Try to fetch user's completed projects to filter them out
         try {
-          const userProjectsResponse = await fetch(`${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const userProjectsResponse = await fetch(
+            `${import.meta.env.VITE_API_URL}/mini-projects/completed-tasks`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
 
           if (userProjectsResponse.ok) {
             const userProjectsData = await userProjectsResponse.json();
             const completedProjectTitles = new Set(
               userProjectsData.completedTasks
-                ?.filter((task: any) => task.status === 'submitted')
-                ?.map((task: any) => task.projectTitle?.toLowerCase()) || []
+                ?.filter((task: any) => task.status === "submitted")
+                ?.map((task: any) => task.projectTitle?.toLowerCase()) || [],
             );
 
             // Filter out completed projects by matching titles
             const incompleteProjects = data.availableProjects
-              .filter((project: any) => !completedProjectTitles.has(project.title?.toLowerCase()))
+              .filter(
+                (project: any) =>
+                  !completedProjectTitles.has(project.title?.toLowerCase()),
+              )
               .slice(0, 4);
             setProjects(incompleteProjects);
           } else {
@@ -720,7 +795,7 @@ function StudentDashboardContent({
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <h1 className="text-[28px] font-semibold text-[#212121]">
-            {getGreeting()}, {getSafeName(user).split(' ')[0]}
+            {getGreeting()}, {getSafeName(user).split(" ")[0]}
           </h1>
           <Sparkles className="w-6 h-6 text-[#FFB300]" />
         </div>
@@ -761,7 +836,9 @@ function StudentDashboardContent({
           {/* Quick Actions - Only show if there are projects */}
           {projects.length > 0 && (
             <div>
-              <h2 className="text-[20px] font-semibold text-[#212121] mb-4">Mini Projects</h2>
+              <h2 className="text-[20px] font-semibold text-[#212121] mb-4">
+                Mini Projects
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {projects.map((project, index) => (
                   <button
@@ -774,11 +851,21 @@ function StudentDashboardContent({
                         <Code className="w-6 h-6 text-[#757575]" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-[15px] font-semibold text-[#212121] mb-1">{project.title}</h3>
-                        <p className="text-[13px] text-[#757575] line-clamp-2">{project.description}</p>
+                        <h3 className="text-[15px] font-semibold text-[#212121] mb-1">
+                          {project.title}
+                        </h3>
+                        <p className="text-[13px] text-[#757575] line-clamp-2">
+                          {project.description}
+                        </p>
                         {project.language && (
                           <div className="mt-2">
-                            <span className="text-[11px] px-2 py-1 rounded" style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}>
+                            <span
+                              className="text-[11px] px-2 py-1 rounded"
+                              style={{
+                                backgroundColor: "#E8F5E9",
+                                color: "#1B5E20",
+                              }}
+                            >
                               {project.language}
                             </span>
                           </div>
@@ -790,7 +877,12 @@ function StudentDashboardContent({
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
                       </svg>
                     </div>
                   </button>
@@ -803,7 +895,9 @@ function StudentDashboardContent({
           <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="w-5 h-5 text-[#1B5E20]" />
-              <h3 className="text-[15px] font-semibold text-[#212121]">Recent Activity</h3>
+              <h3 className="text-[15px] font-semibold text-[#212121]">
+                Recent Activity
+              </h3>
             </div>
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
               {recentActivities.map((activity, index) => (
@@ -812,11 +906,17 @@ function StudentDashboardContent({
                     <Clock className="w-4 h-4 text-[#757575]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-[#212121]">{activity.title}</p>
+                    <p className="text-[13px] font-semibold text-[#212121]">
+                      {activity.title}
+                    </p>
                     {activity.subtitle && (
-                      <p className="text-[12px] text-[#757575]">{activity.subtitle}</p>
+                      <p className="text-[12px] text-[#757575]">
+                        {activity.subtitle}
+                      </p>
                     )}
-                    <p className="text-[12px] text-[#757575] mt-0.5">{activity.timeAgo}</p>
+                    <p className="text-[12px] text-[#757575] mt-0.5">
+                      {activity.timeAgo}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -830,7 +930,9 @@ function StudentDashboardContent({
           <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
             <div className="flex items-center gap-2 mb-5">
               <Calendar className="w-5 h-5 text-[#FFB300]" />
-              <h3 className="text-[15px] font-semibold text-[#212121]">Upcoming</h3>
+              <h3 className="text-[15px] font-semibold text-[#212121]">
+                Upcoming
+              </h3>
             </div>
 
             {upcomingAssignments.length === 0 ? (
@@ -838,19 +940,29 @@ function StudentDashboardContent({
                 <div className="w-16 h-16 bg-[#F5F5F5] rounded-full flex items-center justify-center mx-auto mb-4">
                   <Clock className="w-8 h-8 text-[#1B5E20]" />
                 </div>
-                <h4 className="text-sm font-semibold text-[#212121] mb-1">You're all caught up!</h4>
-                <p className="text-[13px] text-[#757575]">No upcoming assignments or deadlines</p>
+                <h4 className="text-sm font-semibold text-[#212121] mb-1">
+                  You're all caught up!
+                </h4>
+                <p className="text-[13px] text-[#757575]">
+                  No upcoming assignments or deadlines
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {upcomingAssignments.slice(0, 3).map((assignment, index) => (
                   <div key={index} className="p-3 bg-[#F5F5F5] rounded-lg">
-                    <p className="text-sm font-semibold text-[#212121] mb-1">{assignment.title}</p>
-                    <p className="text-xs text-[#757575]">{assignment.classroom?.name}</p>
+                    <p className="text-sm font-semibold text-[#212121] mb-1">
+                      {assignment.title}
+                    </p>
+                    <p className="text-xs text-[#757575]">
+                      {assignment.classroom?.name}
+                    </p>
                     <p className="text-xs text-[#FFB300] font-semibold mt-1">
-                      {assignment.daysUntilDue === 0 ? 'Due today' :
-                        assignment.daysUntilDue === 1 ? 'Due tomorrow' :
-                          `Due in ${assignment.daysUntilDue} days`}
+                      {assignment.daysUntilDue === 0
+                        ? "Due today"
+                        : assignment.daysUntilDue === 1
+                          ? "Due tomorrow"
+                          : `Due in ${assignment.daysUntilDue} days`}
                     </p>
                   </div>
                 ))}
@@ -863,7 +975,11 @@ function StudentDashboardContent({
                 <span>Today</span>
               </div>
               <span className="font-semibold text-[#212121]">
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                })}
               </span>
             </div>
           </div>
@@ -876,9 +992,12 @@ function StudentDashboardContent({
                   <Trophy className="w-8 h-8 text-[#FFB300]" />
                 </div>
                 <h3 className="text-[16px] font-semibold text-[#212121] mb-1">
-                  {completedProjectsCount} Project{completedProjectsCount !== 1 ? 's' : ''} Done!
+                  {completedProjectsCount} Project
+                  {completedProjectsCount !== 1 ? "s" : ""} Done!
                 </h3>
-                <p className="text-[13px] text-[#757575]">Keep up the great work</p>
+                <p className="text-[13px] text-[#757575]">
+                  Keep up the great work
+                </p>
               </div>
             </div>
           )}
@@ -893,21 +1012,28 @@ interface StatCardProps {
   value: number;
   label: string;
   progress: number;
-  color: 'green' | 'gray' | 'gold';
+  color: "green" | "gray" | "gold";
   badge?: string;
 }
 
-function StatCard({ icon: Icon, value, label, progress, color, badge }: StatCardProps) {
+function StatCard({
+  icon: Icon,
+  value,
+  label,
+  progress,
+  color,
+  badge,
+}: StatCardProps) {
   const colorClasses = {
-    green: 'bg-[#1B5E20]',
-    gray: 'bg-[#757575]',
-    gold: 'bg-[#FFB300]'
+    green: "bg-[#1B5E20]",
+    gray: "bg-[#757575]",
+    gold: "bg-[#FFB300]",
   };
 
   const iconColorClasses = {
-    green: 'text-[#1B5E20]',
-    gray: 'text-[#757575]',
-    gold: 'text-[#FFB300]'
+    green: "text-[#1B5E20]",
+    gray: "text-[#757575]",
+    gold: "text-[#FFB300]",
   };
 
   return (
@@ -918,12 +1044,16 @@ function StatCard({ icon: Icon, value, label, progress, color, badge }: StatCard
         </div>
         {badge && (
           <div className="flex items-center gap-1 px-2 py-1 bg-[#F5F5F5] rounded-full">
-            <span className="text-[11px] font-semibold text-[#1B5E20]">{badge}</span>
+            <span className="text-[11px] font-semibold text-[#1B5E20]">
+              {badge}
+            </span>
           </div>
         )}
       </div>
       <div className="space-y-2">
-        <p className="text-[32px] font-semibold text-[#212121] leading-none">{value}</p>
+        <p className="text-[32px] font-semibold text-[#212121] leading-none">
+          {value}
+        </p>
         <p className="text-[13px] font-semibold text-[#757575]">{label}</p>
         <div className="w-full h-0.5 bg-[#F5F5F5] rounded-full overflow-hidden">
           <div
@@ -935,4 +1065,3 @@ function StatCard({ icon: Icon, value, label, progress, color, badge }: StatCard
     </div>
   );
 }
-

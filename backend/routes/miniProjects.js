@@ -1,191 +1,255 @@
-import express from 'express';
-import MiniProject from '../models/MiniProject.js';
-import User from '../models/User.js';
-import Progress from '../models/Progress.js';
-import { authenticateToken, authorizeRole } from '../middleware/auth.js';
-import { gradeProject } from '../services/projectGradingService.js';
-import { checkAndGenerateProjects } from '../services/cronService.js';
+import express from "express";
+import MiniProject from "../models/MiniProject.js";
+import User from "../models/User.js";
+import Progress from "../models/Progress.js";
+import { authenticateToken, authorizeRole } from "../middleware/auth.js";
+import { gradeProject } from "../services/projectGradingService.js";
+import { checkAndGenerateProjects } from "../services/cronService.js";
 
 const router = express.Router();
 
-router.get('/check-language-projects', authenticateToken, async (req, res) => {
+router.get("/check-language-projects", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const { language } = req.query;
-    
+
     if (!language) {
-      return res.status(400).json({ message: 'Language parameter is required' });
+      return res
+        .status(400)
+        .json({ message: "Language parameter is required" });
     }
 
-    const User = (await import('../models/User.js')).default;
+    const User = (await import("../models/User.js")).default;
     const user = await User.findById(req.user.userId);
-    
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
     const languageProjects = miniProject.getProjectsByLanguage(language);
     const surveyCompletedLanguages = user.surveyCompletedLanguages || [];
-    
+
     console.log(`[Check-Language] Language: ${language}`);
-    console.log(`[Check-Language] Has projects: ${languageProjects.length > 0}`);
-    console.log(`[Check-Language] Survey completed: ${surveyCompletedLanguages.includes(language)}`);
+    console.log(
+      `[Check-Language] Has projects: ${languageProjects.length > 0}`,
+    );
+    console.log(
+      `[Check-Language] Survey completed: ${surveyCompletedLanguages.includes(language)}`,
+    );
 
     res.json({
       hasProjects: languageProjects.length > 0,
       surveyCompleted: surveyCompletedLanguages.includes(language),
-      projectCount: languageProjects.length
+      projectCount: languageProjects.length,
     });
   } catch (error) {
-    console.error('[Check-Language] Error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("[Check-Language] Error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.get('/student', authenticateToken, async (req, res) => {
+router.get("/student", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
     res.json(miniProject);
   } catch (error) {
-    console.error('Get mini project error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Get mini project error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.get('/available-projects', authenticateToken, async (req, res) => {
+router.get("/available-projects", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const { fromSurvey } = req.query; // Check if request is from survey completion
-    const isFromSurvey = fromSurvey === 'true';
+    const isFromSurvey = fromSurvey === "true";
 
     console.log(`[Available-Projects] Request from user ${req.user.userId}`);
     console.log(`[Available-Projects] From survey: ${isFromSurvey}`);
 
-    const User = (await import('../models/User.js')).default;
+    const User = (await import("../models/User.js")).default;
     const user = await User.findById(req.user.userId);
-    
+
     if (!user) {
       console.log(`[Available-Projects] User not found: ${req.user.userId}`);
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
-    
-    const currentLanguage = user.primaryLanguage || 'java';
-    
-    console.log(`[Available-Projects] ========== USER LANGUAGE INFO ==========`);
+
+    const currentLanguage = user.primaryLanguage || "java";
+
+    console.log(
+      `[Available-Projects] ========== USER LANGUAGE INFO ==========`,
+    );
     console.log(`[Available-Projects] User ID: ${req.user.userId}`);
     console.log(`[Available-Projects] User email: ${user.email}`);
-    console.log(`[Available-Projects] User primaryLanguage from DB: ${user.primaryLanguage}`);
-    console.log(`[Available-Projects] Current language being used: ${currentLanguage}`);
-    console.log(`[Available-Projects] Survey completed languages: ${user.surveyCompletedLanguages}`);
-    console.log(`[Available-Projects] ================================================`);
-    
+    console.log(
+      `[Available-Projects] User primaryLanguage from DB: ${user.primaryLanguage}`,
+    );
+    console.log(
+      `[Available-Projects] Current language being used: ${currentLanguage}`,
+    );
+    console.log(
+      `[Available-Projects] Survey completed languages: ${user.surveyCompletedLanguages}`,
+    );
+    console.log(
+      `[Available-Projects] ================================================`,
+    );
+
     console.log(`[Available-Projects] Current language: ${currentLanguage}`);
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      console.log(`[Available-Projects] No MiniProject found for user ${req.user.userId}`);
-      return res.status(404).json({ message: 'Mini project data not found' });
+      console.log(
+        `[Available-Projects] No MiniProject found for user ${req.user.userId}`,
+      );
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
     // Use language-specific arrays from current week
     const languageProjects = miniProject.getProjectsByLanguage(currentLanguage);
     const currentWeek = miniProject.weeklyProjectHistory.find(
-      week => week.weekNumber === miniProject.currentWeekNumber
+      (week) => week.weekNumber === miniProject.currentWeekNumber,
     );
 
-    console.log(`[Available-Projects] Current week number: ${miniProject.currentWeekNumber}`);
-    console.log(`[Available-Projects] Java projects in current week: ${currentWeek?.javaProjects?.length || 0}`);
-    console.log(`[Available-Projects] Python projects in current week: ${currentWeek?.pythonProjects?.length || 0}`);
-    console.log(`[Available-Projects] User's current language: ${currentLanguage}`);
-    console.log(`[Available-Projects] Filtered ${currentLanguage} projects: ${languageProjects.length}`);
-    
+    console.log(
+      `[Available-Projects] Current week number: ${miniProject.currentWeekNumber}`,
+    );
+    console.log(
+      `[Available-Projects] Java projects in current week: ${currentWeek?.javaProjects?.length || 0}`,
+    );
+    console.log(
+      `[Available-Projects] Python projects in current week: ${currentWeek?.pythonProjects?.length || 0}`,
+    );
+    console.log(
+      `[Available-Projects] User's current language: ${currentLanguage}`,
+    );
+    console.log(
+      `[Available-Projects] Filtered ${currentLanguage} projects: ${languageProjects.length}`,
+    );
+
     if (languageProjects.length > 0) {
-      console.log(`[Available-Projects] ${currentLanguage} project titles:`, languageProjects.map(p => p.title));
-      console.log(`[Available-Projects] PROJECTS EXIST - RETURNING FROM DATABASE`);
-      
+      console.log(
+        `[Available-Projects] ${currentLanguage} project titles:`,
+        languageProjects.map((p) => p.title),
+      );
+      console.log(
+        `[Available-Projects] PROJECTS EXIST - RETURNING FROM DATABASE`,
+      );
+
       // Projects exist, return them immediately without any generation
-      const completedThisWeek = miniProject.completedTasks.filter(task => {
+      const completedThisWeek = miniProject.completedTasks.filter((task) => {
         const taskDate = new Date(task.completedAt);
-        const weekStart = miniProject.weekStartDate ? new Date(miniProject.weekStartDate) : new Date(0);
-        return taskDate >= weekStart && task.status === 'submitted' && 
-               task.projectTitle && languageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
+        const weekStart = miniProject.weekStartDate
+          ? new Date(miniProject.weekStartDate)
+          : new Date(0);
+        return (
+          taskDate >= weekStart &&
+          task.status === "submitted" &&
+          task.projectTitle &&
+          languageProjects.some(
+            (p) => p.title.toLowerCase() === task.projectTitle.toLowerCase(),
+          )
+        );
       });
 
       const response = {
         availableProjects: languageProjects || [],
         completedThisWeek: completedThisWeek.length,
         weekStartDate: miniProject.weekStartDate,
-        allCompleted: completedThisWeek.length >= 3
+        allCompleted: completedThisWeek.length >= 3,
       };
 
       console.log(`[Available-Projects] ===== FINAL RESPONSE (FROM DB) =====`);
-      console.log(`[Available-Projects] Returning ${response.availableProjects.length} ${currentLanguage} projects`);
-      console.log(`[Available-Projects] Sample returned project:`, response.availableProjects[0] ? { title: response.availableProjects[0].title, language: response.availableProjects[0].language } : 'No projects');
+      console.log(
+        `[Available-Projects] Returning ${response.availableProjects.length} ${currentLanguage} projects`,
+      );
+      console.log(
+        `[Available-Projects] Sample returned project:`,
+        response.availableProjects[0]
+          ? {
+              title: response.availableProjects[0].title,
+              language: response.availableProjects[0].language,
+            }
+          : "No projects",
+      );
       console.log(`[Available-Projects] ============================`);
       return res.json(response);
     }
 
     // No projects exist for this language
-    console.log(`[Available-Projects] No ${currentLanguage} projects available`);
-      
+    console.log(
+      `[Available-Projects] No ${currentLanguage} projects available`,
+    );
+
     const surveyCompletedLanguages = user.surveyCompletedLanguages || [];
-    console.log(`[Available-Projects] Survey completed languages:`, surveyCompletedLanguages);
-    
+    console.log(
+      `[Available-Projects] Survey completed languages:`,
+      surveyCompletedLanguages,
+    );
+
     // Check if survey is completed for current language
     if (!surveyCompletedLanguages.includes(currentLanguage)) {
-      console.log(`[Available-Projects] Survey not completed for ${currentLanguage}`);
+      console.log(
+        `[Available-Projects] Survey not completed for ${currentLanguage}`,
+      );
       return res.json({
         availableProjects: [],
         completedThisWeek: 0,
         weekStartDate: miniProject.weekStartDate,
         allCompleted: false,
-        message: 'Please complete the onboarding survey to generate projects'
+        message: "Please complete the onboarding survey to generate projects",
       });
     }
-    
+
     // Survey is completed but no projects exist
-    console.log(`[Available-Projects] Survey completed for ${currentLanguage} but no projects exist`);
-    
+    console.log(
+      `[Available-Projects] Survey completed for ${currentLanguage} but no projects exist`,
+    );
+
     // Generate if it's from survey OR if generation was explicitly enabled (e.g. by advancing to next phase)
     if (!isFromSurvey && !miniProject.generationEnabled) {
-      console.log(`[Available-Projects] Generation NOT triggered - returning empty projects`);
+      console.log(
+        `[Available-Projects] Generation NOT triggered - returning empty projects`,
+      );
       return res.json({
         availableProjects: [],
         completedThisWeek: 0,
         weekStartDate: miniProject.weekStartDate,
         allCompleted: false,
-        message: `No projects available for ${currentLanguage}. Complete the onboarding survey to generate projects.`
+        message: `No projects available for ${currentLanguage}. Complete the onboarding survey to generate projects.`,
       });
     }
-    
+
     // Request is from survey - proceed with generation
-    console.log(`[Available-Projects] From survey - proceeding with generation...`);
-    
-    const Survey = (await import('../models/Survey.js')).default;
+    console.log(
+      `[Available-Projects] From survey - proceeding with generation...`,
+    );
+
+    const Survey = (await import("../models/Survey.js")).default;
     const survey = await Survey.findOne({ userId: req.user.userId });
-    
+
     if (!survey) {
       console.log(`[Available-Projects] No survey found for user`);
       return res.json({
@@ -193,144 +257,187 @@ router.get('/available-projects', authenticateToken, async (req, res) => {
         completedThisWeek: 0,
         weekStartDate: miniProject.weekStartDate,
         allCompleted: false,
-        message: 'Please complete the onboarding survey to generate projects'
+        message: "Please complete the onboarding survey to generate projects",
       });
     }
 
-    console.log(`[Available-Projects] Survey found, checking if generation is already in progress...`);
-    
+    console.log(
+      `[Available-Projects] Survey found, checking if generation is already in progress...`,
+    );
+
     // Check if projects were recently generated (within last 10 seconds) to prevent duplicate generation
     const recentGenerationTime = new Date(Date.now() - 10000); // 10 seconds ago
-    if (miniProject.lastGenerationDate && new Date(miniProject.lastGenerationDate) > recentGenerationTime) {
-      console.log(`[Available-Projects] Generation already in progress or completed recently, skipping...`);
+    if (
+      miniProject.lastGenerationDate &&
+      new Date(miniProject.lastGenerationDate) > recentGenerationTime
+    ) {
+      console.log(
+        `[Available-Projects] Generation already in progress or completed recently, skipping...`,
+      );
       return res.json({
         availableProjects: [],
         completedThisWeek: 0,
         weekStartDate: miniProject.weekStartDate,
         allCompleted: false,
-        message: 'Projects are being generated, please wait...'
+        message: "Projects are being generated, please wait...",
       });
     }
-    
-    console.log(`[Available-Projects] Starting project generation for ${currentLanguage}...`);
-    
+
+    console.log(
+      `[Available-Projects] Starting project generation for ${currentLanguage}...`,
+    );
+
     try {
-      const { generateWeeklyProjects } = await import('../services/projectGenerationService.js');
+      const { generateWeeklyProjects } =
+        await import("../services/projectGenerationService.js");
       const projects = await generateWeeklyProjects(req.user.userId);
-      
+
       if (projects && projects.length > 0) {
         const weekStartDate = miniProject.weekStartDate || new Date();
         const weekEndDate = new Date(weekStartDate);
         weekEndDate.setDate(weekEndDate.getDate() + 7);
-        
+
         // Use current week number if it exists, otherwise create week 1
         const weekNumber = miniProject.currentWeekNumber || 1;
         console.log(`[Available-Projects] Using week number: ${weekNumber}`);
-        
-        miniProject.addWeeklyGeneratedProjects(projects, weekNumber, weekStartDate, weekEndDate);
-        
+
+        miniProject.addWeeklyGeneratedProjects(
+          projects,
+          weekNumber,
+          weekStartDate,
+          weekEndDate,
+        );
+
         // Only set weekStartDate if it doesn't exist
         if (!miniProject.weekStartDate) {
           miniProject.weekStartDate = weekStartDate;
         }
-        
+
         await miniProject.save();
-        console.log(`[Available-Projects] Successfully generated ${projects.length} ${currentLanguage} projects for week ${weekNumber}`);
+        console.log(
+          `[Available-Projects] Successfully generated ${projects.length} ${currentLanguage} projects for week ${weekNumber}`,
+        );
       } else {
-        console.log(`[Available-Projects] Project generation returned empty array`);
+        console.log(
+          `[Available-Projects] Project generation returned empty array`,
+        );
       }
     } catch (genError) {
-      console.error(`[Available-Projects] Error generating projects:`, genError);
+      console.error(
+        `[Available-Projects] Error generating projects:`,
+        genError,
+      );
     }
-    
-    const updatedProject = await MiniProject.findOne({ userId: req.user.userId });
-    const updatedLanguageProjects = updatedProject.getProjectsByLanguage(currentLanguage);
-    
-    const completedThisWeek = updatedProject.completedTasks.filter(task => {
+
+    const updatedProject = await MiniProject.findOne({
+      userId: req.user.userId,
+    });
+    const updatedLanguageProjects =
+      updatedProject.getProjectsByLanguage(currentLanguage);
+
+    const completedThisWeek = updatedProject.completedTasks.filter((task) => {
       const taskDate = new Date(task.completedAt);
-      const weekStart = updatedProject.weekStartDate ? new Date(updatedProject.weekStartDate) : new Date(0);
-      return taskDate >= weekStart && task.status === 'submitted' && 
-             task.projectTitle && updatedLanguageProjects.some(p => p.title.toLowerCase() === task.projectTitle.toLowerCase());
+      const weekStart = updatedProject.weekStartDate
+        ? new Date(updatedProject.weekStartDate)
+        : new Date(0);
+      return (
+        taskDate >= weekStart &&
+        task.status === "submitted" &&
+        task.projectTitle &&
+        updatedLanguageProjects.some(
+          (p) => p.title.toLowerCase() === task.projectTitle.toLowerCase(),
+        )
+      );
     });
 
-    console.log(`[Available-Projects] Final ${currentLanguage} projects count: ${updatedLanguageProjects.length}`);
+    console.log(
+      `[Available-Projects] Final ${currentLanguage} projects count: ${updatedLanguageProjects.length}`,
+    );
 
     return res.json({
       availableProjects: updatedLanguageProjects || [],
       completedThisWeek: completedThisWeek.length,
       weekStartDate: updatedProject.weekStartDate,
-      allCompleted: completedThisWeek.length >= 3
+      allCompleted: completedThisWeek.length >= 3,
     });
   } catch (error) {
-    console.error('[Available-Projects] Error:', error);
-    console.error('[Available-Projects] Error stack:', error.stack);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("[Available-Projects] Error:", error);
+    console.error("[Available-Projects] Error stack:", error.stack);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-router.post('/complete-task', authenticateToken, async (req, res) => {
+router.post("/complete-task", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const { projectTitle, score, codeBase, aiAnalyization } = req.body;
 
     if (!projectTitle || score === undefined || !codeBase) {
-      return res.status(400).json({ message: 'Project title, score, and code base are required' });
+      return res
+        .status(400)
+        .json({ message: "Project title, score, and code base are required" });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
-    const completedThisWeek = miniProject.completedTasks.filter(task => {
+    const completedThisWeek = miniProject.completedTasks.filter((task) => {
       const taskDate = new Date(task.completedAt);
-      const weekStart = miniProject.weekStartDate ? new Date(miniProject.weekStartDate) : new Date(0);
-      return taskDate >= weekStart && task.status === 'submitted';
+      const weekStart = miniProject.weekStartDate
+        ? new Date(miniProject.weekStartDate)
+        : new Date(0);
+      return taskDate >= weekStart && task.status === "submitted";
     });
 
     if (completedThisWeek.length >= 3) {
-      return res.status(400).json({ 
-        message: 'You have already completed all 3 projects for this week. New projects will be available next Monday.' 
+      return res.status(400).json({
+        message:
+          "You have already completed all 3 projects for this week. New projects will be available next Monday.",
       });
     }
 
-    const User = (await import('../models/User.js')).default;
+    const User = (await import("../models/User.js")).default;
     const user = await User.findById(req.user.userId);
-    const currentLanguage = user?.primaryLanguage || 'java';
-    
+    const currentLanguage = user?.primaryLanguage || "java";
+
     // Get all projects from current week
     const currentWeek = miniProject.weeklyProjectHistory.find(
-      week => week.weekNumber === miniProject.currentWeekNumber
+      (week) => week.weekNumber === miniProject.currentWeekNumber,
     );
-    
+
     if (!currentWeek) {
-      return res.status(400).json({ 
-        message: 'No projects found for current week' 
+      return res.status(400).json({
+        message: "No projects found for current week",
       });
     }
-    
-    const allProjects = [...(currentWeek.javaProjects || []), ...(currentWeek.pythonProjects || [])];
+
+    const allProjects = [
+      ...(currentWeek.javaProjects || []),
+      ...(currentWeek.pythonProjects || []),
+    ];
     const projectExists = allProjects.some(
-      p => p.title.toLowerCase() === projectTitle.toLowerCase()
+      (p) => p.title.toLowerCase() === projectTitle.toLowerCase(),
     );
 
     if (!projectExists) {
-      return res.status(400).json({ 
-        message: 'This project is not in your available projects list' 
+      return res.status(400).json({
+        message: "This project is not in your available projects list",
       });
     }
 
     const alreadyCompleted = completedThisWeek.some(
-      task => task.projectTitle.toLowerCase() === projectTitle.toLowerCase()
+      (task) => task.projectTitle.toLowerCase() === projectTitle.toLowerCase(),
     );
 
     if (alreadyCompleted) {
-      return res.status(400).json({ 
-        message: 'You have already completed this project this week' 
+      return res.status(400).json({
+        message: "You have already completed this project this week",
       });
     }
 
@@ -338,236 +445,262 @@ router.post('/complete-task', authenticateToken, async (req, res) => {
       projectTitle,
       score,
       codeBase,
-      aiAnalyization: aiAnalyization || '',
-      completedAt: new Date()
+      aiAnalyization: aiAnalyization || "",
+      completedAt: new Date(),
     });
 
     await miniProject.save();
 
     // Award XP based on score
-    const { awardXp } = await import('../services/xpService.js');
+    const { awardXp } = await import("../services/xpService.js");
     const xpResult = await awardXp(
       req.user.userId,
       Math.round(score * 10), // 10 XP per point, so max 1000 XP
       `Mini project completion: ${projectTitle}`,
-      'projects'
+      "projects",
     );
 
     const newCompletedCount = completedThisWeek.length + 1;
 
     res.status(201).json({
-      message: 'Task completed successfully',
+      message: "Task completed successfully",
       completedThisWeek: newCompletedCount,
       allCompleted: newCompletedCount >= 3,
       xpAwarded: xpResult.awarded ? Math.round(score * 10) : 0,
       newTotalXp: xpResult.newXp,
       newLevel: xpResult.newLevel,
       leveledUp: xpResult.leveledUp,
-      miniProject
+      miniProject,
     });
   } catch (error) {
-    console.error('Complete task error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Complete task error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.get('/completed-tasks', authenticateToken, async (req, res) => {
+router.get("/completed-tasks", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
-    const completedThisWeek = miniProject.completedTasks.filter(task => {
+    const completedThisWeek = miniProject.completedTasks.filter((task) => {
       const taskDate = new Date(task.completedAt);
-      const weekStart = miniProject.weekStartDate ? new Date(miniProject.weekStartDate) : new Date(0);
-      return taskDate >= weekStart && task.status === 'submitted';
+      const weekStart = miniProject.weekStartDate
+        ? new Date(miniProject.weekStartDate)
+        : new Date(0);
+      return taskDate >= weekStart && task.status === "submitted";
     });
 
     res.json({
       completedTasks: miniProject.completedTasks,
       completedThisWeek: completedThisWeek,
-      totalThisWeek: completedThisWeek.length
+      totalThisWeek: completedThisWeek.length,
     });
   } catch (error) {
-    console.error('Get completed tasks error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Get completed tasks error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.delete('/completed-task/:taskId', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
-    }
+router.delete(
+  "/completed-task/:taskId",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "student") {
+        return res
+          .status(403)
+          .json({ message: "Access denied. Students only." });
+      }
 
-    const { taskId } = req.params;
+      const { taskId } = req.params;
+
+      const miniProject = await MiniProject.findOne({
+        userId: req.user.userId,
+      });
+
+      if (!miniProject) {
+        return res.status(404).json({ message: "Mini project data not found" });
+      }
+
+      miniProject.completedTasks = miniProject.completedTasks.filter(
+        (task) => task._id.toString() !== taskId,
+      );
+
+      await miniProject.save();
+
+      res.json({
+        message: "Task deleted successfully",
+        miniProject,
+      });
+    } catch (error) {
+      console.error("Delete task error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+router.post("/enable-generation", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
+    }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
-    }
-
-    miniProject.completedTasks = miniProject.completedTasks.filter(
-      task => task._id.toString() !== taskId
-    );
-
-    await miniProject.save();
-
-    res.json({
-      message: 'Task deleted successfully',
-      miniProject
-    });
-  } catch (error) {
-    console.error('Delete task error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.post('/enable-generation', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
-    }
-
-    const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
-    if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
     miniProject.enableGeneration();
     await miniProject.save();
 
     res.json({
-      message: 'Project generation enabled successfully',
+      message: "Project generation enabled successfully",
       generationEnabled: miniProject.generationEnabled,
-      lastGenerationDate: miniProject.lastGenerationDate
+      lastGenerationDate: miniProject.lastGenerationDate,
     });
   } catch (error) {
-    console.error('Enable generation error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Enable generation error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.post('/generate-weekly-projects', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
-    }
+router.post(
+  "/generate-weekly-projects",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "student") {
+        return res
+          .status(403)
+          .json({ message: "Access denied. Students only." });
+      }
 
-    const { projects, weekNumber, weekStartDate, weekEndDate } = req.body;
+      const { projects, weekNumber, weekStartDate, weekEndDate } = req.body;
 
-    if (!projects || !Array.isArray(projects) || projects.length === 0) {
-      return res.status(400).json({ message: 'Projects array is required' });
-    }
+      if (!projects || !Array.isArray(projects) || projects.length === 0) {
+        return res.status(400).json({ message: "Projects array is required" });
+      }
 
-    const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
-    if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
-    }
-
-    if (!miniProject.generationEnabled) {
-      return res.status(403).json({ 
-        message: 'Project generation is not enabled. Enable it first.' 
+      const miniProject = await MiniProject.findOne({
+        userId: req.user.userId,
       });
+
+      if (!miniProject) {
+        return res.status(404).json({ message: "Mini project data not found" });
+      }
+
+      if (!miniProject.generationEnabled) {
+        return res.status(403).json({
+          message: "Project generation is not enabled. Enable it first.",
+        });
+      }
+
+      miniProject.addWeeklyGeneratedProjects(
+        projects,
+        weekNumber,
+        weekStartDate ? new Date(weekStartDate) : undefined,
+        weekEndDate ? new Date(weekEndDate) : undefined,
+      );
+
+      await miniProject.save();
+
+      res.status(201).json({
+        message: "Weekly projects generated successfully",
+        weekNumber: miniProject.currentWeekNumber,
+        generatedCount: projects.length,
+        availableProjects: miniProject.availableProjects,
+        weeklyHistory: miniProject.weeklyProjectHistory,
+      });
+    } catch (error) {
+      console.error("Generate weekly projects error:", error);
+      res.status(500).json({ message: "Server error" });
     }
+  },
+);
 
-    miniProject.addWeeklyGeneratedProjects(
-      projects,
-      weekNumber,
-      weekStartDate ? new Date(weekStartDate) : undefined,
-      weekEndDate ? new Date(weekEndDate) : undefined
-    );
-
-    await miniProject.save();
-
-    res.status(201).json({
-      message: 'Weekly projects generated successfully',
-      weekNumber: miniProject.currentWeekNumber,
-      generatedCount: projects.length,
-      availableProjects: miniProject.availableProjects,
-      weeklyHistory: miniProject.weeklyProjectHistory
-    });
-  } catch (error) {
-    console.error('Generate weekly projects error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.get('/weekly-history', authenticateToken, async (req, res) => {
+router.get("/weekly-history", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
     res.json({
       weeklyHistory: miniProject.weeklyProjectHistory,
       currentWeekNumber: miniProject.currentWeekNumber,
       generationEnabled: miniProject.generationEnabled,
-      lastGenerationDate: miniProject.lastGenerationDate
+      lastGenerationDate: miniProject.lastGenerationDate,
     });
   } catch (error) {
-    console.error('Get weekly history error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Get weekly history error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.get('/projects-by-week/:weekNumber', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+router.get(
+  "/projects-by-week/:weekNumber",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "student") {
+        return res
+          .status(403)
+          .json({ message: "Access denied. Students only." });
+      }
+
+      const { weekNumber } = req.params;
+      const weekNum = parseInt(weekNumber);
+
+      if (isNaN(weekNum)) {
+        return res.status(400).json({ message: "Invalid week number" });
+      }
+
+      const miniProject = await MiniProject.findOne({
+        userId: req.user.userId,
+      });
+
+      if (!miniProject) {
+        return res.status(404).json({ message: "Mini project data not found" });
+      }
+
+      const weekProjects = miniProject.getProjectsByWeek(weekNum);
+
+      res.json({
+        weekNumber: weekNum,
+        projects: weekProjects,
+        projectCount: weekProjects.length,
+      });
+    } catch (error) {
+      console.error("Get projects by week error:", error);
+      res.status(500).json({ message: "Server error" });
     }
+  },
+);
 
-    const { weekNumber } = req.params;
-    const weekNum = parseInt(weekNumber);
-
-    if (isNaN(weekNum)) {
-      return res.status(400).json({ message: 'Invalid week number' });
+router.get("/current-week-projects", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
-    }
-
-    const weekProjects = miniProject.getProjectsByWeek(weekNum);
-
-    res.json({
-      weekNumber: weekNum,
-      projects: weekProjects,
-      projectCount: weekProjects.length
-    });
-  } catch (error) {
-    console.error('Get projects by week error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.get('/current-week-projects', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
-    }
-
-    const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
-    if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
     const currentWeekProjects = miniProject.getCurrentWeekProjects();
@@ -575,182 +708,211 @@ router.get('/current-week-projects', authenticateToken, async (req, res) => {
     res.json({
       weekNumber: miniProject.currentWeekNumber,
       projects: currentWeekProjects,
-      projectCount: currentWeekProjects.length
+      projectCount: currentWeekProjects.length,
     });
   } catch (error) {
-    console.error('Get current week projects error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Get current week projects error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.post('/trigger-generation', authenticateToken, async (req, res) => {
+router.post("/trigger-generation", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
     miniProject.enableGeneration();
-    
+
     miniProject.availableProjects = [];
     miniProject.weekStartDate = null;
-    
+
     await miniProject.save();
 
     await checkAndGenerateProjects(req.user.userId);
 
-    const updatedProject = await MiniProject.findOne({ userId: req.user.userId });
+    const updatedProject = await MiniProject.findOne({
+      userId: req.user.userId,
+    });
 
     res.json({
-      message: 'Generation triggered successfully',
+      message: "Generation triggered successfully",
       generationEnabled: updatedProject.generationEnabled,
       availableProjects: updatedProject.availableProjects,
       projectCount: updatedProject.availableProjects.length,
-      weekNumber: updatedProject.currentWeekNumber
+      weekNumber: updatedProject.currentWeekNumber,
     });
   } catch (error) {
-    console.error('Trigger generation error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Trigger generation error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-router.post('/save-progress', authenticateToken, async (req, res) => {
+router.post("/save-progress", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const { projectTitle, codeBase } = req.body;
 
     if (!projectTitle || !codeBase) {
-      return res.status(400).json({ message: 'Project title and code base are required' });
+      return res
+        .status(400)
+        .json({ message: "Project title and code base are required" });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
-    const User = (await import('../models/User.js')).default;
+    const User = (await import("../models/User.js")).default;
     const user = await User.findById(req.user.userId);
-    const currentLanguage = user?.primaryLanguage || 'java';
-    
+    const currentLanguage = user?.primaryLanguage || "java";
+
     // Get all projects from current week
     const currentWeek = miniProject.weeklyProjectHistory.find(
-      week => week.weekNumber === miniProject.currentWeekNumber
+      (week) => week.weekNumber === miniProject.currentWeekNumber,
     );
-    
+
     if (!currentWeek) {
-      return res.status(400).json({ 
-        message: 'No projects found for current week' 
+      return res.status(400).json({
+        message: "No projects found for current week",
       });
     }
-    
-    const allProjects = [...(currentWeek.javaProjects || []), ...(currentWeek.pythonProjects || [])];
+
+    const allProjects = [
+      ...(currentWeek.javaProjects || []),
+      ...(currentWeek.pythonProjects || []),
+    ];
     const projectExists = allProjects.some(
-      p => p.title.toLowerCase() === projectTitle.toLowerCase()
+      (p) => p.title.toLowerCase() === projectTitle.toLowerCase(),
     );
 
     if (!projectExists) {
-      return res.status(400).json({ 
-        message: 'This project is not in your available projects list' 
+      return res.status(400).json({
+        message: "This project is not in your available projects list",
       });
     }
 
     const existingTask = miniProject.completedTasks.find(
-      task => task.projectTitle.toLowerCase() === projectTitle.toLowerCase()
+      (task) => task.projectTitle.toLowerCase() === projectTitle.toLowerCase(),
     );
 
     if (existingTask) {
       existingTask.codeBase = codeBase;
-      existingTask.status = 'paused';
+      existingTask.status = "paused";
       existingTask.lastSavedAt = new Date();
     } else {
       miniProject.completedTasks.push({
         projectTitle,
         score: 0,
         codeBase,
-        aiAnalyization: '',
-        status: 'paused',
+        aiAnalyization: "",
+        status: "paused",
         completedAt: new Date(),
-        lastSavedAt: new Date()
+        lastSavedAt: new Date(),
       });
     }
 
     await miniProject.save();
 
     res.json({
-      message: 'Progress saved successfully',
-      status: 'paused',
-      miniProject
+      message: "Progress saved successfully",
+      status: "paused",
+      miniProject,
     });
   } catch (error) {
-    console.error('Save progress error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Save progress error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-router.post('/submit-project', authenticateToken, async (req, res) => {
+router.post("/submit-project", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const { projectTitle, codeBase } = req.body;
 
     if (!projectTitle || !codeBase) {
-      return res.status(400).json({ message: 'Project title and code base are required' });
+      return res
+        .status(400)
+        .json({ message: "Project title and code base are required" });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
-    const User = (await import('../models/User.js')).default;
+    const User = (await import("../models/User.js")).default;
     const user = await User.findById(req.user.userId);
-    const currentLanguage = user?.primaryLanguage || 'java';
-    
+    const currentLanguage = user?.primaryLanguage || "java";
+
     // Get all projects from current week
     const currentWeek = miniProject.weeklyProjectHistory.find(
-      week => week.weekNumber === miniProject.currentWeekNumber
+      (week) => week.weekNumber === miniProject.currentWeekNumber,
     );
-    
+
     if (!currentWeek) {
-      return res.status(400).json({ 
-        message: 'No projects found for current week' 
+      return res.status(400).json({
+        message: "No projects found for current week",
       });
     }
-    
-    const allProjects = [...(currentWeek.javaProjects || []), ...(currentWeek.pythonProjects || [])];
+
+    const allProjects = [
+      ...(currentWeek.javaProjects || []),
+      ...(currentWeek.pythonProjects || []),
+    ];
     const projectDetails = allProjects.find(
-      p => p.title.toLowerCase() === projectTitle.toLowerCase()
+      (p) => p.title.toLowerCase() === projectTitle.toLowerCase(),
     );
 
     if (!projectDetails) {
-      return res.status(400).json({ 
-        message: 'This project is not in your available projects list' 
+      return res.status(400).json({
+        message: "This project is not in your available projects list",
       });
     }
 
     console.log(`[Submit] Grading project: ${projectTitle}`);
-    const gradingResult = await gradeProject(projectDetails, codeBase);
-    console.log(`[Submit] Grading complete: Score ${gradingResult.score}, Passed: ${gradingResult.passed}`);
+    let gradingResult;
+    try {
+      gradingResult = await gradeProject(projectDetails, codeBase);
+      console.log(
+        `[Submit] Grading complete: Score ${gradingResult.score}, Passed: ${gradingResult.passed}`,
+      );
+    } catch (gradingError) {
+      console.error(
+        `[Submit] Grading failed for ${projectTitle}:`,
+        gradingError.message,
+      );
+      // Provide fallback grading result if AI grading fails
+      gradingResult = {
+        score: 0,
+        passed: false,
+        feedback:
+          "AI grading is temporarily unavailable. Your submission has been saved. Please contact your instructor for manual grading, or try resubmitting later.",
+      };
+    }
 
     const existingTask = miniProject.completedTasks.find(
-      task => task.projectTitle.toLowerCase() === projectTitle.toLowerCase()
+      (task) => task.projectTitle.toLowerCase() === projectTitle.toLowerCase(),
     );
 
     if (existingTask) {
       existingTask.codeBase = codeBase;
-      existingTask.status = 'submitted';
+      existingTask.status = "submitted";
       existingTask.score = gradingResult.score;
       existingTask.aiAnalyization = gradingResult.feedback;
       existingTask.lastSavedAt = new Date();
@@ -761,9 +923,9 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
         score: gradingResult.score,
         codeBase,
         aiAnalyization: gradingResult.feedback,
-        status: 'submitted',
+        status: "submitted",
         completedAt: new Date(),
-        lastSavedAt: new Date()
+        lastSavedAt: new Date(),
       });
     }
 
@@ -772,55 +934,65 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
     // Update progress tracking
     try {
       // Get user's enrolled classrooms
-      const User = (await import('../models/User.js')).default;
+      const User = (await import("../models/User.js")).default;
       const user = await User.findById(req.user.userId);
-      const Classroom = (await import('../models/Classroom.js')).default;
+      const Classroom = (await import("../models/Classroom.js")).default;
       const classrooms = await Classroom.find({
-        'students.studentId': req.user.userId
+        "students.studentId": req.user.userId,
       });
 
       // Update progress for each classroom
       for (const classroom of classrooms) {
         let progress = await Progress.findOne({
           student: req.user.userId,
-          classroom: classroom._id
+          classroom: classroom._id,
         });
-        
+
         if (!progress) {
           progress = new Progress({
             student: req.user.userId,
-            classroom: classroom._id
+            classroom: classroom._id,
           });
         }
 
         // Update mini-project progress
         progress.activities.miniProjects.completed++;
-        const total = progress.activities.miniProjects.averageScore * (progress.activities.miniProjects.completed - 1);
-        progress.activities.miniProjects.averageScore = (total + gradingResult.score) / progress.activities.miniProjects.completed;
+        const total =
+          progress.activities.miniProjects.averageScore *
+          (progress.activities.miniProjects.completed - 1);
+        progress.activities.miniProjects.averageScore =
+          (total + gradingResult.score) /
+          progress.activities.miniProjects.completed;
         progress.activities.miniProjects.lastCompleted = new Date();
 
         // Update language-specific progress
-        const language = user?.primaryLanguage || 'java';
+        const language = user?.primaryLanguage || "java";
         progress.skills[language].projectsCompleted++;
         progress.skills[language].lastActivity = new Date();
 
         // Update streaks
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
-        if (!progress.streaks.lastActiveDate || progress.streaks.lastActiveDate < today) {
+
+        if (
+          !progress.streaks.lastActiveDate ||
+          progress.streaks.lastActiveDate < today
+        ) {
           const yesterday = new Date(today);
           yesterday.setDate(yesterday.getDate() - 1);
-          
-          if (progress.streaks.lastActiveDate && progress.streaks.lastActiveDate >= yesterday) {
+
+          if (
+            progress.streaks.lastActiveDate &&
+            progress.streaks.lastActiveDate >= yesterday
+          ) {
             progress.streaks.currentStreak++;
           } else {
             progress.streaks.currentStreak = 1;
           }
-          
+
           progress.streaks.lastActiveDate = today;
           progress.streaks.totalActiveDays++;
-          
+
           if (progress.streaks.currentStreak > progress.streaks.longestStreak) {
             progress.streaks.longestStreak = progress.streaks.currentStreak;
           }
@@ -831,7 +1003,10 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
         await progress.save();
       }
     } catch (progressError) {
-      console.error('Error updating progress after mini-project submission:', progressError);
+      console.error(
+        "Error updating progress after mini-project submission:",
+        progressError,
+      );
       // Don't fail the submission if progress update fails
     }
 
@@ -840,104 +1015,123 @@ router.post('/submit-project', authenticateToken, async (req, res) => {
       const progressRecords = await Progress.find({ student: req.user.userId });
       for (const progress of progressRecords) {
         if (!progress.aiInteractions) {
-          progress.aiInteractions = { hintsRequested: 0, feedbackReceived: 0, lastHintAt: null, lastFeedbackAt: null };
+          progress.aiInteractions = {
+            hintsRequested: 0,
+            feedbackReceived: 0,
+            lastHintAt: null,
+            lastFeedbackAt: null,
+          };
         }
-        progress.aiInteractions.feedbackReceived = (progress.aiInteractions.feedbackReceived || 0) + 1;
+        progress.aiInteractions.feedbackReceived =
+          (progress.aiInteractions.feedbackReceived || 0) + 1;
         progress.aiInteractions.lastFeedbackAt = new Date();
         await progress.save();
       }
     } catch (trackErr) {
-      console.error('[MiniProject] Error tracking AI feedback:', trackErr);
+      console.error("[MiniProject] Error tracking AI feedback:", trackErr);
     }
 
     // Award XP based on score (even if not in a classroom)
     let leveledUp = false;
     let newLevel = user?.level || 1;
     try {
-      const { awardXp } = await import('../services/xpService.js');
+      const { awardXp } = await import("../services/xpService.js");
       const xpResult = await awardXp(
         req.user.userId,
         Math.round(gradingResult.score * 10),
         `Mini project submission: ${projectTitle}`,
-        'projects'
+        "projects",
       );
       if (xpResult) {
         leveledUp = xpResult.leveledUp;
         newLevel = xpResult.newLevel;
       }
     } catch (xpError) {
-      console.error('Error awarding XP for mini-project submission:', xpError);
+      console.error("Error awarding XP for mini-project submission:", xpError);
     }
 
     res.json({
-      message: 'Project submitted and graded successfully',
-      status: 'submitted',
+      message: "Project submitted and graded successfully",
+      status: "submitted",
       gradingResult,
       miniProject,
       leveledUp,
-      newLevel
+      newLevel,
     });
   } catch (error) {
-    console.error('Submit project error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Submit project error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-router.get('/project-progress/:projectTitle', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
-    }
-
-    const { projectTitle } = req.params;
-
-    const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
-    if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
-    }
-
-    const task = miniProject.completedTasks.find(
-      task => task.projectTitle.toLowerCase() === projectTitle.toLowerCase()
-    );
-
-    if (!task) {
-      return res.json({ 
-        found: false,
-        message: 'No saved progress found for this project' 
-      });
-    }
-
-    res.json({
-      found: true,
-      task: {
-        projectTitle: task.projectTitle,
-        codeBase: task.codeBase,
-        status: task.status,
-        lastSavedAt: task.lastSavedAt,
-        completedAt: task.completedAt
+router.get(
+  "/project-progress/:projectTitle",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "student") {
+        return res
+          .status(403)
+          .json({ message: "Access denied. Students only." });
       }
-    });
-  } catch (error) {
-    console.error('Get project progress error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
 
-router.post('/clear-and-regenerate', authenticateToken, async (req, res) => {
+      const { projectTitle } = req.params;
+
+      const miniProject = await MiniProject.findOne({
+        userId: req.user.userId,
+      });
+
+      if (!miniProject) {
+        return res.status(404).json({ message: "Mini project data not found" });
+      }
+
+      const task = miniProject.completedTasks.find(
+        (task) =>
+          task.projectTitle.toLowerCase() === projectTitle.toLowerCase(),
+      );
+
+      if (!task) {
+        return res.json({
+          found: false,
+          message: "No saved progress found for this project",
+        });
+      }
+
+      res.json({
+        found: true,
+        task: {
+          projectTitle: task.projectTitle,
+          codeBase: task.codeBase,
+          status: task.status,
+          lastSavedAt: task.lastSavedAt,
+          completedAt: task.completedAt,
+        },
+      });
+    } catch (error) {
+      console.error("Get project progress error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  },
+);
+
+router.post("/clear-and-regenerate", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ message: 'Access denied. Students only.' });
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
     }
 
     const miniProject = await MiniProject.findOne({ userId: req.user.userId });
-    
+
     if (!miniProject) {
-      return res.status(404).json({ message: 'Mini project data not found' });
+      return res.status(404).json({ message: "Mini project data not found" });
     }
 
-    console.log(`[Clear-Regenerate] Clearing old projects for user ${req.user.userId}`);
-    console.log(`[Clear-Regenerate] Old projects count: ${miniProject.availableProjects.length}`);
+    console.log(
+      `[Clear-Regenerate] Clearing old projects for user ${req.user.userId}`,
+    );
+    console.log(
+      `[Clear-Regenerate] Old projects count: ${miniProject.availableProjects.length}`,
+    );
 
     miniProject.availableProjects = [];
     miniProject.weeklyProjectHistory = [];
@@ -945,56 +1139,168 @@ router.post('/clear-and-regenerate', authenticateToken, async (req, res) => {
     miniProject.generationEnabled = true;
     miniProject.lastGenerationDate = new Date();
     miniProject.weekStartDate = new Date();
-    
-    await miniProject.save();
-    console.log(`[Clear-Regenerate] Projects cleared, triggering new generation...`);
 
-    const Survey = (await import('../models/Survey.js')).default;
-    const { generateWeeklyProjects } = await import('../services/projectGenerationService.js');
-    
+    await miniProject.save();
+    console.log(
+      `[Clear-Regenerate] Projects cleared, triggering new generation...`,
+    );
+
+    const Survey = (await import("../models/Survey.js")).default;
+    const { generateWeeklyProjects } =
+      await import("../services/projectGenerationService.js");
+
     const survey = await Survey.findOne({ userId: req.user.userId });
-    
+
     if (!survey) {
-      return res.status(400).json({ 
-        message: 'Please complete the onboarding survey first to generate projects' 
+      return res.status(400).json({
+        message:
+          "Please complete the onboarding survey first to generate projects",
       });
     }
 
     const projects = await generateWeeklyProjects(req.user.userId);
-    
+
     if (projects.length === 0) {
-      return res.status(500).json({ 
-        message: 'Failed to generate projects. AI service is unavailable.' 
+      return res.status(500).json({
+        message: "Failed to generate projects. AI service is unavailable.",
       });
     }
 
     const weekStartDate = new Date();
     const weekEndDate = new Date(weekStartDate);
     weekEndDate.setDate(weekEndDate.getDate() + 7);
-    
-    miniProject.addWeeklyGeneratedProjects(projects, 1, weekStartDate, weekEndDate);
+
+    miniProject.addWeeklyGeneratedProjects(
+      projects,
+      1,
+      weekStartDate,
+      weekEndDate,
+    );
     miniProject.weekStartDate = weekStartDate;
-    
+
     await miniProject.save();
 
-    const updatedProject = await MiniProject.findOne({ userId: req.user.userId });
+    const updatedProject = await MiniProject.findOne({
+      userId: req.user.userId,
+    });
 
-    console.log(`[Clear-Regenerate] Successfully generated ${updatedProject.availableProjects.length} new projects`);
+    console.log(
+      `[Clear-Regenerate] Successfully generated ${updatedProject.availableProjects.length} new projects`,
+    );
 
     res.json({
-      message: 'Projects cleared and regenerated successfully',
+      message: "Projects cleared and regenerated successfully",
       oldProjectsCount: 0,
       newProjectsCount: updatedProject.availableProjects.length,
       availableProjects: updatedProject.availableProjects,
       weekNumber: updatedProject.currentWeekNumber,
-      generationEnabled: updatedProject.generationEnabled
+      generationEnabled: updatedProject.generationEnabled,
     });
   } catch (error) {
-    console.error('[Clear-Regenerate] Error:', error);
-    res.status(500).json({ 
-      message: 'Server error during regeneration', 
-      error: error.message 
+    console.error("[Clear-Regenerate] Error:", error);
+    res.status(500).json({
+      message: "Server error during regeneration",
+      error: error.message,
     });
+  }
+});
+
+// Re-grade a submitted project
+router.post("/regrade-project", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied. Students only." });
+    }
+
+    const { projectTitle } = req.body;
+
+    if (!projectTitle) {
+      return res.status(400).json({ message: "Project title is required" });
+    }
+
+    const miniProject = await MiniProject.findOne({ userId: req.user.userId });
+
+    if (!miniProject) {
+      return res.status(404).json({ message: "Mini project data not found" });
+    }
+
+    // Find the submitted task
+    const existingTask = miniProject.completedTasks.find(
+      (task) => task.projectTitle.toLowerCase() === projectTitle.toLowerCase(),
+    );
+
+    if (!existingTask) {
+      return res
+        .status(404)
+        .json({ message: "Project not found in your submissions" });
+    }
+
+    if (existingTask.status !== "submitted") {
+      return res
+        .status(400)
+        .json({ message: "Only submitted projects can be re-graded" });
+    }
+
+    // Get project details
+    const currentWeek = miniProject.weeklyProjectHistory.find(
+      (week) => week.weekNumber === miniProject.currentWeekNumber,
+    );
+
+    if (!currentWeek) {
+      return res
+        .status(400)
+        .json({ message: "No projects found for current week" });
+    }
+
+    const allProjects = [
+      ...(currentWeek.javaProjects || []),
+      ...(currentWeek.pythonProjects || []),
+    ];
+    const projectDetails = allProjects.find(
+      (p) => p.title.toLowerCase() === projectTitle.toLowerCase(),
+    );
+
+    if (!projectDetails) {
+      return res.status(400).json({ message: "Project details not found" });
+    }
+
+    console.log(`[Regrade] Re-grading project: ${projectTitle}`);
+
+    try {
+      const gradingResult = await gradeProject(
+        projectDetails,
+        existingTask.codeBase,
+      );
+      console.log(
+        `[Regrade] Grading complete: Score ${gradingResult.score}, Passed: ${gradingResult.passed}`,
+      );
+
+      // Update the task with new grading
+      existingTask.score = gradingResult.score;
+      existingTask.aiAnalyization = gradingResult.feedback;
+      existingTask.lastSavedAt = new Date();
+
+      await miniProject.save();
+
+      res.json({
+        message: "Project re-graded successfully",
+        score: gradingResult.score,
+        passed: gradingResult.passed,
+        feedback: gradingResult.feedback,
+      });
+    } catch (gradingError) {
+      console.error(
+        `[Regrade] Grading failed for ${projectTitle}:`,
+        gradingError.message,
+      );
+      res.status(500).json({
+        message: "AI grading failed. Please try again later.",
+        error: gradingError.message,
+      });
+    }
+  } catch (error) {
+    console.error("Regrade project error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
