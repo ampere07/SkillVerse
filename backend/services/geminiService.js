@@ -1,10 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import GEMINI_CONFIG from '../config/geminiConfig.js';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import GEMINI_CONFIG from "../config/geminiConfig.js";
 
 const MODELS = [
-  'gemini-3-flash-preview',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-2.5-flash'
+  "gemini-3-flash-preview",
+  "gemini-3.1-flash-lite-preview",
+  "gemini-2.5-flash",
 ];
 
 const MAX_RETRIES = GEMINI_CONFIG.maxRetries || 3;
@@ -12,10 +12,10 @@ const MAX_RETRIES = GEMINI_CONFIG.maxRetries || 3;
 let genAI;
 
 if (!process.env.GEMINI_API_KEY) {
-  console.warn('WARNING: GEMINI_API_KEY is not set in environment variables');
+  console.warn("WARNING: GEMINI_API_KEY is not set in environment variables");
 } else {
   genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  console.log('Gemini Service Initialized');
+  console.log("Gemini Service Initialized");
 }
 
 export const generateWithRetry = async (prompt, _options = {}) => {
@@ -23,49 +23,54 @@ export const generateWithRetry = async (prompt, _options = {}) => {
   let currentModelIndex = 0;
 
   if (!genAI) {
-     throw new Error('Gemini API is not configured. Missing GEMINI_API_KEY.');
+    throw new Error("Gemini API is not configured. Missing GEMINI_API_KEY.");
   }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const modelName = MODELS[currentModelIndex] || MODELS[0];
     try {
-      console.log(`AI Generation attempt ${attempt}/${MAX_RETRIES} using model: ${modelName}`);
+      console.log(
+        `AI Generation attempt ${attempt}/${MAX_RETRIES} using model: ${modelName}`,
+      );
       const startTime = Date.now();
 
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
-      
+
       const response = {
         message: {
-          content: result.response.text()
-        }
+          content: result.response.text(),
+        },
       };
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-      console.log(`Generation completed in ${duration} seconds using ${modelName}`);
+      console.log(
+        `Generation completed in ${duration} seconds using ${modelName}`,
+      );
 
       return response;
-
     } catch (error) {
       lastError = error;
       const errorMessage = error.message.toLowerCase();
       console.error(`Attempt ${attempt} (${modelName}) failed:`, error.message);
 
       // If it's a quota error (429), exhausted error, or overloaded (503)
-      const isQuotaError = 
-        errorMessage.includes('429') || 
-        errorMessage.includes('quota') || 
-        errorMessage.includes('exhausted') || 
-        errorMessage.includes('overloaded') || 
-        errorMessage.includes('limit') ||
+      const isQuotaError =
+        errorMessage.includes("429") ||
+        errorMessage.includes("quota") ||
+        errorMessage.includes("exhausted") ||
+        errorMessage.includes("overloaded") ||
+        errorMessage.includes("limit") ||
         error.status === 429 ||
         (error.response && error.response.status === 429);
 
       if (isQuotaError) {
         if (currentModelIndex < MODELS.length - 1) {
           currentModelIndex++;
-          console.log(`Quota reached/Overloaded for ${modelName}. Falling back to ${MODELS[currentModelIndex]}...`);
-          attempt--; 
+          console.log(
+            `Quota reached/Overloaded for ${modelName}. Falling back to ${MODELS[currentModelIndex]}...`,
+          );
+          attempt--;
           continue;
         }
       }
@@ -73,17 +78,22 @@ export const generateWithRetry = async (prompt, _options = {}) => {
       if (attempt < MAX_RETRIES) {
         const delay = 2000 * attempt;
         console.log(`Retrying SAME model in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
 
-  throw new Error(`AI generation failed after ${MAX_RETRIES} attempts and model fallbacks: ${lastError.message}`);
+  throw new Error(
+    `AI generation failed after ${MAX_RETRIES} attempts and model fallbacks: ${lastError.message}`,
+  );
 };
 
-export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => {
+export const analyzeStudentSkills = async (
+  surveyData,
+  fullName = "Student",
+) => {
   try {
-    console.log('[Survey] Starting AI analysis for student skills...');
+    console.log("[Survey] Starting AI analysis for student skills...");
     const startTime = Date.now();
 
     const prompt = constructPrompt(surveyData, fullName);
@@ -92,7 +102,7 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
       temperature: 0.7,
       top_p: 0.95,
       num_predict: 1000,
-      num_thread: 10
+      num_thread: 10,
     });
 
     const endTime = Date.now();
@@ -102,26 +112,26 @@ export const analyzeStudentSkills = async (surveyData, fullName = 'Student') => 
     const analysis = response.message.content;
 
     if (!analysis || analysis.trim().length === 0) {
-      throw new Error('Empty analysis received from AI');
+      throw new Error("Empty analysis received from AI");
     }
 
-    console.log('[Survey] AI analysis completed successfully');
+    console.log("[Survey] AI analysis completed successfully");
 
     const roadmap = parseRoadmap(analysis);
 
     return {
       success: true,
       analysis: analysis.trim(),
-      roadmap: roadmap
+      roadmap: roadmap,
     };
   } catch (error) {
-    console.error('AI Service Error:', error.message);
-    console.error('Error stack:', error.stack);
+    console.error("AI Service Error:", error.message);
+    console.error("Error stack:", error.stack);
     return {
       success: false,
       error: error.message,
       analysis: null,
-      roadmap: null
+      roadmap: null,
     };
   }
 };
@@ -130,7 +140,7 @@ const parseRoadmap = (analysisText) => {
   const roadmap = {
     phase1: [],
     phase2: [],
-    phase3: []
+    phase3: [],
   };
 
   const phase1Match = analysisText.match(/Phase 1[:\s-]*(.+?)(?=Phase 2|$)/is);
@@ -139,32 +149,44 @@ const parseRoadmap = (analysisText) => {
 
   if (phase1Match) {
     const items = phase1Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
-    if (items) roadmap.phase1 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
+    if (items)
+      roadmap.phase1 = items.map((item) => item.replace(/^[-•]\s*/, "").trim());
   }
 
   if (phase2Match) {
     const items = phase2Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
-    if (items) roadmap.phase2 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
+    if (items)
+      roadmap.phase2 = items.map((item) => item.replace(/^[-•]\s*/, "").trim());
   }
 
   if (phase3Match) {
     const items = phase3Match[1].match(/[-•]\s*(.+?)(?=\n|$)/g);
-    if (items) roadmap.phase3 = items.map(item => item.replace(/^[-•]\s*/, '').trim());
+    if (items)
+      roadmap.phase3 = items.map((item) => item.replace(/^[-•]\s*/, "").trim());
   }
 
   return roadmap;
 };
 
-const constructPrompt = (surveyData, fullName = 'Student') => {
-  const { primaryLanguage, javaExpertise, pythonExpertise, javaQuestions, pythonQuestions } = surveyData;
+const constructPrompt = (surveyData, fullName = "Student") => {
+  const {
+    primaryLanguage,
+    javaExpertise,
+    pythonExpertise,
+    javaQuestions,
+    pythonQuestions,
+  } = surveyData;
 
   const language = primaryLanguage;
-  const currentLevel = primaryLanguage === 'java' ? (javaExpertise || 'not specified') : (pythonExpertise || 'not specified');
+  const currentLevel =
+    primaryLanguage === "java"
+      ? javaExpertise || "not specified"
+      : pythonExpertise || "not specified";
 
   let prompt = `Create a personalized learning roadmap for this student.
 
 Student Profile:
-Primary Language: ${language === 'java' ? 'Java' : 'Python'}
+Primary Language: ${language === "java" ? "Java" : "Python"}
 Self-Assessment Level: ${currentLevel}
 
 `;
@@ -172,40 +194,43 @@ Self-Assessment Level: ${currentLevel}
   let strengths = [];
   let weaknesses = [];
 
-  if (primaryLanguage === 'java' && javaQuestions?.score) {
+  if (primaryLanguage === "java" && javaQuestions?.score) {
     const score = javaQuestions.score;
 
-    if (score.easy >= 2) strengths.push('basic Java syntax and fundamentals');
-    else weaknesses.push('basic Java syntax');
+    if (score.easy >= 2) strengths.push("basic Java syntax and fundamentals");
+    else weaknesses.push("basic Java syntax");
 
-    if (score.medium >= 2) strengths.push('intermediate concepts like collections and OOP');
-    else weaknesses.push('object-oriented programming concepts');
+    if (score.medium >= 2)
+      strengths.push("intermediate concepts like collections and OOP");
+    else weaknesses.push("object-oriented programming concepts");
 
-    if (score.hard >= 2) strengths.push('advanced Java features and algorithms');
-    else weaknesses.push('advanced programming concepts');
+    if (score.hard >= 2)
+      strengths.push("advanced Java features and algorithms");
+    else weaknesses.push("advanced programming concepts");
 
     prompt += `Java Assessment Analysis:
-Based on the assessment, the student shows understanding in: ${strengths.length > 0 ? strengths.join(', ') : 'foundational concepts'}
-Areas that need improvement: ${weaknesses.length > 0 ? weaknesses.join(', ') : 'continue practicing'}
+Based on the assessment, the student shows understanding in: ${strengths.length > 0 ? strengths.join(", ") : "foundational concepts"}
+Areas that need improvement: ${weaknesses.length > 0 ? weaknesses.join(", ") : "continue practicing"}
 
 `;
   }
 
-  if (primaryLanguage === 'python' && pythonQuestions?.score) {
+  if (primaryLanguage === "python" && pythonQuestions?.score) {
     const score = pythonQuestions.score;
 
-    if (score.easy >= 2) strengths.push('basic Python syntax and fundamentals');
-    else weaknesses.push('basic Python syntax');
+    if (score.easy >= 2) strengths.push("basic Python syntax and fundamentals");
+    else weaknesses.push("basic Python syntax");
 
-    if (score.medium >= 2) strengths.push('intermediate concepts like data structures');
-    else weaknesses.push('data structures and algorithms');
+    if (score.medium >= 2)
+      strengths.push("intermediate concepts like data structures");
+    else weaknesses.push("data structures and algorithms");
 
-    if (score.hard >= 2) strengths.push('advanced Python features');
-    else weaknesses.push('advanced programming concepts');
+    if (score.hard >= 2) strengths.push("advanced Python features");
+    else weaknesses.push("advanced programming concepts");
 
     prompt += `Python Assessment Analysis:
-Based on the assessment, the student shows understanding in: ${strengths.length > 0 ? strengths.join(', ') : 'foundational concepts'}
-Areas that need improvement: ${weaknesses.length > 0 ? weaknesses.join(', ') : 'continue practicing'}
+Based on the assessment, the student shows understanding in: ${strengths.length > 0 ? strengths.join(", ") : "foundational concepts"}
+Areas that need improvement: ${weaknesses.length > 0 ? weaknesses.join(", ") : "continue practicing"}
 
 `;
   }
@@ -261,8 +286,8 @@ CRITICAL REQUIREMENTS FOR ROADMAP:
    - Progressive (each builds on previous)
 
 CONCEPT SELECTION BASED ON ASSESSMENT:
-${strengths.length > 0 ? `Student Strengths: ${strengths.join(', ')}` : ''}
-${weaknesses.length > 0 ? `Student Weaknesses: ${weaknesses.join(', ')}` : ''}
+${strengths.length > 0 ? `Student Strengths: ${strengths.join(", ")}` : ""}
+${weaknesses.length > 0 ? `Student Weaknesses: ${weaknesses.join(", ")}` : ""}
 
 For Phase 1, first item MUST be from their strengths to build confidence.
 For Phase 2 and 3, focus on addressing their weaknesses progressively.
@@ -273,24 +298,24 @@ Hi ${fullName},
 
 Welcome to SkillVerse!
 
-You have a solid understanding of ${strengths.length > 0 ? strengths[0] : 'basic programming concepts'}. This foundation will help you tackle more complex topics. Your ability to work with these concepts shows you are ready to grow your skills.
+You have a solid understanding of ${strengths.length > 0 ? strengths[0] : "basic programming concepts"}. This foundation will help you tackle more complex topics. Your ability to work with these concepts shows you are ready to grow your skills.
 
 We will guide you through a structured path from where you are now to more advanced topics. Each phase builds on the previous one, so you will learn step by step. By the end, you will have the skills to build real projects confidently.
 
 Your Learning Roadmap:
 
 Phase 1 - Foundation
-- ${strengths.length > 0 ? strengths[0] : 'Basic syntax and variables'} (practice what you know)
-- ${weaknesses.length > 0 ? weaknesses[0] : 'Understanding conditional statements'} (new skill)
+- ${strengths.length > 0 ? strengths[0] : "Basic syntax and variables"} (practice what you know)
+- ${weaknesses.length > 0 ? weaknesses[0] : "Understanding conditional statements"} (new skill)
 - Working with loops and iteration (new skill)
 
 Phase 2 - Building Skills
-- ${weaknesses.length > 1 ? weaknesses[1] : 'Object-oriented programming basics'} (intermediate)
+- ${weaknesses.length > 1 ? weaknesses[1] : "Object-oriented programming basics"} (intermediate)
 - Working with collections and data structures (intermediate)
 - Understanding inheritance and polymorphism (intermediate)
 
 Phase 3 - Advanced Practice
-- ${weaknesses.length > 2 ? weaknesses[2] : 'Algorithm design and problem solving'} (advanced)
+- ${weaknesses.length > 2 ? weaknesses[2] : "Algorithm design and problem solving"} (advanced)
 - Implementing common data structures (advanced)
 - Understanding design patterns (advanced)
 
@@ -325,73 +350,69 @@ Now create the analysis and roadmap for this ${currentLevel} level ${language} s
 export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
   const language = primaryLanguage.toLowerCase();
 
-  if (language === 'java') {
+  if (language === "java") {
     return {
       phase1: [
-        'Variables and data types',
-        'Conditional statements (if/else)',
-        'Loops and iteration'
+        "Variables and data types",
+        "Conditional statements (if/else)",
+        "Loops and iteration",
       ],
       phase2: [
-        'Object-oriented programming basics',
-        'Classes and objects',
-        'Inheritance and polymorphism'
+        "Object-oriented programming basics",
+        "Classes and objects",
+        "Inheritance and polymorphism",
       ],
       phase3: [
-        'Abstract classes and interfaces',
-        'Generic types and methods',
-        'Lambda expressions and streams'
-      ]
+        "Abstract classes and interfaces",
+        "Generic types and methods",
+        "Lambda expressions and streams",
+      ],
     };
-  } else if (language === 'python') {
+  } else if (language === "python") {
     return {
       phase1: [
-        'Variables and data types',
-        'Conditional statements (if/elif/else)',
-        'Loops (for/while)'
+        "Variables and data types",
+        "Conditional statements (if/elif/else)",
+        "Loops (for/while)",
       ],
-      phase2: [
-        'Dictionaries and sets',
-        'List comprehensions',
-        'File handling'
-      ],
+      phase2: ["Dictionaries and sets", "List comprehensions", "File handling"],
       phase3: [
-        'Decorators and generators',
-        'Working with APIs',
-        'Data processing with pandas'
-      ]
+        "Decorators and generators",
+        "Working with APIs",
+        "Data processing with pandas",
+      ],
     };
   }
 
   return {
-    phase1: ['Basic syntax', 'Variables', 'Conditionals'],
-    phase2: ['OOP basics', 'Classes', 'Inheritance'],
-    phase3: ['Advanced OOP', 'Algorithms', 'Design patterns']
+    phase1: ["Basic syntax", "Variables", "Conditionals"],
+    phase2: ["OOP basics", "Classes", "Inheritance"],
+    phase3: ["Advanced OOP", "Algorithms", "Design patterns"],
   };
 };
 
 export const checkGeminiConnection = async () => {
   try {
     if (genAI) {
-       // Just doing a simple fast query to ensure API key is valid using the primary model
-       const model = genAI.getGenerativeModel({ model: MODELS[0] });
-       const result = await model.generateContent("hello");
-       if (result) {
-         return {
-           connected: true,
-           model: MODELS[0],
-           availableModels: MODELS,
-           mode: 'Gemini'
-         };
-       }
+      // Just doing a simple fast query to ensure API key is valid using the primary model
+      const model = genAI.getGenerativeModel({ model: MODELS[0] });
+      const result = await model.generateContent("hello");
+      if (result) {
+        return {
+          connected: true,
+          model: MODELS[0],
+          availableModels: MODELS,
+          mode: "Gemini",
+        };
+      }
     }
     throw new Error("Unable to connect to Gemini via SDK");
   } catch (error) {
-    console.error('AI connection failed:', error.message);
+    console.error("AI connection failed:", error.message);
     return {
       connected: false,
       error: error.message,
-      mode: 'Gemini'
+      mode: "Gemini",
     };
   }
 };
