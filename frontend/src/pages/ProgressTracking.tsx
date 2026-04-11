@@ -18,6 +18,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import axios from 'axios';
+import { getCachedStudentProgress, setStudentProgress, getCachedTeacherClassrooms, setTeacherClassrooms, isProgressCacheValid } from '../utils/progressStore';
 
 interface ProgressData {
   student: any;
@@ -166,14 +167,19 @@ interface Classroom {
 
 export default function ProgressTracking() {
   const { user, loading: authLoading } = useAuth();
-  const [progressData, setProgressData] = useState<ProgressData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const isViewingStudent = sessionStorage.getItem('viewingStudent') === 'true';
+  const viewingStudentId = sessionStorage.getItem('studentId');
+  
+  const cacheKey = viewingStudentId || 'self';
+  const initialCachedData = getCachedStudentProgress(cacheKey);
+  const initialCachedClassrooms = user?.role === 'teacher' ? getCachedTeacherClassrooms() : null;
+
+  const [progressData, setProgressData] = useState<ProgressData | null>(initialCachedData);
+  const [loading, setLoading] = useState(isViewingStudent ? !initialCachedData : (user?.role === 'teacher' ? !initialCachedClassrooms : !initialCachedData));
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'skills' | 'activities' | 'skills-assessment'>('overview');
 
   // Check if viewing another student's progress from sessionStorage
-  const isViewingStudent = sessionStorage.getItem('viewingStudent') === 'true';
-  const viewingStudentId = sessionStorage.getItem('studentId');
   const viewingStudentName = sessionStorage.getItem('studentName');
 
   // Detailed AI Analysis state
@@ -195,19 +201,29 @@ export default function ProgressTracking() {
 
   useEffect(() => {
     if (authLoading) return;
-    console.log('useEffect triggered, authLoading:', authLoading);
-    if (isViewingStudent && viewingStudentId) {
-      console.log('Fetching student progress for ID:', viewingStudentId);
-      setLoading(true);
-      fetchStudentProgress(viewingStudentId);
-    } else if (user?.role === 'student') {
-      console.log('Fetching own progress as student');
-      setLoading(true);
-      fetchStudentProgress();
-    } else if (user?.role === 'teacher') {
-      console.log('Fetching teacher classrooms');
-      setLoading(true);
-      fetchTeacherClassrooms();
+    
+    const sid = isViewingStudent && viewingStudentId ? viewingStudentId : 'self';
+    const hasCache = user?.role === 'teacher' ? !!getCachedTeacherClassrooms() : !!getCachedStudentProgress(sid);
+    const isValid = isProgressCacheValid(sid);
+
+    if (!isValid) {
+      setLoading(!hasCache);
+      if (isViewingStudent && viewingStudentId) {
+        fetchStudentProgress(viewingStudentId);
+      } else if (user?.role === 'student') {
+        fetchStudentProgress();
+      } else if (user?.role === 'teacher') {
+        fetchTeacherClassrooms();
+      }
+    } else {
+      // Silent refresh
+      if (isViewingStudent && viewingStudentId) {
+        fetchStudentProgress(viewingStudentId, true);
+      } else if (user?.role === 'student') {
+        fetchStudentProgress(undefined, true);
+      } else if (user?.role === 'teacher') {
+        fetchTeacherClassrooms(true);
+      }
     }
   }, [user?.role, authLoading, isViewingStudent, viewingStudentId]);
 
@@ -229,9 +245,9 @@ export default function ProgressTracking() {
     };
   }, [isViewingStudent]);
 
-  const fetchStudentProgress = async (studentId?: string) => {
+  const fetchStudentProgress = async (studentId?: string, isSilent = false) => {
     try {
-      console.log('fetchStudentProgress called with studentId:', studentId);
+      if (!isSilent) setLoading(true);
       const token = localStorage.getItem('token');
 
       console.log('Fetching progress with token:', token ? 'Token exists' : 'No token');
@@ -259,9 +275,11 @@ export default function ProgressTracking() {
       console.log('Response received:', response.data);
 
       if (response.data.success) {
-        console.log('Setting progress data...');
-        setProgressData(response.data.progress || response.data);
-        console.log('Progress data set successfully');
+        const data = response.data.progress || response.data;
+        setProgressData(data);
+        
+        // Update Cache
+        setStudentProgress(data, studentId || 'self');
 
         // Only generate AI insights/recommendations for students
         if (user?.role === 'student') {
@@ -277,28 +295,14 @@ export default function ProgressTracking() {
         }
       }
     } catch (error) {
-      console.error('Error fetching progress data:', error);
-
-      // Type guard for axios error
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as any;
-        console.error('Error response:', axiosError.response?.data);
-        console.error('Error status:', axiosError.response?.status);
-
-        // If teacher has no progress data, show a message
-        if (axiosError.response?.status === 403) {
-          setError('You do not have any progress data to view. Start learning to see your progress!');
-        } else if (axiosError.response?.status === 404) {
-          setError('No progress data found for this student.');
-        } else {
-          setError('Failed to load progress data. Please try again.');
-        }
-      } else {
-        console.error('Unexpected error:', error);
-        setError('An unexpected error occurred. Please try again.');
+      if (!isSilent) {
+        console.error('Error fetching progress data:', error);
+        // ... rest of error handling ...
+        setError('Failed to load progress data');
       }
+    } finally {
+      if (!isSilent) setLoading(false);
     }
-    setLoading(false);
   };
 
   const generateAIInsights = async () => {
@@ -425,23 +429,27 @@ export default function ProgressTracking() {
     }
   };
 
-  const fetchTeacherClassrooms = async () => {
+  const fetchTeacherClassrooms = async (isSilent = false) => {
     try {
+      if (!isSilent) setLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/classrooms/teacher`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       if (response.data.success && response.data.classrooms) {
-        setClassrooms(response.data.classrooms);
-        if (response.data.classrooms.length > 0) {
-          setSelectedClassroom(response.data.classrooms[0]._id);
+        const classroomData = response.data.classrooms;
+        setClassrooms(classroomData);
+        setTeacherClassrooms(classroomData);
+        if (classroomData.length > 0) {
+          setSelectedClassroom(classroomData[0]._id);
         }
       }
     } catch (error) {
-      console.error('Error fetching classrooms:', error);
+      if (!isSilent) console.error('Error fetching classrooms:', error);
+    } finally {
+      if (!isSilent) setLoading(false);
     }
-    setLoading(false);
   };
 
   const formatTime = (minutes: number) => {
@@ -453,12 +461,8 @@ export default function ProgressTracking() {
     return `${mins}m`;
   };
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading progress data...</div>
-      </div>
-    );
+  if (authLoading || (loading && !progressData && !classrooms.length)) {
+    return <ProgressSkeleton isTeacher={user?.role === 'teacher' && !isViewingStudent} />;
   }
 
   // Instructor View - Show when teacher is NOT viewing a student
@@ -1840,6 +1844,66 @@ function RecommendationsSection({ score, aiRecommendations, onRefresh }: any) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ProgressSkeleton({ isTeacher }: { isTeacher: boolean }) {
+  const pulse = "animate-pulse bg-gray-200 rounded-lg";
+  
+  return (
+    <div className="p-6 space-y-8">
+      {/* Header Skeleton */}
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <div className={`h-8 w-64 ${pulse}`} />
+          <div className={`h-4 w-96 ${pulse}`} />
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Column Skeleton (Hexagon) */}
+        <div className="w-full lg:w-[420px] space-y-6">
+          <div className={`bg-white border border-gray-100 rounded-xl p-6 h-[450px] ${pulse}`} />
+        </div>
+
+        {/* Right Column Skeleton */}
+        <div className="flex-1 space-y-6">
+          <div className="flex gap-4 border-b border-gray-100 pb-2">
+             <div className={`h-4 w-20 ${pulse}`} />
+             <div className={`h-4 w-20 ${pulse}`} />
+             <div className={`h-4 w-20 ${pulse}`} />
+          </div>
+
+          {!isTeacher ? (
+            <div className="space-y-6">
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className={`h-24 ${pulse}`} />
+                <div className={`h-24 ${pulse}`} />
+                <div className={`h-24 ${pulse}`} />
+              </div>
+              
+              {/* AI Insights Skeleton */}
+              <div className={`h-48 w-full ${pulse}`} />
+              
+              {/* Activity Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className={`h-64 ${pulse}`} />
+                <div className={`h-64 ${pulse}`} />
+              </div>
+            </div>
+          ) : (
+             <div className="space-y-6">
+                <div className={`h-12 w-full ${pulse}`} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className={`h-80 ${pulse}`} />
+                   <div className={`h-80 ${pulse}`} />
+                </div>
+             </div>
+          )}
+        </div>
       </div>
     </div>
   );

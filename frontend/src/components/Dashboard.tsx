@@ -12,6 +12,7 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { connectSocket, disconnectSocket, getSocket } from "../utils/socket";
 import LevelUpModal from "./LevelUpModal";
+import { getCachedDashboardData, setDashboardData, isCacheValid } from "../utils/dashboardStore";
 
 const getSafeName = (user: any) => {
   if (!user?.name || user.name.toLowerCase().includes("undefined")) {
@@ -124,12 +125,14 @@ export default function Dashboard() {
     null,
   );
   const miniProjectsRef = useRef<any>(null);
-  const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
-  const [completedProjectsCount, setCompletedProjectsCount] = useState(0);
+  const initialData = getCachedDashboardData();
 
-  const [activeAssignmentsCount, setActiveAssignmentsCount] = useState(0);
-  const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(initialData?.enrolledCoursesCount || 0);
+  const [completedProjectsCount, setCompletedProjectsCount] = useState(initialData?.completedProjectsCount || 0);
+
+  const [activeAssignmentsCount, setActiveAssignmentsCount] = useState(initialData?.activeAssignmentsCount || 0);
+  const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>(initialData?.upcomingAssignments || []);
+  const [recentActivities, setRecentActivities] = useState<any[]>(initialData?.recentActivities || []);
   const [createPostClassroomId, setCreatePostClassroomId] = useState<
     string | null
   >(null);
@@ -189,6 +192,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (user?.role === "student") {
+      // If we have cached data and it's valid, we still fetch in the background (silent refresh)
+      // but the user already sees the cached data.
       fetchDashboardStats();
     }
   }, [user]);
@@ -371,6 +376,20 @@ export default function Dashboard() {
                 },
               ],
         );
+
+        // Update store
+        setDashboardData({
+          enrolledCoursesCount: coursesData.enrolledCourses?.length || 0,
+          completedProjectsCount: completedCount,
+          activeAssignmentsCount: activeCount,
+          upcomingAssignments: upcomingActivities,
+          recentActivities: sortedActivities.length > 0 ? sortedActivities : [{
+            title: "No recent activities",
+            subtitle: "",
+            timeAgo: "Get started with your first activity!",
+            type: "empty",
+          }]
+        });
       }
     } catch (error) {
       // Error fetching dashboard stats
@@ -724,10 +743,22 @@ function StudentDashboardContent({
   onMiniProjectsClick,
 }: StudentDashboardContentProps) {
   const [projects, setProjects] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { logout } = useAuth();
 
   useEffect(() => {
-    fetchMiniProjects();
+    const cachedData = getCachedDashboardData();
+    if (cachedData && cachedData.availableProjects.length > 0) {
+      setProjects(cachedData.availableProjects);
+      setIsLoading(false);
+      // If cache is valid, we don't necessarily need to refetch immediately,
+      // but we can do a silent refresh if needed.
+      if (!isCacheValid()) {
+        fetchMiniProjects();
+      }
+    } else {
+      fetchMiniProjects();
+    }
   }, []);
 
   const fetchMiniProjects = async () => {
@@ -775,19 +806,30 @@ function StudentDashboardContent({
               )
               .slice(0, 4);
             setProjects(incompleteProjects);
+            setDashboardData({ availableProjects: incompleteProjects });
           } else {
             // If endpoint doesn't exist, just show all available projects
-            setProjects(data.availableProjects.slice(0, 4));
+            const projectsSlice = data.availableProjects.slice(0, 4);
+            setProjects(projectsSlice);
+            setDashboardData({ availableProjects: projectsSlice });
           }
         } catch (err) {
           // If there's an error fetching completed tasks, just show all available projects
-          setProjects(data.availableProjects.slice(0, 4));
+          const projectsSlice = data.availableProjects.slice(0, 4);
+          setProjects(projectsSlice);
+          setDashboardData({ availableProjects: projectsSlice });
         }
       }
     } catch (error) {
       // Error fetching mini projects
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (isLoading && !getCachedDashboardData()) {
+    return <DashboardSkeleton user={user} />;
+  }
 
   return (
     <div className="max-w-[1280px] mx-auto">
@@ -1060,6 +1102,99 @@ function StatCard({
             className={`h-full ${colorClasses[color]} rounded-full transition-all duration-300`}
             style={{ width: `${progress}%` }}
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardSkeleton({ user }: { user: any }) {
+  const skeletonPulse = "animate-pulse bg-[#EEEEEE] rounded-lg";
+  
+  return (
+    <div className="max-w-[1280px] mx-auto">
+      {/* Welcome Header */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <div className={`h-8 w-64 ${skeletonPulse}`} />
+          <div className="w-6 h-6 rounded-full bg-[#EEEEEE] animate-pulse" />
+        </div>
+        <div className={`h-5 w-96 ${skeletonPulse}`} />
+      </div>
+
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-white border border-[#E0E0E0] rounded-xl p-5 shadow-sm">
+            <div className="w-12 h-12 rounded-lg bg-[#EEEEEE] animate-pulse mb-4" />
+            <div className="space-y-2">
+              <div className="h-10 w-16 bg-[#EEEEEE] animate-pulse rounded" />
+              <div className="h-4 w-32 bg-[#EEEEEE] animate-pulse rounded" />
+              <div className="w-full h-0.5 bg-[#F5F5F5] rounded-full overflow-hidden">
+                <div className="h-full w-0 bg-[#EEEEEE]" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left Column */}
+        <div className="xl:col-span-2 space-y-6">
+          <div>
+            <div className="h-7 w-40 bg-[#EEEEEE] animate-pulse rounded mb-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white border border-[#E0E0E0] rounded-xl p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-[#EEEEEE] animate-pulse flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-5 w-3/4 bg-[#EEEEEE] animate-pulse rounded" />
+                      <div className="h-4 w-full bg-[#EEEEEE] animate-pulse rounded" />
+                      <div className="h-4 w-1/4 bg-[#EEEEEE] animate-pulse rounded mt-2" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Activity Skeleton */}
+          <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
+            <div className="h-6 w-40 bg-[#EEEEEE] animate-pulse rounded mb-4" />
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#EEEEEE] animate-pulse flex-shrink-0" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-4 w-1/2 bg-[#EEEEEE] animate-pulse rounded" />
+                    <div className="h-3 w-1/3 bg-[#EEEEEE] animate-pulse rounded" />
+                    <div className="h-3 w-1/4 bg-[#EEEEEE] animate-pulse rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+          <div className="bg-white border border-[#E0E0E0] rounded-xl p-5">
+            <div className="h-6 w-32 bg-[#EEEEEE] animate-pulse rounded mb-5" />
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-3 bg-[#F5F5F5] rounded-lg space-y-2">
+                  <div className="h-4 w-3/4 bg-[#EEEEEE] animate-pulse rounded" />
+                  <div className="h-3 w-1/2 bg-[#EEEEEE] animate-pulse rounded" />
+                  <div className="h-3 w-1/4 bg-[#EEEEEE] animate-pulse rounded" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 pt-4 border-t border-[#E0E0E0] flex justify-between">
+              <div className="h-4 w-20 bg-[#EEEEEE] animate-pulse rounded" />
+              <div className="h-4 w-24 bg-[#EEEEEE] animate-pulse rounded" />
+            </div>
+          </div>
         </div>
       </div>
     </div>

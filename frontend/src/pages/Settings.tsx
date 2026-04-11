@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Mail, Shield, Calendar, Save, Code2, AlertCircle, Loader2, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
 import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
+import { getCachedSettingsProfile, setSettingsProfile, isSettingsCacheValid } from '../utils/settingsStore';
 
 export default function Settings() {
-  const { user } = useAuth();
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedProfile = getCachedSettingsProfile();
+  
+  const [userData, setUserData] = useState<any>(cachedProfile);
+  const [loading, setLoading] = useState(!cachedProfile);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [operationLoading, setOperationLoading] = useState<{
@@ -55,7 +57,11 @@ export default function Settings() {
   };
 
   useEffect(() => {
-    fetchUserData();
+    if (!isSettingsCacheValid()) {
+      fetchUserData();
+    } else {
+      fetchUserData(true); // Silent background refresh
+    }
   }, []);
 
   useEffect(() => {
@@ -66,9 +72,9 @@ export default function Settings() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const fetchUserData = async () => {
+  const fetchUserData = async (isSilent = false) => {
     try {
-      const token = localStorage.getItem('token');
+      if (!isSilent) setLoading(true);
       if (!token) return;
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
@@ -80,6 +86,10 @@ export default function Settings() {
       const data = await response.json();
       if (response.ok) {
         setUserData(data.user);
+        
+        // Update Cache
+        setSettingsProfile(data.user);
+        
         setFormData({
           firstName: data.user.firstName || '',
           middleInitial: data.user.middleInitial || '',
@@ -92,9 +102,9 @@ export default function Settings() {
         setSelectedLanguage(data.user.primaryLanguage || 'java');
       }
     } catch (error) {
-      // Error fetching user data
+      if (!isSilent) console.error('Error fetching user data:', error);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -268,6 +278,7 @@ export default function Settings() {
           message: 'Profile updated successfully!'
         });
         setUserData(data.user);
+        setSettingsProfile(data.user); // Update cache on manual save
         setIsEditing(false);
       } else {
         setOperationResult({
@@ -380,12 +391,8 @@ export default function Settings() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <p style={{ color: '#757575' }}>Loading...</p>
-      </div>
-    );
+  if (loading && !getCachedSettingsProfile()) {
+    return <SettingsSkeleton />;
   }
 
   if (!userData) {
@@ -886,6 +893,46 @@ function ResultModal({ success, message, onClose }: ResultModalProps) {
           >
             OK
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsSkeleton() {
+  const pulse = "animate-pulse bg-gray-200 rounded-lg";
+  
+  return (
+    <div className="bg-white -m-6 min-h-screen p-8 space-y-10">
+      <div className="space-y-2">
+        <div className={`h-8 w-48 ${pulse}`} />
+        <div className={`h-4 w-72 ${pulse}`} />
+      </div>
+
+      <div className="space-y-12">
+        {/* Profile Info Section */}
+        <div className="space-y-6 pb-10 border-b border-gray-100">
+          <div className="flex justify-between items-center">
+            <div className={`h-6 w-40 ${pulse}`} />
+            <div className={`h-5 w-12 ${pulse}`} />
+          </div>
+          <div className="space-y-4">
+               {[1, 2, 3, 4].map(i => (
+                 <div key={i} className="space-y-2">
+                   <div className={`h-4 w-24 ${pulse}`} />
+                   <div className={`h-6 w-full max-w-md ${pulse}`} />
+                 </div>
+               ))}
+          </div>
+        </div>
+
+        {/* Other Section */}
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div className={`h-6 w-40 ${pulse}`} />
+            <div className={`h-10 w-32 ${pulse}`} />
+          </div>
+          <div className={`h-4 w-64 ${pulse}`} />
         </div>
       </div>
     </div>

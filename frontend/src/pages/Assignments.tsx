@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { FileText, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { classroomAPI } from '../utils/api';
 import StudentClassroomDetail from './StudentClassroomDetail';
+import { getCachedAssignmentData, setAssignmentData, isAssignmentCacheValid } from '../utils/assignmentStore';
+import {
+  AssignmentList,
+  AssignmentsSkeleton
+} from '../components/AssignmentComponents';
 
-interface Assignment {
+export interface Assignment {
   _id: string;
   title: string;
   description: string;
@@ -33,28 +38,34 @@ interface Classroom {
   code: string;
 }
 
-type TabType = 'todo' | 'dueToday' | 'missing';
+export type TabType = 'todo' | 'dueToday' | 'missing';
 
 import { getSocket } from '../utils/socket';
 
 export default function Assignments() {
   const { user } = useAuth();
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const cachedData = getCachedAssignmentData();
+
+  const [assignments, setAssignments] = useState<Assignment[]>(cachedData?.assignments || []);
+  const [classrooms, setClassrooms] = useState<Classroom[]>(cachedData?.classrooms || []);
   const [selectedClassroom, setSelectedClassroom] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<TabType>('todo');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState('');
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
+    if (!isAssignmentCacheValid()) {
+      fetchData();
+    } else {
+      fetchData(true); // Silent background refresh
+    }
 
     // Listen for real-time updates
     const socket = getSocket();
     const handleUpdate = () => {
-      fetchData();
+      fetchData(true);
     };
 
     socket.on('assignment-update', handleUpdate);
@@ -66,9 +77,9 @@ export default function Assignments() {
     };
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError('');
 
       const response = await classroomAPI.getStudentClassrooms();
@@ -117,10 +128,16 @@ export default function Assignments() {
       });
 
       setAssignments(allAssignments);
+
+      // Update Cache
+      setAssignmentData({
+        assignments: allAssignments,
+        classrooms: userClassrooms
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      if (!isSilent) setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -222,12 +239,8 @@ export default function Assignments() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-500">Loading assignments...</div>
-      </div>
-    );
+  if (loading && !getCachedAssignmentData()) {
+    return <AssignmentsSkeleton />;
   }
 
   return (
@@ -256,8 +269,8 @@ export default function Assignments() {
                 <button
                   onClick={() => setActiveTab('todo')}
                   className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'todo'
-                      ? 'text-white'
-                      : 'border-transparent hover:border-gray-300'
+                    ? 'text-white'
+                    : 'border-transparent hover:border-gray-300'
                     }`}
                   style={activeTab === 'todo' ? {
                     borderColor: '#1B5E20',
@@ -269,8 +282,8 @@ export default function Assignments() {
                 <button
                   onClick={() => setActiveTab('dueToday')}
                   className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'dueToday'
-                      ? 'text-white'
-                      : 'border-transparent hover:border-gray-300'
+                    ? 'text-white'
+                    : 'border-transparent hover:border-gray-300'
                     }`}
                   style={activeTab === 'dueToday' ? {
                     borderColor: '#1B5E20',
@@ -282,8 +295,8 @@ export default function Assignments() {
                 <button
                   onClick={() => setActiveTab('missing')}
                   className={`px-3 sm:px-6 py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'missing'
-                      ? 'text-white'
-                      : 'border-transparent hover:border-gray-300'
+                    ? 'text-white'
+                    : 'border-transparent hover:border-gray-300'
                     }`}
                   style={activeTab === 'missing' ? {
                     borderColor: '#1B5E20',
@@ -293,7 +306,7 @@ export default function Assignments() {
                   Missing
                 </button>
               </nav>
-              
+
               <div className="flex-shrink-0 p-3 sm:p-0 sm:pr-6">
                 <select
                   value={selectedClassroom}
@@ -328,201 +341,6 @@ export default function Assignments() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-interface AssignmentListProps {
-  assignments: Assignment[];
-  activeTab: TabType;
-  getSubmissionStatus: (assignment: Assignment) => string;
-  getDaysUntilDue: (dueDate: string) => number;
-  onNavigate: (classroomId: string, postId: string) => void;
-}
-
-function AssignmentList({ assignments, activeTab, getSubmissionStatus, getDaysUntilDue, onNavigate }: AssignmentListProps) {
-  const getEmptyMessage = () => {
-    switch (activeTab) {
-      case 'todo':
-        return 'No pending assignments';
-      case 'dueToday':
-        return 'No assignments due today';
-      case 'missing':
-        return 'No missing assignments';
-      default:
-        return 'No assignments';
-    }
-  };
-
-  const groupAssignmentsByDueDate = () => {
-    if (activeTab === 'missing') {
-      return { 'Overdue': assignments };
-    }
-
-    const groups: { [key: string]: Assignment[] } = {};
-
-    if (activeTab === 'dueToday') {
-      return { 'Due Today': assignments };
-    }
-
-    assignments.forEach(assignment => {
-      if (!assignment.dueDate) {
-        if (!groups['No due date']) {
-          groups['No due date'] = [];
-        }
-        groups['No due date'].push(assignment);
-      } else {
-        const daysUntilDue = getDaysUntilDue(assignment.dueDate);
-        const now = new Date();
-        const due = new Date(assignment.dueDate);
-        const endOfThisWeek = new Date(now);
-        endOfThisWeek.setDate(now.getDate() + (7 - now.getDay()));
-        const endOfNextWeek = new Date(endOfThisWeek);
-        endOfNextWeek.setDate(endOfThisWeek.getDate() + 7);
-
-        if (due <= endOfThisWeek) {
-          if (!groups['This week']) {
-            groups['This week'] = [];
-          }
-          groups['This week'].push(assignment);
-        } else if (due <= endOfNextWeek) {
-          if (!groups['Next week']) {
-            groups['Next week'] = [];
-          }
-          groups['Next week'].push(assignment);
-        } else {
-          if (!groups['Later']) {
-            groups['Later'] = [];
-          }
-          groups['Later'].push(assignment);
-        }
-      }
-    });
-
-    return groups;
-  };
-
-  if (assignments.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-sm" style={{ color: '#757575' }}>{getEmptyMessage()}</p>
-      </div>
-    );
-  }
-
-  const groupedAssignments = groupAssignmentsByDueDate();
-
-  return (
-    <div className="space-y-4">
-      {Object.entries(groupedAssignments).map(([groupName, groupAssignments]) => (
-        <AssignmentGroup
-          key={groupName}
-          title={groupName}
-          assignments={groupAssignments}
-          getSubmissionStatus={getSubmissionStatus}
-          getDaysUntilDue={getDaysUntilDue}
-          onNavigate={onNavigate}
-        />
-      ))}
-    </div>
-  );
-}
-
-interface AssignmentGroupProps {
-  title: string;
-  assignments: Assignment[];
-  getSubmissionStatus: (assignment: Assignment) => string;
-  getDaysUntilDue: (dueDate: string) => number;
-  onNavigate: (classroomId: string, postId: string) => void;
-}
-
-function AssignmentGroup({ title, assignments, getSubmissionStatus, getDaysUntilDue, onNavigate }: AssignmentGroupProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-
-  return (
-    <div className="border-b border-gray-200 last:border-b-0">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between py-3 hover:bg-gray-50 transition-colors rounded-lg px-2"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium" style={{ color: '#212121' }}>{title}</span>
-          <span className="text-sm px-2 py-0.5 bg-gray-100 rounded-full" style={{ color: '#757575' }}>
-            {assignments.length}
-          </span>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="w-5 h-5" style={{ color: '#757575' }} strokeWidth={1.5} />
-        ) : (
-          <ChevronDown className="w-5 h-5" style={{ color: '#757575' }} strokeWidth={1.5} />
-        )}
-      </button>
-
-      {isExpanded && (
-        <div className="pb-4 space-y-3">
-          {assignments.map((assignment) => {
-            const status = getSubmissionStatus(assignment);
-            const daysUntilDue = assignment.dueDate ? getDaysUntilDue(assignment.dueDate) : null;
-
-            return (
-              <AssignmentCard
-                key={assignment._id}
-                assignment={assignment}
-                status={status}
-                daysUntilDue={daysUntilDue}
-                onNavigate={onNavigate}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface AssignmentCardProps {
-  assignment: Assignment;
-  status: string;
-  daysUntilDue: number | null;
-  onNavigate: (classroomId: string, postId: string) => void;
-}
-
-function AssignmentCard({ assignment, status, daysUntilDue, onNavigate }: AssignmentCardProps) {
-  const getDueDateDisplay = () => {
-    if (!assignment.dueDate) return null;
-
-    const dueDate = new Date(assignment.dueDate);
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric'
-    };
-
-    return dueDate.toLocaleDateString('en-US', options);
-  };
-
-  const handleClick = () => {
-    onNavigate(assignment.classroom._id, assignment._id);
-  };
-
-  const dueDateDisplay = getDueDateDisplay();
-
-  return (
-    <div
-      onClick={handleClick}
-      className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all cursor-pointer"
-    >
-      <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#E8F5E9' }}>
-        <FileText className="w-5 h-5" style={{ color: '#1B5E20' }} strokeWidth={1.5} />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-medium mb-1" style={{ color: '#212121' }}>{assignment.title}</h4>
-        <p className="text-xs mb-1" style={{ color: '#757575' }}>{assignment.classroom.name}</p>
-        {dueDateDisplay && (
-          <p className="text-xs" style={{ color: '#757575' }}>Posted {dueDateDisplay}</p>
-        )}
-      </div>
     </div>
   );
 }

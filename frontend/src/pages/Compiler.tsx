@@ -4,61 +4,36 @@ import {
   useEffect,
   forwardRef,
   useImperativeHandle,
+  useCallback,
 } from "react";
-import {
-  Play,
-  Menu,
-  BookOpen,
-  X,
-  Square,
-  Lightbulb,
-  ArrowLeft,
-  Save,
-  Send,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-} from "lucide-react";
-import UnsavedChangesModal from "../components/UnsavedChangesModal";
-import OnboardingSurveyModal from "../components/OnboardingSurveyModal";
-import { useAuth } from "../contexts/AuthContext";
 import { io, Socket } from "socket.io-client";
-import {
-  JAVA_SUGGESTIONS,
-  highlightJavaCode,
-  findMissingImports,
-  findLinesWithMissingImports,
-  findUnusedImports,
-  MissingImport,
-  CompilationError as JavaCompilationError,
+import { X } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import OnboardingSurveyModal from "../components/OnboardingSurveyModal";
+import { 
+  MissingImport, 
+  JAVA_SUGGESTIONS, 
+  findMissingImports, 
+  findLinesWithMissingImports, 
+  findUnusedImports 
 } from "../utils/javaUtils";
-import {
-  PYTHON_SUGGESTIONS,
-  highlightPythonCode,
-  CompilationError as PythonCompilationError,
-} from "../utils/pythonUtils";
-
-type CompilationError = JavaCompilationError | PythonCompilationError;
-
-const LANGUAGE_OPTIONS = [
-  { value: "python", label: "Python" },
-  { value: "java", label: "Java" },
-];
-
-const DEFAULT_CODE: Record<string, string> = {
-  python: `# Python Code
-def greet(name):
-    return f"Hello, {name}!"
-
-print(greet('World'))`,
-  java: `import java.util.Scanner;
-
-public class Main {
-    public static void main(String[] args) { 
-        System.out.println("Hello, World!");
-    }
-}`,
-};
+import { PYTHON_SUGGESTIONS } from "../utils/pythonUtils";
+import { 
+  CompilationError, 
+  DEFAULT_CODE, 
+  highlightCode
+} from "../utils/compilerUtils";
+import { 
+  CompilerHeader, 
+  MissingImportsBanner, 
+  OutputConsole, 
+  TimeUpModal, 
+  SubmitConfirmModal, 
+  GradingLoadingModal, 
+  GradingResultsModal, 
+  ActivityStatusModals, 
+  LanguageSwitchModal 
+} from "../components/CompilerComponents";
 
 interface Library {
   filename: string;
@@ -73,32 +48,13 @@ interface Suggestion {
   className?: string;
 }
 
-const highlightCode = (
-  code: string,
-  language: string,
-  errors: CompilationError[] = [],
-  warningLines: Set<number> = new Set(),
-) => {
-  if (language === "java") {
-    return highlightJavaCode(code, errors, warningLines);
-  }
-
-  if (language === "python") {
-    return highlightPythonCode(code, errors);
-  }
-
-  return code.split("\n").map((line, index) => (
-    <div key={index} style={{ height: "24px", minHeight: "24px" }}>
-      {line || "\u00A0"}
-    </div>
-  ));
-};
-
 interface ProjectDetails {
+  _id?: string;
   title: string;
   description: string;
   language: string;
   requirements: string;
+  duration?: { hours: number; minutes: number };
 }
 
 interface CompilerProps {
@@ -119,7 +75,6 @@ const Compiler = forwardRef<any, CompilerProps>(
       onBack,
       onHasUnsavedChanges,
       isActivityMode = false,
-      readOnly = false,
       onSubmitSuccess,
     },
     ref,
@@ -174,7 +129,7 @@ const Compiler = forwardRef<any, CompilerProps>(
     const [lastHintTime, setLastHintTime] = useState<number>(0);
     const [streamingText, setStreamingText] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
-    const streamingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const streamingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
     const [timerStarted, setTimerStarted] = useState(false);
@@ -184,7 +139,7 @@ const Compiler = forwardRef<any, CompilerProps>(
     const [isSubmittingActivity, setIsSubmittingActivity] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useImperativeHandle(ref, () => ({
       saveProgress: () => handleSaveProgress(),
@@ -211,8 +166,8 @@ const Compiler = forwardRef<any, CompilerProps>(
 
     useEffect(() => {
       if (isActivityMode && projectDetails && !timerStarted) {
-        const durationHours = (projectDetails as any).duration?.hours || 0;
-        const durationMinutes = (projectDetails as any).duration?.minutes || 0;
+        const durationHours = projectDetails.duration?.hours || 0;
+        const durationMinutes = projectDetails.duration?.minutes || 0;
         const totalSeconds = durationHours * 3600 + durationMinutes * 60;
 
         if (totalSeconds > 0) {
@@ -286,7 +241,7 @@ const Compiler = forwardRef<any, CompilerProps>(
         } else {
           setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
         }
-      } catch (error) {
+      } catch {
         setCode(DEFAULT_CODE[lang] || DEFAULT_CODE.java);
       }
     };
@@ -347,26 +302,45 @@ const Compiler = forwardRef<any, CompilerProps>(
       };
     }, []);
 
-    useEffect(() => {
-      if (!projectDetails || isRunning || isActivityMode) return;
+    const startStreamingMessage = useCallback((message: string) => {
+      setIsStreaming(true);
+      setStreamingText("");
+      setAiMessages([]);
 
-      const interval = setInterval(() => {
-        const now = Date.now();
-        if (now - lastHintTime >= 300000) {
-          analyzeCodeAndGiveHint();
-          setLastHintTime(now);
+      let currentIndex = 0;
+
+      if (streamingIntervalRef.current) {
+        clearInterval(streamingIntervalRef.current);
+      }
+
+      streamingIntervalRef.current = setInterval(() => {
+        if (currentIndex < message.length) {
+          setStreamingText(message.substring(0, currentIndex + 1));
+          currentIndex++;
+
+          if (consoleRef.current) {
+            consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+          }
+        } else {
+          setIsStreaming(false);
+          setAiMessages([{ type: "ai", text: message }]);
+          setStreamingText("");
+
+          if (streamingIntervalRef.current) {
+            clearInterval(streamingIntervalRef.current);
+            streamingIntervalRef.current = null;
+          }
+
+          setTimeout(() => {
+            if (consoleRef.current) {
+              consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+            }
+          }, 100);
         }
-      }, 60000);
+      }, 20);
+    }, []);
 
-      return () => clearInterval(interval);
-    }, [projectDetails, isRunning, code, lastHintTime, isActivityMode]);
-
-    const sendAiGreeting = () => {
-      const greeting = `Hello! I'm your SkillVerse coding assistant. I'll analyze your code and provide hints to help you complete the project. Let me know if you need help!`;
-      setAiMessages([{ type: "ai", text: greeting }]);
-    };
-
-    const analyzeCodeAndGiveHint = async () => {
+    const analyzeCodeAndGiveHint = useCallback(async () => {
       if (
         !projectDetails ||
         isRunning ||
@@ -405,48 +379,32 @@ const Compiler = forwardRef<any, CompilerProps>(
           setIsAiThinking(false);
           startStreamingMessage(data.hint);
         }
-      } catch (error) {
+      } catch {
         setIsAiThinking(false);
       }
-    };
+    }, [projectDetails, isRunning, isAiThinking, isStreaming, isActivityMode, code, startStreamingMessage]);
 
-    const startStreamingMessage = (message: string) => {
-      setIsStreaming(true);
-      setStreamingText("");
-      setAiMessages([]);
+    useEffect(() => {
+      if (!projectDetails || isRunning || isActivityMode) return;
 
-      let currentIndex = 0;
-
-      if (streamingIntervalRef.current) {
-        clearInterval(streamingIntervalRef.current);
-      }
-
-      streamingIntervalRef.current = setInterval(() => {
-        if (currentIndex < message.length) {
-          setStreamingText(message.substring(0, currentIndex + 1));
-          currentIndex++;
-
-          if (consoleRef.current) {
-            consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
-          }
-        } else {
-          setIsStreaming(false);
-          setAiMessages([{ type: "ai", text: message }]);
-          setStreamingText("");
-
-          if (streamingIntervalRef.current) {
-            clearInterval(streamingIntervalRef.current);
-            streamingIntervalRef.current = null;
-          }
-
-          setTimeout(() => {
-            if (consoleRef.current) {
-              consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
-            }
-          }, 100);
+      const interval = setInterval(() => {
+        const now = Date.now();
+        if (now - lastHintTime >= 300000) {
+          analyzeCodeAndGiveHint();
+          setLastHintTime(now);
         }
-      }, 20);
-    };
+      }, 60000);
+
+      return () => clearInterval(interval);
+    }, [projectDetails, isRunning, code, lastHintTime, isActivityMode, analyzeCodeAndGiveHint]);
+
+    // AI messages initialization
+    useEffect(() => {
+      if (projectDetails && !isActivityMode) {
+        const greeting = `Hello! I'm your SkillVerse coding assistant. I'll analyze your code and provide hints to help you complete the project. Let me know if you need help!`;
+        setAiMessages([{ type: "ai", text: greeting }]);
+      }
+    }, [projectDetails, isActivityMode, analyzeCodeAndGiveHint]);
 
     useEffect(() => {
       if (isRunning && consoleRef.current) {
@@ -472,7 +430,9 @@ const Compiler = forwardRef<any, CompilerProps>(
         if (data.success) {
           setLibraries(data.libraries);
         }
-      } catch (error) {}
+      } catch {
+        // Silent error
+      }
     };
 
     const handleLanguageChange = async (newLanguage: string) => {
@@ -529,7 +489,7 @@ const Compiler = forwardRef<any, CompilerProps>(
           setPendingLanguage(newLanguage);
           setShowConfirmationModal(true);
         }
-      } catch (error) {
+      } catch {
         setPendingLanguage(newLanguage);
         setShowConfirmationModal(true);
       }
@@ -669,7 +629,7 @@ const Compiler = forwardRef<any, CompilerProps>(
         });
       }
 
-      const lastWord = currentLine.split(/[\s\(\)\{\}\[\];,:]/).pop() || "";
+      const lastWord = currentLine.split(/[\s(){}[\];,:]/).pop() || "";
 
       if (lastWord.length >= 2) {
         suggestions.keywords.forEach((keyword) => {
@@ -931,6 +891,7 @@ const Compiler = forwardRef<any, CompilerProps>(
           e.key === "ArrowRight") &&
         !showSuggestions
       ) {
+        // Handle cursor movement if needed
       }
 
       const closingPairs: Record<string, string> = {
@@ -1005,7 +966,7 @@ const Compiler = forwardRef<any, CompilerProps>(
         newText = beforeImport + suggestion.text + textAfter;
         newCursorPos = beforeImport.length + suggestion.text.length;
       } else {
-        const lastWord = textBefore.split(/[\s\(\)\{\}\[\];,]/).pop() || "";
+        const lastWord = textBefore.split(/[\s(){}[\];,]/).pop() || "";
         const beforeWord = textBefore.substring(
           0,
           textBefore.length - lastWord.length,
@@ -1144,7 +1105,7 @@ const Compiler = forwardRef<any, CompilerProps>(
       return null;
     };
 
-    const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    const handleTextareaClick = () => {
       if (!textareaRef.current) return;
 
       const clickPos = textareaRef.current.selectionStart;
@@ -1193,7 +1154,7 @@ const Compiler = forwardRef<any, CompilerProps>(
         } else {
           setSaveMessage(data.message || "Error saving progress");
         }
-      } catch (error) {
+      } catch {
         setSaveMessage("Error saving progress");
       } finally {
         setIsSaving(false);
@@ -1206,16 +1167,7 @@ const Compiler = forwardRef<any, CompilerProps>(
       }
     };
 
-    const formatTime = (seconds: number): string => {
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const secs = seconds % 60;
 
-      if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-      }
-      return `${minutes}:${secs.toString().padStart(2, "0")}`;
-    };
 
     const handleAutoSubmit = async (): Promise<{
       success: boolean;
@@ -1235,7 +1187,7 @@ const Compiler = forwardRef<any, CompilerProps>(
         }
 
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/activities/${(projectDetails as any)._id}/submit`,
+          `${import.meta.env.VITE_API_URL}/activities/${projectDetails._id}/submit`,
           {
             method: "POST",
             headers: {
@@ -1342,7 +1294,7 @@ const Compiler = forwardRef<any, CompilerProps>(
         } else {
           setSaveMessage(data.message || "Error submitting project");
         }
-      } catch (error) {
+      } catch {
         setSaveMessage("Error submitting project");
       } finally {
         setIsSaving(false);
@@ -1352,274 +1304,46 @@ const Compiler = forwardRef<any, CompilerProps>(
 
     return (
       <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-        {/* Header */}
-        <div className="border-b border-gray-200 px-4 py-3 flex-shrink-0">
-          <div className="flex items-start justify-between gap-4">
-            {/* Left side - Activity Details or Language Selector */}
-            <div className="flex-1">
-              {isActivityMode && projectDetails ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    {onBack && (
-                      <button
-                        onClick={handleBackClick}
-                        className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
-                        title="Back"
-                      >
-                        <ArrowLeft className="w-5 h-5" />
-                      </button>
-                    )}
-                    <h2 className="text-base font-semibold text-gray-900">
-                      {projectDetails.title}
-                    </h2>
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                      {projectDetails.language}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {projectDetails.description}
-                  </p>
-                  {projectDetails.requirements && (
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">
-                        Requirements:
-                      </p>
-                      <div className="text-xs text-gray-600 whitespace-pre-line">
-                        {projectDetails.requirements}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 text-xs text-gray-600">
-                    {(projectDetails as any).points && (
-                      <span>{(projectDetails as any).points} points</span>
-                    )}
-                    {(projectDetails as any).duration && (
-                      <span>
-                        Duration: {(projectDetails as any).duration.hours}h{" "}
-                        {(projectDetails as any).duration.minutes}m
-                      </span>
-                    )}
-                    {(projectDetails as any).dueDate && (
-                      <span>
-                        Due:{" "}
-                        {new Date(
-                          (projectDetails as any).dueDate,
-                        ).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : projectDetails && !isActivityMode ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    {onBack && (
-                      <button
-                        onClick={handleBackClick}
-                        className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
-                        title="Back"
-                      >
-                        <ArrowLeft className="w-5 h-5" />
-                      </button>
-                    )}
-                    <h2 className="text-base font-semibold text-gray-900">
-                      {projectDetails.title}
-                    </h2>
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                      {projectDetails.language}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {projectDetails.description}
-                  </p>
-                  {projectDetails.requirements && (
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">
-                        Requirements:
-                      </p>
-                      <div className="text-xs text-gray-600 whitespace-pre-line">
-                        {projectDetails.requirements}
-                      </div>
-                    </div>
-                  )}
-                  {saveMessage && (
-                    <div
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                        saveMessage.includes("Error")
-                          ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {saveMessage}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center space-x-3">
-                  {!projectDetails && !isActivityMode && (
-                    <button
-                      onClick={onMenuClick}
-                      className="lg:hidden text-gray-600 hover:text-gray-900"
-                    >
-                      <Menu className="w-5 h-5" />
-                    </button>
-                  )}
-                  {!isActivityMode && (
-                    <select
-                      value={language}
-                      onChange={(e) => handleLanguageChange(e.target.value)}
-                      className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isRunning || !!projectDetails}
-                    >
-                      {LANGUAGE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-            </div>
+        <CompilerHeader
+          isActivityMode={isActivityMode}
+          projectDetails={projectDetails}
+          onBack={onBack ? handleBackClick : undefined}
+          language={language}
+          isRunning={isRunning}
+          isSaving={isSaving}
+          isGrading={isGrading}
+          hasUnsavedChanges={hasUnsavedChanges}
+          timeRemaining={timeRemaining}
+          saveMessage={saveMessage}
+          onLanguageChange={handleLanguageChange}
+          onRun={handleRun}
+          onStop={handleStop}
+          onSaveProgress={handleSaveProgress}
+          onSubmitProject={handleSubmitProject}
+          onMenuClick={onMenuClick}
+          isSubmittingActivity={isSubmittingActivity}
+          setShowActivitySubmitModal={setShowActivitySubmitModal}
+        />
 
-            {/* Right side - Timer and Action Buttons */}
-            <div className="flex items-center space-x-2">
-              {isActivityMode && timeRemaining !== null && (
-                <div
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg font-mono text-sm font-semibold ${
-                    timeRemaining <= 300
-                      ? "bg-red-100 text-red-700"
-                      : timeRemaining <= 600
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-blue-100 text-blue-700"
-                  }`}
-                >
-                  <Clock className="w-4 h-4" />
-                  <span>{formatTime(timeRemaining)}</span>
-                </div>
-              )}
-              {projectDetails && !isActivityMode && (
-                <>
-                  <button
-                    onClick={handleSaveProgress}
-                    disabled={isSaving}
-                    className="relative p-2 text-gray-600 hover:text-gray-900 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Save Progress"
-                  >
-                    <Save className="w-5 h-5" />
-                    {hasUnsavedChanges && (
-                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-                    )}
-                  </button>
-                  <button
-                    onClick={handleSubmitProject}
-                    disabled={isSaving || isGrading}
-                    className="flex items-center gap-1.5 px-2 py-2 text-gray-600 hover:text-gray-900 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Submit Project"
-                  >
-                    <Send className="w-5 h-5" />
-                    <span className="text-sm font-medium">
-                      {isGrading
-                        ? "Grading..."
-                        : isSaving
-                          ? "Submitting..."
-                          : "Submit"}
-                    </span>
-                  </button>
-                </>
-              )}
-              {isActivityMode && (
-                <button
-                  onClick={() => {
-                    setShowActivitySubmitModal(true);
-                  }}
-                  disabled={isSaving || isSubmittingActivity}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>
-                    {isSubmittingActivity ? "Submitting..." : "Submit"}
-                  </span>
-                </button>
-              )}
-              {isRunning && (
-                <button
-                  onClick={handleStop}
-                  className="flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-                >
-                  <Square className="w-4 h-4" />
-                  <span className="hidden sm:inline">Stop</span>
-                </button>
-              )}
-              <button
-                onClick={handleRun}
-                disabled={isRunning}
-                className="flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play className="w-4 h-4" />
-                <span className="hidden sm:inline">
-                  {isRunning ? "Running..." : "Run Code"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <MissingImportsBanner
+          language={language}
+          missingImports={missingImports}
+          onAddImport={addMissingImport}
+        />
 
-        {/* Missing Imports Banner */}
-        {language === "java" && missingImports.length > 0 && (
-          <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Lightbulb className="w-4 h-4 text-yellow-600" />
-                <span className="text-sm text-yellow-800 font-medium">
-                  Missing imports detected:{" "}
-                  {missingImports.map((m) => m.className).join(", ")}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                {missingImports.map((missing, index) => (
-                  <button
-                    key={index}
-                    onClick={() => addMissingImport(missing.importStatement)}
-                    className="text-xs px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors"
-                  >
-                    Add {missing.className}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Libraries Panel */}
         {showLibraries && (
           <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
             <div className="flex items-start justify-between mb-2">
-              <h4 className="text-sm font-semibold text-gray-900">
-                Available Libraries
-              </h4>
-              <button
-                onClick={() => setShowLibraries(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <h4 className="text-sm font-semibold text-gray-900">Available Libraries</h4>
+              <button onClick={() => setShowLibraries(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               {libraries.map((lib) => (
-                <div
-                  key={lib.filename}
-                  className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="text-xs font-medium text-gray-900">
-                    {lib.name}
-                  </div>
+                <div key={lib.filename} className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-xs font-medium text-gray-900">{lib.name}</div>
                   <div className="text-xs text-gray-500">v{lib.version}</div>
                 </div>
               ))}
-            </div>
-            <div className="mt-3 text-xs text-gray-500">
-              Import these libraries in your Java code. Missing imports will be
-              suggested automatically.
             </div>
           </div>
         )}
@@ -1783,8 +1507,8 @@ const Compiler = forwardRef<any, CompilerProps>(
                   onKeyDown={handleKeyDown}
                   onKeyUp={handleCursorMove}
                   onScroll={handleScroll}
-                  onClick={(e) => {
-                    handleTextareaClick(e);
+                  onClick={() => {
+                    handleTextareaClick();
                     handleCursorMove();
                     updateCursorPosition();
                     setShowSuggestions(false);
@@ -1850,531 +1574,98 @@ const Compiler = forwardRef<any, CompilerProps>(
             </div>
           </div>
 
-          {/* Interactive Console */}
-          <div className="flex flex-col bg-gray-900 overflow-hidden">
-            <div className="px-1 py-1 bg-gray-800 border-b border-gray-700 flex-shrink-0">
-              <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
-                {projectDetails && !isRunning && !output
-                  ? "SkillVerse Coding Assistant"
-                  : "Interactive Console"}
-              </h3>
-            </div>
 
-            {/* Console Area */}
-            <div
-              ref={consoleRef}
-              className="flex-1 overflow-auto min-h-0 focus:outline-none"
-              tabIndex={0}
-              onKeyDown={handleConsoleKeyDown}
-              style={{ cursor: isRunning ? "text" : "default" }}
-            >
-              {projectDetails && !isRunning && !isActivityMode && !output ? (
-                <div className="space-y-2 p-2">
-                  {aiMessages.length === 0 && !isStreaming && !isAiThinking ? (
-                    <div className="text-sm text-gray-400 font-mono">
-                      Waiting for AI hints...
-                    </div>
-                  ) : (
-                    <>
-                      {aiMessages.map((msg, index) => (
-                        <div key={index} className="flex justify-start">
-                          <div className="max-w-full">
-                            <div className="text-xs font-semibold mb-1 text-gray-400">
-                              SkillVerse Assistant
-                            </div>
-                            <div className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
-                              {msg.text}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {isStreaming && (
-                        <div className="flex justify-start">
-                          <div className="max-w-full">
-                            <div className="text-xs font-semibold mb-1 text-gray-400">
-                              SkillVerse Assistant
-                            </div>
-                            <div className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
-                              {streamingText}
-                              <span className="animate-pulse">|</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {isAiThinking && (
-                        <div className="flex justify-start">
-                          <div className="max-w-full">
-                            <div className="text-xs font-semibold mb-1 text-gray-400">
-                              SkillVerse Assistant
-                            </div>
-                            <div className="text-sm font-mono text-gray-100">
-                              Analyzing your code
-                              <span className="animate-pulse">...</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="p-4">
-                  <pre className="text-sm font-mono text-gray-100 whitespace-pre-wrap">
-                    {output ||
-                      'Click "Run Code" to execute your program.\n\nMissing imports are automatically detected!\nWhen the program asks for input, type directly here and press Enter.'}
-                    {isRunning && (
-                      <span className="text-green-400">{currentInput}</span>
-                    )}
-                    {isRunning && (
-                      <span className="animate-pulse text-green-400">█</span>
-                    )}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Interactive Console */}
+          <OutputConsole
+            isActivityMode={isActivityMode}
+            projectDetails={projectDetails}
+            isRunning={isRunning}
+            output={output}
+            currentInput={currentInput}
+            aiMessages={aiMessages}
+            isStreaming={isStreaming}
+            streamingText={streamingText}
+            isAiThinking={isAiThinking}
+            consoleRef={consoleRef}
+            onKeyDown={handleConsoleKeyDown}
+          />
         </div>
 
         {/* Navigation Warning Modal - Removed */}
 
-        {/* Time Up Modal */}
         {showTimeUpModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Time's Up!
-                </h2>
-              </div>
-
-              <div className="p-6">
-                <p className="text-sm text-gray-700 mb-4">
-                  The time limit for this activity has been reached. Your code
-                  will be automatically submitted.
-                </p>
-                <p className="text-xs text-gray-500">
-                  Click Continue to submit and return to the classroom.
-                </p>
-              </div>
-
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
-                <button
-                  onClick={async () => {
-                    setShowTimeUpModal(false);
-                    await handleAutoSubmit();
-                    if (onBack) onBack();
-                  }}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
+          <TimeUpModal
+            onContinue={async () => {
+              setShowTimeUpModal(false);
+              await handleAutoSubmit();
+              if (onBack) onBack();
+            }}
+          />
         )}
 
-        {/* Submit Confirmation Modal */}
         {showSubmitConfirmModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Confirm Submission
-                </h2>
-              </div>
-
-              <div className="p-6">
-                <p className="text-sm text-gray-700">
-                  Are you sure you want to submit this project? The AI will
-                  grade your submission and you cannot edit it after submission.
-                </p>
-              </div>
-
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                <button
-                  onClick={() => setShowSubmitConfirmModal(false)}
-                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmSubmitProject}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          </div>
+          <SubmitConfirmModal
+            onConfirm={confirmSubmitProject}
+            onCancel={() => setShowSubmitConfirmModal(false)}
+          />
         )}
 
-        {/* Mini Project Grading Loading Modal */}
-        {isGrading && !showGradingModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
-              <div className="flex flex-col items-center justify-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-gray-900 mb-4"></div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Grading Your Project
-                </h3>
-                <p className="text-sm text-gray-600 text-center mb-3">
-                  Please wait while AI analyzes your code...
-                </p>
-                <div className="mt-4 space-y-2 w-full">
-                  <p className="text-xs text-gray-500 text-center">
-                    Submitting your code...
-                  </p>
-                  <p className="text-xs text-gray-500 text-center">
-                    AI is analyzing your solution...
-                  </p>
-                  <p className="text-xs text-gray-500 text-center">
-                    Generating feedback...
-                  </p>
-                  <p className="text-xs text-gray-500 text-center">
-                    Calculating your score...
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {isGrading && !showGradingModal && <GradingLoadingModal />}
 
-        {/* Grading Results Modal */}
         {showGradingModal && gradingResult && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Grading Results
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setShowGradingModal(false);
-                      if (onBack) onBack();
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <div className="text-center py-4">
-                  <div className="text-6xl font-bold text-black mb-2">
-                    {gradingResult.score}/100
-                  </div>
-                  <div className="text-lg font-semibold text-gray-600">
-                    {gradingResult.passed ? "You Passed!" : "Keep Practicing!"}
-                  </div>
-                </div>
-
-                <div className="border border-gray-300 rounded-lg p-6 bg-gray-50">
-                  <div className="text-sm text-gray-800 whitespace-pre-line font-mono">
-                    {typedFeedback}
-                    {isTyping && <span className="animate-pulse">|</span>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
-                <button
-                  onClick={() => {
-                    setShowGradingModal(false);
-                    if (onBack) onBack();
-                  }}
-                  className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-                >
-                  Back to Projects
-                </button>
-              </div>
-            </div>
-          </div>
+          <GradingResultsModal
+            result={gradingResult}
+            feedback={typedFeedback}
+            isTyping={isTyping}
+            onClose={() => {
+              setShowGradingModal(false);
+              if (onBack) onBack();
+            }}
+          />
         )}
 
-        {/* Activity Submit Confirmation Modal */}
-        {showActivitySubmitModal &&
-          !isSubmittingActivity &&
-          !submitSuccess &&
-          !submitError && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Submit Activity?
-                  </h2>
-                </div>
+        <ActivityStatusModals
+          showConfirm={showActivitySubmitModal}
+          isSubmitting={isSubmittingActivity}
+          success={submitSuccess}
+          error={submitError}
+          onConfirm={async () => {
+            setIsSubmittingActivity(true);
+            const result = await handleAutoSubmit();
+            setIsSubmittingActivity(false);
+            if (result.success) setSubmitSuccess(true);
+            else setSubmitError(result.error || "Failed to submit activity");
+          }}
+          onCancel={() => setShowActivitySubmitModal(false)}
+          onCloseSuccess={() => {
+            setSubmitSuccess(false);
+            setShowActivitySubmitModal(false);
+            setHasUnsavedChanges(false);
+            if (onHasUnsavedChanges) onHasUnsavedChanges(false);
+            if (onBack) setTimeout(() => onBack(), 100);
+          }}
+          onCloseError={() => {
+            setSubmitError(null);
+            setShowActivitySubmitModal(false);
+          }}
+          onRetry={() => setSubmitError(null)}
+        />
 
-                <div className="p-6">
-                  <p className="text-sm text-gray-700">
-                    Are you sure you want to submit this activity? You cannot
-                    edit your submission after submitting.
-                  </p>
-                </div>
-
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowActivitySubmitModal(false)}
-                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={async () => {
-                      setIsSubmittingActivity(true);
-                      const result = await handleAutoSubmit();
-                      setIsSubmittingActivity(false);
-
-                      if (result.success) {
-                        setSubmitSuccess(true);
-                      } else {
-                        setSubmitError(
-                          result.error || "Failed to submit activity",
-                        );
-                      }
-                    }}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-        {/* Loading Modal */}
-        {isSubmittingActivity && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
-              <div className="flex flex-col items-center justify-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-gray-900 mb-4"></div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Submitting Activity
-                </h3>
-                <p className="text-sm text-gray-600 text-center mb-3">
-                  Please wait while we submit your code...
-                </p>
-                <div className="mt-4 space-y-2 w-full">
-                  <p className="text-xs text-gray-500 text-center">
-                    Uploading your assignment...
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Success Modal */}
-        {submitSuccess && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-green-600">
-                  Submission Successful!
-                </h2>
-              </div>
-
-              <div className="p-6">
-                <div className="flex flex-col items-center mb-4">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                    <CheckCircle className="w-10 h-10 text-green-600" />
-                  </div>
-                  <p className="text-sm text-gray-700 text-center">
-                    Your activity has been submitted successfully! Your teacher
-                    will review your submission.
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
-                <button
-                  onClick={() => {
-                    setSubmitSuccess(false);
-                    setShowActivitySubmitModal(false);
-                    setHasUnsavedChanges(false);
-                    if (onHasUnsavedChanges) {
-                      onHasUnsavedChanges(false);
-                    }
-                    if (onBack) {
-                      setTimeout(() => onBack(), 100);
-                    }
-                  }}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Error Modal */}
-        {submitError && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-red-600">
-                  Submission Failed
-                </h2>
-              </div>
-
-              <div className="p-6">
-                <div className="flex flex-col items-center mb-4">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                    <AlertCircle className="w-10 h-10 text-red-600" />
-                  </div>
-                  <p className="text-sm text-gray-700 text-center mb-2">
-                    We encountered an error while submitting your activity.
-                  </p>
-                  <p className="text-xs text-red-600 text-center">
-                    {submitError}
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setSubmitError(null);
-                    setShowActivitySubmitModal(false);
-                  }}
-                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => {
-                    setSubmitError(null);
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Language Confirmation Modal */}
         {showConfirmationModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Switch Programming Language
-                </h2>
-              </div>
-
-              <div className="px-6 py-6 space-y-4">
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div
-                    className="w-12 h-12 rounded-lg flex items-center justify-center"
-                    style={{
-                      backgroundColor:
-                        language === "java" ? "#DBEAFE" : "#FEF3C7",
-                    }}
-                  >
-                    <span
-                      className="text-lg font-bold"
-                      style={{
-                        color: language === "java" ? "#3B82F6" : "#F59E0B",
-                      }}
-                    >
-                      {language === "java" ? "Jv" : "Py"}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-700">
-                      Current Language
-                    </p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {language === "java" ? "Java" : "Python"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                    />
-                  </svg>
-                </div>
-
-                <div
-                  className="flex items-center gap-4 p-4 border-2 rounded-lg"
-                  style={{ borderColor: "#1B5E20", backgroundColor: "#E8F5E9" }}
-                >
-                  <div
-                    className="w-12 h-12 rounded-lg flex items-center justify-center"
-                    style={{
-                      backgroundColor:
-                        pendingLanguage === "java" ? "#DBEAFE" : "#FEF3C7",
-                    }}
-                  >
-                    <span
-                      className="text-lg font-bold"
-                      style={{
-                        color:
-                          pendingLanguage === "java" ? "#3B82F6" : "#F59E0B",
-                      }}
-                    >
-                      {pendingLanguage === "java" ? "Jv" : "Py"}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-700">
-                      Switch To
-                    </p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {pendingLanguage === "java" ? "Java" : "Python"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <p className="text-sm text-gray-600">
-                    You will need to complete a quick survey to assess your
-                    skills in {pendingLanguage === "java" ? "Java" : "Python"}.
-                    This helps us personalize your learning experience.
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowConfirmationModal(false);
-                    setPendingLanguage(null);
-                  }}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShowConfirmationModal(false);
-                    setShowSurveyModal(true);
-                  }}
-                  className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium transition-all hover:bg-gray-800"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
+          <LanguageSwitchModal
+            currentLang={language}
+            pendingLang={pendingLanguage || ""}
+            onConfirm={() => {
+              setShowConfirmationModal(false);
+              setShowSurveyModal(true);
+            }}
+            onCancel={() => {
+              setShowConfirmationModal(false);
+              setPendingLanguage(null);
+            }}
+          />
         )}
 
-        {/* Language Survey Modal */}
         <OnboardingSurveyModal
           isOpen={showSurveyModal}
           onClose={handleSurveyComplete}
