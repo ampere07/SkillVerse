@@ -48,7 +48,6 @@ const bugHuntLeaderboardSchema = new mongoose.Schema({
 });
 
 bugHuntLeaderboardSchema.index({ totalScore: -1 });
-bugHuntLeaderboardSchema.index({ userId: 1 });
 
 const BugHuntLeaderboard = mongoose.model('BugHuntLeaderboard', bugHuntLeaderboardSchema);
 

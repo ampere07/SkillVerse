@@ -6,8 +6,7 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Email is required'],
     unique: true,
     trim: true,
-    lowercase: true,
-    index: true
+    lowercase: true
   },
   password: {
     type: String,
@@ -122,6 +121,5 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-userSchema.index({ email: 1 });
 
 export default mongoose.model('User', userSchema);

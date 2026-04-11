@@ -6,10 +6,7 @@ export const connectDB = async () => {
       throw new Error('MONGODB_URI is not defined in environment variables');
     }
 
-    await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    await mongoose.connect(process.env.MONGODB_URI);
     
     console.log('MongoDB Atlas connected successfully');
     console.log('Database name:', mongoose.connection.db.databaseName);

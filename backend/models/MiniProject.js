@@ -111,8 +111,7 @@ const miniProjectSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   completedTasks: {
     type: [completedTaskSchema],
@@ -150,7 +149,7 @@ const miniProjectSchema = new mongoose.Schema({
   timestamps: true
 });
 
-miniProjectSchema.index({ userId: 1 });
+
 
 miniProjectSchema.methods.enableGeneration = function () {
   this.generationEnabled = true;

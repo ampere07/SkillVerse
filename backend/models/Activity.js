@@ -4,14 +4,12 @@ const activitySchema = new mongoose.Schema({
   classroom: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Classroom',
-    required: [true, 'Classroom is required'],
-    index: true
+    required: [true, 'Classroom is required']
   },
   teacher: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Teacher is required'],
-    index: true
+    required: [true, 'Teacher is required']
   },
   title: {
     type: String,
@@ -45,8 +43,7 @@ const activitySchema = new mongoose.Schema({
     }
   },
   dueDate: {
-    type: Date,
-    index: true
+    type: Date
   },
   points: {
     type: Number,
