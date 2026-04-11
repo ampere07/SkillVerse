@@ -645,8 +645,8 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(
             </div>
             <div className="text-right">
               {(() => {
-                // Calculate level locally to ensure consistency with total XP
-                const level = Math.floor(currentXP / 1000) + 1;
+                // Use currentLevel from API as the source of truth
+                const level = currentLevel;
                 const getXpRequiredForLevel = (lvl: number) => {
                   if (lvl <= 1) return 0;
                   return (lvl - 1) * 1000;
@@ -664,10 +664,10 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(
                       className="text-sm font-semibold"
                       style={{ color: "#212121" }}
                     >
-                      {xpProgress} / {xpNeededForLevel} XP
+                      {Math.max(0, xpProgress)} / {xpNeededForLevel} XP
                     </p>
                     <p className="text-xs" style={{ color: "#757575" }}>
-                      {xpToNextLevel} XP to Level {level + 1}
+                      {Math.max(0, xpToNextLevel)} XP to Level {level + 1}
                     </p>
                   </>
                 );
@@ -681,7 +681,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(
                 className="h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden"
                 style={{
                   width: `${(() => {
-                    const level = Math.floor(currentXP / 1000) + 1;
+                    const level = currentLevel;
                     const getXpRequiredForLevel = (lvl: number) => {
                       if (lvl <= 1) return 0;
                       return (lvl - 1) * 1000;

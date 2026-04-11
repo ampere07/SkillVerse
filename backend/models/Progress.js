@@ -126,11 +126,48 @@ const progressSchema = new mongoose.Schema({
     pythonProficiency: { type: Number },
     problemSolvingScore: { type: Number },
     codeQualityScore: { type: Number },
+    debuggingSkillsScore: { type: Number },
+    projectMasteryScore: { type: Number },
     efficiencyScore: { type: Number },
     collaborationScore: { type: Number },
     consistencyScore: { type: Number },
     overallScore: { type: Number },
     phaseProgress: { type: Number },
+    activitySnapshot: {
+      executions: { type: Number, default: 0 },
+      assignments: { type: Number, default: 0 },
+      projects: { type: Number, default: 0 },
+      bugHunts: { type: Number, default: 0 }
+    },
+    generatedAt: { type: Date }
+  },
+  
+  previousAiAnalysis: {
+    problemSolving: { type: String },
+    codeQuality: { type: String },
+    efficiency: { type: String },
+    collaboration: { type: String },
+    consistency: { type: String },
+    overall: { type: String },
+    weaknessAnalysis: { type: String },
+    recommendation: { type: String },
+    javaProficiency: { type: Number },
+    pythonProficiency: { type: Number },
+    problemSolvingScore: { type: Number },
+    codeQualityScore: { type: Number },
+    debuggingSkillsScore: { type: Number },
+    projectMasteryScore: { type: Number },
+    efficiencyScore: { type: Number },
+    collaborationScore: { type: Number },
+    consistencyScore: { type: Number },
+    overallScore: { type: Number },
+    phaseProgress: { type: Number },
+    activitySnapshot: {
+      executions: { type: Number, default: 0 },
+      assignments: { type: Number, default: 0 },
+      projects: { type: Number, default: 0 },
+      bugHunts: { type: Number, default: 0 }
+    },
     generatedAt: { type: Date }
   },
 
@@ -209,28 +246,49 @@ progressSchema.statics.calculateJobReadiness = function(progressData) {
     scores.codeQuality = Math.round(weightedLangScore * langVolumeWeight);
   }
 
-  // Efficiency: based on on-time submission rate (requires at least 1 assignment)
-  if (assignmentsCompleted > 0) {
-    const onTime = progressData.activities.assignments.onTime || 0;
-    scores.efficiency = Math.round((onTime / assignmentsCompleted) * 100);
+  // Debugging Skills (field uses efficiency): based on Bug Hunt participation and bugs found
+  const bugHuntStats = progressData.activities.bugHunt || { participated: 0, bugsFound: 0 };
+  const participationScore = Math.min(40, bugHuntStats.participated * 8); // Max 40 points for participation
+  const bugsScore = Math.min(60, bugHuntStats.bugsFound * 4); // Max 60 points for findings
+  scores.efficiency = participationScore + bugsScore;
+
+  // Project Mastery (collaboration): based on Mini Project completion and average scores
+  if (projectsCompleted > 0) {
+    // Each project completed contributes 10% base mastery, plus average score weight
+    const projectVolumeWeight = Math.min(1, projectsCompleted / 5); // Max volume at 5 projects
+    scores.collaboration = Math.round(projectScore * projectVolumeWeight);
+  } else {
+    scores.collaboration = 0;
   }
 
-  // Collaboration: 0 until student participates in classroom activities
-  // Grows with bug hunt participation and assignments (social activities)
-  const bugHuntScore = progressData.activities.bugHunt?.participated > 0 ? 
-    Math.min(100, progressData.activities.bugHunt.participated * 10) : 0;
-  const classroomScore = assignmentsCompleted > 0 ? Math.min(50, assignmentsCompleted * 5) : 0;
-  scores.collaboration = Math.min(100, bugHuntScore + classroomScore);
-
-  // Consistency: based on streaks and regular activity (unchanged)
+  // Consistency: based on streaks, active days, and time spent
   const consistencyScore = Math.min(100, 
-    (progressData.streaks.currentStreak * 5) + 
-    (progressData.streaks.totalActiveDays * 2)
+    (progressData.streaks.currentStreak * 8) + 
+    (progressData.streaks.totalActiveDays * 1.5) +
+    (progressData.timeSpent.totalMinutes / 120) // Every 2 hours adds some weight
   );
   scores.consistency = Math.round(consistencyScore);
 
+  // Calculate curriculum accuracy (Accurate basis for all skills)
+  const userLevel = progressData.level || 1;
+  const enrolledCourses = progressData.enrolledCourses || [];
+  
+  const levelWeight = Math.min(1, userLevel / 9); // Scale against max levels
+  const courseProgress = enrolledCourses.reduce((acc, curr) => acc + (curr.progress || 0), 0) / (enrolledCourses.length || 1);
+  const progressWeight = Math.min(1, courseProgress / 100);
+  
+  // Combined accuracy multiplier (Level + Practical Progress)
+  const accuracyMultiplier = (levelWeight * 0.4) + (progressWeight * 0.6);
+
+  // Apply accuracy multiplier to all scores
+  scores.problemSolving = Math.round(scores.problemSolving * accuracyMultiplier);
+  scores.codeQuality = Math.round(scores.codeQuality * accuracyMultiplier);
+  scores.efficiency = Math.round(scores.efficiency * accuracyMultiplier);
+  scores.collaboration = Math.round(scores.collaboration * accuracyMultiplier);
+  scores.consistency = Math.round(scores.consistency * accuracyMultiplier);
+
   // Calculate overall score
-  const overallScore = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
+  const overallScore = Object.values(scores).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) / 5;
 
   return {
     ...scores,

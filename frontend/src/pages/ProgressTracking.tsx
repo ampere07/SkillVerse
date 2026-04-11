@@ -15,7 +15,10 @@ import {
   RefreshCw,
   ShieldAlert,
   Lightbulb,
-  ChevronRight
+  Info,
+  ChevronRight,
+  ChevronLeft,
+  X
 } from 'lucide-react';
 import axios from 'axios';
 import { getCachedStudentProgress, setStudentProgress, getCachedTeacherClassrooms, setTeacherClassrooms, isProgressCacheValid } from '../utils/progressStore';
@@ -140,8 +143,8 @@ interface ProgressData {
   detailedAiAnalysis?: {
     problemSolving: string;
     codeQuality: string;
-    efficiency: string;
-    collaboration: string;
+    debuggingSkills: string;
+    projectMastery: string;
     consistency: string;
     overall: string;
     weaknessAnalysis: string;
@@ -150,8 +153,28 @@ interface ProgressData {
     pythonProficiency?: number;
     problemSolvingScore?: number;
     codeQualityScore?: number;
-    efficiencyScore?: number;
-    collaborationScore?: number;
+    debuggingSkillsScore?: number;
+    projectMasteryScore?: number;
+    consistencyScore?: number;
+    overallScore?: number;
+    phaseProgress?: number;
+    generatedAt: string;
+  };
+  previousAiAnalysis?: {
+    problemSolving: string;
+    codeQuality: string;
+    debuggingSkills: string;
+    projectMastery: string;
+    consistency: string;
+    overall: string;
+    weaknessAnalysis: string;
+    recommendation: string;
+    javaProficiency?: number;
+    pythonProficiency?: number;
+    problemSolvingScore?: number;
+    codeQualityScore?: number;
+    debuggingSkillsScore?: number;
+    projectMasteryScore?: number;
     consistencyScore?: number;
     overallScore?: number;
     phaseProgress?: number;
@@ -169,7 +192,7 @@ export default function ProgressTracking() {
   const { user, loading: authLoading } = useAuth();
   const isViewingStudent = sessionStorage.getItem('viewingStudent') === 'true';
   const viewingStudentId = sessionStorage.getItem('studentId');
-  
+
   const cacheKey = viewingStudentId || 'self';
   const initialCachedData = getCachedStudentProgress(cacheKey);
   const initialCachedClassrooms = user?.role === 'teacher' ? getCachedTeacherClassrooms() : null;
@@ -184,6 +207,8 @@ export default function ProgressTracking() {
 
   // Detailed AI Analysis state
   const [detailedAiLoading, setDetailedAiLoading] = useState(false);
+  const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'noChange'>('idle');
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   // Instructor-only states
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
@@ -201,7 +226,7 @@ export default function ProgressTracking() {
 
   useEffect(() => {
     if (authLoading) return;
-    
+
     const sid = isViewingStudent && viewingStudentId ? viewingStudentId : 'self';
     const hasCache = user?.role === 'teacher' ? !!getCachedTeacherClassrooms() : !!getCachedStudentProgress(sid);
     const isValid = isProgressCacheValid(sid);
@@ -277,7 +302,7 @@ export default function ProgressTracking() {
       if (response.data.success) {
         const data = response.data.progress || response.data;
         setProgressData(data);
-        
+
         // Update Cache
         setStudentProgress(data, studentId || 'self');
 
@@ -387,6 +412,7 @@ export default function ProgressTracking() {
 
   const generateDetailedAiAnalysis = async () => {
     setDetailedAiLoading(true);
+    setAiStatus('loading');
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
@@ -394,16 +420,30 @@ export default function ProgressTracking() {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (response.data.noChange) {
+        setAiStatus('noChange');
+        return;
+      }
+
       if (response.data.success && progressData) {
         setProgressData({
           ...progressData,
+          previousAiAnalysis: response.data.previousAnalysis || progressData.detailedAiAnalysis,
           detailedAiAnalysis: response.data.analysis
         });
+        setAiStatus('success');
+      } else {
+        setAiStatus('error');
       }
     } catch (error) {
       console.error('Error generating detailed AI analysis:', error);
+      setAiStatus('error');
     } finally {
-      setDetailedAiLoading(false);
+      // Keep showing success/error for 2 seconds before closing
+      setTimeout(() => {
+        setDetailedAiLoading(false);
+        setAiStatus('idle');
+      }, 2000);
     }
   };
 
@@ -413,13 +453,13 @@ export default function ProgressTracking() {
       const token = localStorage.getItem('token');
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/progress/next-phase`,
-        { studentId: viewingStudentId },
+        { studentId: viewingStudentId || undefined },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.success) {
         alert(`Congratulations! You have advanced to Phase ${response.data.newPhase}. Your new mini-projects are waiting for you!`);
         // Refresh progress data to reflect new phase
-        fetchStudentProgress(viewingStudentId);
+        fetchStudentProgress(viewingStudentId || undefined);
       }
     } catch (error) {
       console.error('Error advancing to next phase:', error);
@@ -492,9 +532,9 @@ export default function ProgressTracking() {
   return (
     <>
       {/* Header */}
-      <div className="mb-6 px-4 lg:px-0 flex justify-between items-start">
-        <div>
-          <h1 className="text-[24px] lg:text-[28px] font-semibold text-[#212121]">
+      <div className="mb-6 px-4 lg:px-0 flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[24px] lg:text-[28px] font-semibold text-[#212121] truncate">
             {isViewingStudent ? `${viewingStudentName}'s Progress` : 'Progress Tracking'}
           </h1>
           <p className="text-[14px] lg:text-[15px] text-[#757575]">
@@ -505,14 +545,23 @@ export default function ProgressTracking() {
           </p>
         </div>
         {user?.role === 'student' && progressData && (
-          <button
-            onClick={generateDetailedAiAnalysis}
-            disabled={detailedAiLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${detailedAiLoading ? 'animate-spin' : ''}`} />
-            {detailedAiLoading ? 'Generating...' : 'Generate AI Analysis'}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={generateDetailedAiAnalysis}
+              disabled={detailedAiLoading}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${detailedAiLoading ? 'animate-spin' : ''}`} />
+              {detailedAiLoading ? 'Generating...' : 'Generate AI Analysis'}
+            </button>
+            <button
+              onClick={() => setShowComparisonModal(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-[#E8F5E9] hover:bg-[#C8E6C9] text-[#1B5E20] text-sm font-medium rounded-lg transition-colors border border-[#1B5E20]"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Comparison
+            </button>
+          </div>
         )}
       </div>
 
@@ -521,11 +570,12 @@ export default function ProgressTracking() {
         {/* Left Column: Hexagon */}
         <div className="w-full lg:w-[420px] lg:sticky lg:top-4 order-1 lg:order-none">
           <div className="bg-white border border-[#E0E0E0] lg:rounded-xl p-4 lg:p-6 shadow-sm rounded-none border-x-0 lg:border-x">
-            <LevelHexagon
-              level={progressData.level || user?.level || 1}
-              jobReadiness={progressData.jobReadiness.overallScore}
+            <LevelHexagon 
+              level={progressData.level || user?.level || 1} 
+              xp={progressData.totalXp || user?.xp || 0}
+              jobReadiness={progressData.jobReadiness} 
               progressData={progressData}
-              onNextPhase={handleNextPhase}
+              onNextPhase={handleNextPhase} 
             />
           </div>
         </div>
@@ -813,14 +863,14 @@ export default function ProgressTracking() {
                         description={progressData.detailedAiAnalysis?.codeQuality || "Writing clean, efficient, and maintainable code"}
                       />
                       <JobReadinessMetric
-                        title="Efficiency"
-                        score={progressData.detailedAiAnalysis?.efficiencyScore !== undefined ? progressData.detailedAiAnalysis.efficiencyScore : progressData.jobReadiness.efficiency}
-                        description={progressData.detailedAiAnalysis?.efficiency || "Completing tasks on time and managing workload"}
+                        title="Debugging Skills"
+                        score={progressData.detailedAiAnalysis?.debuggingSkillsScore !== undefined ? progressData.detailedAiAnalysis.debuggingSkillsScore : progressData.jobReadiness.efficiency}
+                        description={progressData.detailedAiAnalysis?.debuggingSkills || "Proficiency in identifying and resolving logic errors and code bugs"}
                       />
                       <JobReadinessMetric
-                        title="Project Mastery"
-                        score={progressData.detailedAiAnalysis?.collaborationScore !== undefined ? progressData.detailedAiAnalysis.collaborationScore : progressData.jobReadiness.collaboration}
-                        description={progressData.detailedAiAnalysis?.collaboration || "Success in completing varied projects and exercises"}
+                        title="Logic & Implementation"
+                        score={progressData.detailedAiAnalysis?.projectMasteryScore !== undefined ? progressData.detailedAiAnalysis.projectMasteryScore : progressData.jobReadiness.collaboration}
+                        description={progressData.detailedAiAnalysis?.projectMastery || "Proficiency in designing logic and implementing code in Mini Project phases"}
                       />
                       <JobReadinessMetric
                         title="Consistency"
@@ -833,6 +883,37 @@ export default function ProgressTracking() {
                         description={progressData.detailedAiAnalysis?.overall || "Combined assessment of all skills"}
                         isOverall
                       />
+                    </div>
+
+                    {/* Assessment Basis Section */}
+                    <div className="mt-8 pt-8 border-t border-[#E0E0E0]">
+                      <h4 className="text-sm font-bold text-[#212121] mb-4 uppercase tracking-wider">Assessment Methodology</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <p className="text-xs font-bold text-[#1B5E20] mb-1">Problem Solving</p>
+                          <p className="text-[11px] text-[#757575]">Basis: Ratio of successful project completions to assignment attempts and code iterations.</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <p className="text-xs font-bold text-[#1B5E20] mb-1">Code Quality</p>
+                          <p className="text-[11px] text-[#757575]">Basis: Weighted average of raw scores from Java and Python tasks relative to total milestones hit.</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <p className="text-xs font-bold text-[#1B5E20] mb-1">Debugging Skills</p>
+                          <p className="text-[11px] text-[#757575]">Basis: Performance in Bug Hunt modules and success rate in passing automated test cases.</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <p className="text-xs font-bold text-[#1B5E20] mb-1">Logic & Implementation</p>
+                          <p className="text-[11px] text-[#757575]">Basis: Progress through Mini Project phases (1-5) and accuracy of code implementation in the compiler.</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <p className="text-xs font-bold text-[#1B5E20] mb-1">Consistency</p>
+                          <p className="text-[11px] text-[#757575]">Basis: Multiplier based on daily streak length, active days, and sustained weekly focus time.</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <p className="text-xs font-bold text-[#1B5E20] mb-1">Overall Score</p>
+                          <p className="text-[11px] text-[#757575]">Basis: A balanced aggregate of the 5 core work-readiness pillars above.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -900,17 +981,65 @@ export default function ProgressTracking() {
 
       {detailedAiLoading && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center">
-            <div className="relative w-24 h-24 mx-auto mb-6">
-              <div className="absolute inset-0 border-4 border-[#E8F5E9] rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-[#1B5E20] border-t-transparent rounded-full animate-spin"></div>
-            </div>
-            <h3 className="text-xl font-bold text-[#212121] mb-2">Analyzing Your Progress</h3>
-            <p className="text-[#757575] text-sm leading-relaxed mb-6">
-              Our AI is carefully evaluating your coding performance, problem-solving skills, and consistency to provide tailored insights.
-            </p>
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center animate-in zoom-in duration-200">
+            {aiStatus === 'loading' && (
+              <>
+                <div className="relative w-24 h-24 mx-auto mb-6">
+                  <div className="absolute inset-0 border-4 border-[#E8F5E9] rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-[#1B5E20] border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <h3 className="text-xl font-bold text-[#212121] mb-2">Analyzing Your Progress</h3>
+                <p className="text-[#757575] text-sm leading-relaxed">
+                  Our AI is carefully evaluating your coding performance, problem-solving skills, and consistency to provide tailored insights.
+                </p>
+              </>
+            )}
+
+            {aiStatus === 'success' && (
+              <div className="animate-in fade-in zoom-in duration-300">
+                <div className="w-24 h-24 mx-auto mb-6 bg-[#E8F5E9] rounded-full flex items-center justify-center text-[#2E7D32]">
+                  <CheckCircle className="w-12 h-12" />
+                </div>
+                <h3 className="text-xl font-bold text-[#1B5E20] mb-2">Analysis Complete!</h3>
+                <p className="text-[#757575] text-sm">
+                  Your skill assessments have been updated with the latest performance data.
+                </p>
+              </div>
+            )}
+
+            {aiStatus === 'error' && (
+              <div className="animate-in fade-in shake duration-300">
+                <div className="w-24 h-24 mx-auto mb-6 bg-red-50 rounded-full flex items-center justify-center text-red-600">
+                  <AlertCircle className="w-12 h-12" />
+                </div>
+                <h3 className="text-xl font-bold text-red-700 mb-2">Analysis Failed</h3>
+                <p className="text-[#757575] text-sm">
+                  Something went wrong while generating your analysis. Please try again.
+                </p>
+              </div>
+            )}
+            {aiStatus === 'noChange' && (
+              <div className="animate-in fade-in zoom-in duration-300">
+                <div className="w-24 h-24 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                  <Info className="w-12 h-12" />
+                </div>
+                <h3 className="text-xl font-bold text-blue-700 mb-2">No New Activity Found</h3>
+                <p className="text-[#757575] text-sm">
+                  The AI didn't detect any new work since your last analysis. Complete more projects or bug hunts to see updated insights!
+                </p>
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {showComparisonModal && (
+        <ComparisonModal
+          isOpen={showComparisonModal}
+          onClose={() => setShowComparisonModal(false)}
+          currentAnalysis={progressData.detailedAiAnalysis}
+          previousAnalysis={progressData.previousAiAnalysis}
+        />
       )}
     </>
   );
@@ -1253,9 +1382,19 @@ function StudentAnalyticsDetails({ studentAnalytics, onClose }: any) {
           description="Writing clean and efficient code"
         />
         <JobReadinessMetric
-          title="Efficiency"
+          title="Debugging Skills"
           score={studentAnalytics.currentLevel.efficiency}
-          description="Time management and delivery"
+          description="Proficiency in identifying and fixing errors"
+        />
+        <JobReadinessMetric
+          title="Logic & Implementation"
+          score={studentAnalytics.currentLevel.collaboration}
+          description="Ability to implement complex project logic"
+        />
+        <JobReadinessMetric
+          title="Consistency"
+          score={studentAnalytics.currentLevel.consistency}
+          description="Regular practice and habit formation"
         />
       </div>
 
@@ -1285,10 +1424,14 @@ interface PhaseInfo {
 }
 
 // Level Hexagon Component
-function LevelHexagon({ level, jobReadiness, progressData, onNextPhase }: any) {
+function LevelHexagon({ level, xp, jobReadiness, progressData, onNextPhase }: any) {
   const getPhaseInfo = (levelNum: number, overallScore: number): PhaseInfo => {
+    // Use the overall skill assessment score as the "Accurate" basis for level progression
+    // This ensures skills like Debugging and Logic are the primary drivers of advancement.
+    const overallSkillScore = progressData?.jobReadiness?.overallScore || 0;
+    
     const aiProgress = progressData?.detailedAiAnalysis?.phaseProgress;
-    const currentProgress = aiProgress !== undefined ? aiProgress : overallScore;
+    const currentProgress = aiProgress !== undefined ? aiProgress : overallSkillScore;
 
     if (levelNum <= 3) {
       return {
@@ -1320,16 +1463,19 @@ function LevelHexagon({ level, jobReadiness, progressData, onNextPhase }: any) {
     } else {
       return {
         phase: 'Expert',
-        nextPhase: 'Professional',
+        nextPhase: 'Mastery Tier',
         color: '#1B5E20',
-        description: 'Industry Mastery',
-        ready: true,
-        currentProgress: 100
+        description: 'Industry Standard',
+        ready: currentProgress >= 100,
+        currentProgress
       };
     }
   };
 
   const phaseInfo = getPhaseInfo(level, jobReadiness);
+  
+  // Per Level progression: button appears when 100% level mastery is reached
+  const isLevelComplete = phaseInfo.currentProgress >= 100;
 
   // Use real data from progressData or fallback to zeros
   // Angles: 0=top, 60=top-right, 120=bottom-right, 180=bottom, 240=bottom-left, 300=top-left
@@ -1355,13 +1501,13 @@ function LevelHexagon({ level, jobReadiness, progressData, onNextPhase }: any) {
       exercises: progressData?.skills?.python?.exercisesCompleted || 0
     },
     {
-      label: 'Efficiency',
-      value: progressData?.jobReadiness?.efficiency || 0,
-      exercises: progressData?.activities?.assignments?.onTime || 0
+      label: 'Debugging Skills',
+      value: progressData?.detailedAiAnalysis?.debuggingSkillsScore !== undefined ? progressData.detailedAiAnalysis.debuggingSkillsScore : progressData?.jobReadiness?.efficiency || 0,
+      exercises: progressData?.activities?.bugHunt?.bugsFound || 0
     },
     {
-      label: 'Project Mastery',
-      value: progressData?.detailedAiAnalysis?.collaborationScore !== undefined ? progressData.detailedAiAnalysis.collaborationScore : progressData?.jobReadiness?.collaboration || 0,
+      label: 'Logic & Implementation',
+      value: progressData?.detailedAiAnalysis?.projectMasteryScore !== undefined ? progressData.detailedAiAnalysis.projectMasteryScore : progressData?.jobReadiness?.collaboration || 0,
       exercises: progressData?.streaks?.currentStreak || 0
     }
   ];
@@ -1507,28 +1653,22 @@ function LevelHexagon({ level, jobReadiness, progressData, onNextPhase }: any) {
         <h2 className="text-xl font-bold text-gray-900 mb-1">{phaseInfo.description}</h2>
         <p className="text-gray-500 text-sm mb-3">Keep up the great work!</p>
 
-        {phaseInfo.ready ? (
+        {isLevelComplete ? (
           <div className="space-y-4">
             <div className="flex items-center justify-center gap-2 text-green-600">
               <CheckCircle className="w-4 h-4" />
-              <span className="font-semibold text-sm">Ready to advance!</span>
+              <span className="font-semibold text-sm">Level {level} Mastered!</span>
             </div>
             <button
               onClick={onNextPhase}
-              className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
+              className="w-full bg-[#1B5E20] text-white py-3 rounded-xl font-bold hover:bg-[#2E7D32] transition-all transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2"
             >
-              <ChevronRight className="w-5 h-5" />
-              Next Phase
+              Move to Level {level + 1}
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="flex items-baseline justify-center gap-2">
-              <span className="text-3xl font-bold" style={{ color: phaseInfo.color }}>
-                {phaseInfo.currentProgress}%
-              </span>
-              <span className="text-gray-400 text-sm">to next phase</span>
-            </div>
             <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
               <div
                 className="h-1.5 rounded-full transition-all duration-700"
@@ -1849,9 +1989,220 @@ function RecommendationsSection({ score, aiRecommendations, onRefresh }: any) {
   );
 }
 
+function ComparisonModal({ isOpen, onClose, currentAnalysis, previousAnalysis }: any) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  if (!isOpen) return null;
+
+  if (!currentAnalysis) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 text-center">
+          <BarChart3 className="w-16 h-16 text-[#CCC] mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-[#212121] mb-2">No Analysis Data</h3>
+          <p className="text-[#757575] text-sm mb-6">
+            Please generate your first AI analysis to start tracking and comparing your progress!
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-[#1B5E20] hover:bg-[#2E7D32] text-white font-bold rounded-lg transition-all"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const hasPrevious = !!previousAnalysis?.generatedAt;
+
+  const skills = [
+    { 
+      name: 'Problem Solving', 
+      scoreKey: 'problemSolvingScore', 
+      descKey: 'problemSolving',
+      fallbackScoreKeys: ['problemSolvingScore'],
+      fallbackDescKeys: ['problemSolving']
+    },
+    { 
+      name: 'Code Quality', 
+      scoreKey: 'codeQualityScore', 
+      descKey: 'codeQuality',
+      fallbackScoreKeys: ['codeQualityScore'],
+      fallbackDescKeys: ['codeQuality']
+    },
+    { 
+      name: 'Debugging Skills', 
+      scoreKey: 'debuggingSkillsScore', 
+      descKey: 'debuggingSkills',
+      fallbackScoreKeys: ['efficiencyScore', 'efficiency'],
+      fallbackDescKeys: ['efficiency']
+    },
+    { 
+      name: 'Logic & Implementation', 
+      scoreKey: 'projectMasteryScore', 
+      descKey: 'projectMastery',
+      fallbackScoreKeys: ['collaborationScore', 'collaboration'],
+      fallbackDescKeys: ['collaboration']
+    },
+    { 
+      name: 'Consistency', 
+      scoreKey: 'consistencyScore', 
+      descKey: 'consistency',
+      fallbackScoreKeys: ['consistencyScore'],
+      fallbackDescKeys: ['consistency']
+    },
+    { 
+      name: 'Overall Score', 
+      scoreKey: 'overallScore', 
+      descKey: 'overall',
+      fallbackScoreKeys: ['overallScore'],
+      fallbackDescKeys: ['overall']
+    },
+  ];
+
+  const skill = skills[currentIndex];
+
+  const handlePrev = () => setCurrentIndex(prev => (prev > 0 ? prev - 1 : skills.length - 1));
+  const handleNext = () => setCurrentIndex(prev => (prev < skills.length - 1 ? prev + 1 : 0));
+
+  // Accessing values with fallbacks for older data structures
+  const getValueWithFallback = (obj: any, keys: string[]) => {
+    for (const key of keys) {
+      if (obj && obj[key] !== undefined) return obj[key];
+    }
+    return undefined;
+  };
+
+  const oldScore = hasPrevious ? (getValueWithFallback(previousAnalysis, [skill.scoreKey, ...(skill.fallbackScoreKeys || [])]) || 0) : 0;
+  const newScore = getValueWithFallback(currentAnalysis, [skill.scoreKey, ...(skill.fallbackScoreKeys || [])]) || 0;
+  
+  const oldDesc = hasPrevious ? (getValueWithFallback(previousAnalysis, [skill.descKey, ...(skill.fallbackDescKeys || [])]) || "") : "This is your starting point. Generate future analyses to see how your scores and skills evolve from this baseline!";
+  const newDesc = getValueWithFallback(currentAnalysis, [skill.descKey, ...(skill.fallbackDescKeys || [])]) || "";
+
+  const prevDate = hasPrevious ? new Date(previousAnalysis.generatedAt).toLocaleDateString() : "Initial Baseline";
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        {/* Modal Header */}
+        <div className="bg-[#1B5E20] p-4 flex justify-between items-center text-white">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5" />
+            <h3 className="text-lg font-bold">Skills Progress Comparison</h3>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          {/* Skill Navigation */}
+          <div className="flex items-center justify-between mb-8 bg-[#F5F5F5] p-3 rounded-xl border border-[#E0E0E0]">
+            <button
+              onClick={handlePrev}
+              className="p-2 hover:bg-[#E0E0E0] rounded-lg transition-colors text-[#1B5E20]"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            <div className="text-center">
+              <span className="text-xs font-bold text-[#757575] uppercase tracking-wider block mb-1">Comparing Component</span>
+              <h4 className="text-xl font-bold text-[#212121]">{skill.name}</h4>
+              <div className="flex justify-center gap-1 mt-1">
+                {skills.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1 w-4 rounded-full transition-all ${i === currentIndex ? 'bg-[#1B5E20] w-8' : 'bg-[#E0E0E0]'}`}
+                  />
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={handleNext}
+              className="p-2 hover:bg-[#E0E0E0] rounded-lg transition-colors text-[#1B5E20]"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            {/* Older Data (Top) */}
+            <div className="relative p-4 sm:p-6 rounded-2xl border-2 border-dashed border-[#E0E0E0] bg-[#FAFAFA]">
+              <div className="absolute -top-3 left-6 inline-block px-3 py-1 bg-[#757575] text-white text-[10px] font-bold uppercase rounded-full tracking-wider">
+                {hasPrevious ? `Previous Assessment (${prevDate})` : 'Learning Baseline'}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
+                <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 relative flex items-center justify-center bg-white rounded-full border-4 border-[#E0E0E0] shadow-inner">
+                  <span className={`text-xl sm:text-2xl font-bold ${getScoreColor(oldScore)}`}>{Math.round(oldScore)}%</span>
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-sm text-[#424242] italic line-clamp-4 leading-relaxed">
+                    "{oldDesc}"
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center -my-3 relative z-10">
+              <div className="bg-white p-2 rounded-full border border-[#E0E0E0] shadow-sm">
+                <TrendingUp className="w-6 h-6 text-[#1B5E20]" />
+              </div>
+            </div>
+
+            {/* Newer Data (Bottom) */}
+            <div className="relative p-4 sm:p-6 rounded-2xl border-2 border-[#1B5E20] bg-white shadow-lg">
+              <div className="absolute -top-3 left-6 inline-block px-3 py-1 bg-[#1B5E20] text-white text-[10px] font-bold uppercase rounded-full tracking-wider">
+                Current Assessment ({new Date(currentAnalysis.generatedAt).toLocaleDateString()})
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
+                <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 relative flex items-center justify-center bg-white rounded-full border-4 border-[#1B5E20] shadow-md">
+                  <span className={`text-xl sm:text-2xl font-bold ${getScoreColor(newScore)}`}>{Math.round(newScore)}%</span>
+                  {newScore > oldScore && (
+                    <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1 border-2 border-white">
+                      <ArrowUp className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-sm text-[#212121] leading-relaxed font-medium">
+                    {newDesc}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 bg-[#F9FAFB] border-t border-[#E0E0E0] flex justify-between items-center">
+          <div className="text-xs text-[#757575]">
+            Analysis by SkillVerse AI
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArrowUp({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <polyline points="5 12 12 5 19 12" />
+    </svg>
+  );
+}
+
 function ProgressSkeleton({ isTeacher }: { isTeacher: boolean }) {
   const pulse = "animate-pulse bg-gray-200 rounded-lg";
-  
+
   return (
     <div className="p-6 space-y-8">
       {/* Header Skeleton */}
@@ -1871,9 +2222,9 @@ function ProgressSkeleton({ isTeacher }: { isTeacher: boolean }) {
         {/* Right Column Skeleton */}
         <div className="flex-1 space-y-6">
           <div className="flex gap-4 border-b border-gray-100 pb-2">
-             <div className={`h-4 w-20 ${pulse}`} />
-             <div className={`h-4 w-20 ${pulse}`} />
-             <div className={`h-4 w-20 ${pulse}`} />
+            <div className={`h-4 w-20 ${pulse}`} />
+            <div className={`h-4 w-20 ${pulse}`} />
+            <div className={`h-4 w-20 ${pulse}`} />
           </div>
 
           {!isTeacher ? (
@@ -1884,10 +2235,10 @@ function ProgressSkeleton({ isTeacher }: { isTeacher: boolean }) {
                 <div className={`h-24 ${pulse}`} />
                 <div className={`h-24 ${pulse}`} />
               </div>
-              
+
               {/* AI Insights Skeleton */}
               <div className={`h-48 w-full ${pulse}`} />
-              
+
               {/* Activity Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className={`h-64 ${pulse}`} />
@@ -1895,13 +2246,13 @@ function ProgressSkeleton({ isTeacher }: { isTeacher: boolean }) {
               </div>
             </div>
           ) : (
-             <div className="space-y-6">
-                <div className={`h-12 w-full ${pulse}`} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className={`h-80 ${pulse}`} />
-                   <div className={`h-80 ${pulse}`} />
-                </div>
-             </div>
+            <div className="space-y-6">
+              <div className={`h-12 w-full ${pulse}`} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={`h-80 ${pulse}`} />
+                <div className={`h-80 ${pulse}`} />
+              </div>
+            </div>
           )}
         </div>
       </div>

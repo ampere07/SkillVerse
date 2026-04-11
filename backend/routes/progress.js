@@ -334,7 +334,8 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
         averagePerDay: 0,
         lastUpdated: new Date()
       },
-      detailedAiAnalysis: null
+      detailedAiAnalysis: null,
+      previousAiAnalysis: null
     };
 
     // Aggregate all the data
@@ -425,7 +426,42 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
           new Date(progress.detailedAiAnalysis.generatedAt) > new Date(aggregatedProgress.detailedAiAnalysis.generatedAt))) {
         aggregatedProgress.detailedAiAnalysis = progress.detailedAiAnalysis;
       }
+      
+      // Keep latest previous AI analysis
+      if (progress.previousAiAnalysis?.generatedAt &&
+        (!aggregatedProgress.previousAiAnalysis?.generatedAt ||
+          new Date(progress.previousAiAnalysis.generatedAt) > new Date(aggregatedProgress.previousAiAnalysis.generatedAt))) {
+        
+        const prev = progress.previousAiAnalysis;
+        // Ensure debugging and logic keys exist for old records
+        if (prev.debuggingSkillsScore === undefined) prev.debuggingSkillsScore = prev.efficiencyScore || progress.jobReadiness?.efficiency || 0;
+        if (prev.projectMasteryScore === undefined) prev.projectMasteryScore = prev.collaborationScore || progress.jobReadiness?.collaboration || 0;
+        if (!prev.debuggingSkills) prev.debuggingSkills = prev.efficiency || "Baseline debugging assessment.";
+        if (!prev.projectMastery) prev.projectMastery = prev.collaboration || "Baseline logic implementation assessment.";
+        
+        aggregatedProgress.previousAiAnalysis = prev;
+      }
     });
+
+    // If still no previous analysis, create a synthetic one from jobReadiness baseline
+    if (!aggregatedProgress.previousAiAnalysis?.generatedAt && aggregatedProgress.jobReadiness?.overallScore > 0) {
+      const jr = aggregatedProgress.jobReadiness;
+      aggregatedProgress.previousAiAnalysis = {
+        generatedAt: new Date(Date.now() - 86400000), // 1 day ago
+        problemSolvingScore: jr.problemSolving || 0,
+        codeQualityScore: jr.codeQuality || 0,
+        debuggingSkillsScore: jr.efficiency || 0,
+        projectMasteryScore: jr.collaboration || 0,
+        consistencyScore: jr.consistency || 0,
+        overallScore: jr.overallScore || 0,
+        problemSolving: "Initial baseline analysis.",
+        codeQuality: "Initial baseline analysis.",
+        debuggingSkills: "Initial baseline analysis.",
+        projectMastery: "Initial baseline analysis.",
+        consistency: "Initial baseline analysis.",
+        overall: "Initial baseline analysis."
+      };
+    }
 
     // Calculate average scores
     const totalJavaExercises = aggregatedProgress.skills.java.exercisesCompleted;
@@ -489,9 +525,10 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       aggregatedProgress.skills.python.averageScore = pythonAvgScore;
     }
 
-    // Add real XP and level from User model
+    // Add real XP, level, and enrollment from User model for accurate scaling
     aggregatedProgress.totalXp = totalXp;
     aggregatedProgress.level = userDoc?.level || 1;
+    aggregatedProgress.enrolledCourses = userDoc?.enrolledCourses || [];
 
     // Calculate overall job readiness
     aggregatedProgress.jobReadiness = Progress.calculateJobReadiness(aggregatedProgress);
@@ -1102,66 +1139,102 @@ router.post('/detailed-ai-analysis', authenticateToken, async (req, res) => {
         pythonProjects = latestProgress.skills.python?.projectsCompleted || 0;
       }
     }
+    const latestAnalysis = progressRecords.find(p => p.detailedAiAnalysis?.overallScore > 0)?.detailedAiAnalysis;
+    
+    // Check for "No New Activity" (Volume-based)
+    if (latestAnalysis?.activitySnapshot) {
+      const { executions, assignments, projects, bugHunts } = latestAnalysis.activitySnapshot;
+      if (
+        totalCodeExecutions <= executions &&
+        totalAssignments <= assignments &&
+        submittedTasks.length <= projects &&
+        bugHuntParticipated <= bugHunts
+      ) {
+        return res.json({
+          success: true,
+          noChange: true,
+          message: "No new activity found since last analysis."
+        });
+      }
+    }
+
+    const stabilityReference = latestAnalysis ? `
+STABILITY REFERENCE (CURRENT SCORES):
+- Problem Solving: ${latestAnalysis.problemSolvingScore}%
+- Code Quality: ${latestAnalysis.codeQualityScore}%
+- Debugging: ${latestAnalysis.debuggingSkillsScore}%
+- Logic & Implementation: ${latestAnalysis.projectMasteryScore}%
+- Consistency: ${latestAnalysis.consistencyScore}%
+- IMPORTANT: If the ACTIVITY DATA below is significantly similar to when these scores were generated, DO NOT INCREASE THEM. 
+- Only award higher percentages if the student has completed NEW assignments, NEW projects, or NEW bug hunts.
+` : '';
 
     const studentName = userDoc?.name || `${userDoc?.firstName || ''} ${userDoc?.lastName || ''}`.trim() || 'Student';
-    const prompt = `You are an AI learning coach. Analyze this student's programming learning data based on their assignments, miniprojects, bughunt, and performance overall. Provide a CONCISE textual analysis (2-3 sentences max) for each of their core job readiness areas and an overall summary.
-Additionally, calculate a realistic "True Proficiency" score (0-100) for Java and Python. A student at Level 1 or 2 with high assignment scores should NOT have 90%+ true proficiency, but rather a scaled percentage based on their progression level and tasks completed.
+    const prompt = `You are an AI learning coach. Perform a deep, data-driven analysis of this student's learning journey. 
+Calculate their "True Proficiency" and "Skill Assessment" scores based STRICTLY on these criteria:
+
+TONE AND GUIDELINES:
+- Be encouraging and constructive. Avoid punitive or overly harsh language.
+- NEVER tell the student to "stop using AI" or suggest they should avoid the system's features. This is an AI-assisted learning platform.
+- Recommendations MUST be actionable next steps within the SkillVerse modules.
+
+MASTERY PHASE BRACKETS (Global Cumulative Scoring):
+- Your "javaProficiency" and "pythonProficiency" scores must represent the student's progress through the FULL 4-phase curriculum (Industry Expert = 100%).
+- BRACKET CAPS:
+  * Level 1-3: Beginner (Score Range: 0% - 25%)
+  * Level 4-6: Intermediate (Score Range: 25% - 50%)
+  * Level 7-9: Advanced (Score Range: 50% - 75%)
+  * Level 10+: Expert (Score Range: 75% - 100%)
+- EXPLANATION: If a student is in Level 5 (Intermediate), their proficiency score should be between 25% and 50% based on their performance on level-appropriate tasks. 100% is ONLY for Level 10+ Experts.
+
+BASIS FOR PERCENTAGES (TECHNICAL MASTERY):
+- IMPORTANT: Scores must reflect the student's technical performance on their current tasks.
+- PHASE PROGRESS: For current level mastery only (0-100%). When the student hits 100% in their current level, they are ready to advance.
+${stabilityReference}
 
 STUDENT: ${studentName}
 PRIMARY LANGUAGE: ${userDoc?.primaryLanguage || 'Not set'}
-LEVEL: ${userDoc?.level || 1} (XP: ${userDoc?.xp || 0})
+LEVEL: ${userDoc?.level || 1} (XP: ${userDoc?.xp || 0}) (Phase: ${
+  userDoc?.level <= 3 ? 'Beginner' : 
+  userDoc?.level <= 6 ? 'Intermediate' : 
+  userDoc?.level <= 9 ? 'Advanced' : 'Expert'
+})
 MINI PROJECT PHASE: Phase ${miniProjectDoc?.currentPhase || 1}
-GENERATION ENABLED: ${miniProjectDoc?.generationEnabled ? 'Yes' : 'No'}
 
-SKILLS ASSESSMENT SCORES (Tab 4):
-- Problem Solving: ${Math.round(jobReadiness.problemSolving)}%
-- Code Quality: ${Math.round(jobReadiness.codeQuality)}%
-- Efficiency: ${Math.round(jobReadiness.efficiency)}%
-- Project Mastery (previously Collaboration): ${Math.round(jobReadiness.collaboration)}%
-- Consistency: ${Math.round(jobReadiness.consistency)}%
-- Overall Score: ${Math.round(jobReadiness.overallScore)}%
-
-LANGUAGE PROGRESS (Tab 2):
-- Java: ${javaProjects} projects completed, Raw Average Score: ${Math.round(latestJavaScore)}%
-- Python: ${pythonProjects} projects completed, Raw Average Score: ${Math.round(latestPythonScore)}%
-
-ACTIVITY DATA (Tab 3):
+ACTIVITY DATA:
 - Code Executions: ${totalCodeExecutions}
-- Assignments Submitted: ${totalAssignments} (${assignmentsOnTime} on time)
-- Mini Projects Completed: ${submittedTasks.length} (Avg Score: ${Math.round(avgProjectScore)}%)
-- Bug Hunt Participations: ${bugHuntParticipated} (Total Bugs Found: ${bugsFound})
+- Assignments: ${totalAssignments} (${assignmentsOnTime} on time)
+- Mini Projects: ${submittedTasks.length} (Avg Score: ${Math.round(avgProjectScore)}%)
+- Bug Hunt: ${bugHuntParticipated} participations, ${bugsFound} bugs found
 
-OVERVIEW DATA (Tab 1):
-- Current Streak: ${currentStreak} days
-- Total Active Days: ${totalActiveDays}
-- Total Time Spent: ${totalMinutes} minutes
-
-You are an AI learning coach. Perform a deep correlation analysis across ALL these data points (Overview, Skills, Activities, and Skills Assessment). For example, compare "Code Executions" vs "Project Scores" to see if the student iterates enough, or "Streak" vs "Consistency Score".
-Provide a CONCISE textual analysis (2-3 sentences max) for each area.
+OVERVIEW DATA:
+- Streak: ${currentStreak} days
+- Active Days: ${totalActiveDays}
+- Time Spent: ${totalMinutes} minutes
 
 Respond in STRICT JSON format ONLY:
 {
   "detailedAiAnalysis": {
-    "problemSolving": "A short (2-3 sentences) analysis of problem solving.",
-    "codeQuality": "A short (2-3 sentences) analysis of code quality.",
-    "efficiency": "A short (2-3 sentences) analysis of efficiency.",
-    "collaboration": "A short (2-3 sentences) analysis of project mastery (success in completing varied projects and exercises).",
-    "consistency": "A short (2-3 sentences) analysis of consistency.",
-    "overall": "A short (2-3 sentences) overall summary.",
-    "weaknessAnalysis": "A short (2-3 sentences) detail of their weaknesses.",
-    "recommendation": "A short (2-3 sentences) actionable recommendation.",
-    "javaProficiency": <number from 0 to 100 based on level + java stats>,
-    "pythonProficiency": <number from 0 to 100 based on level + python stats>,
-    "problemSolvingScore": <number from 0 to 100 based on activity>,
-    "codeQualityScore": <number from 0 to 100 based on activity>,
-    "efficiencyScore": <number from 0 to 100 based on activity>,
-    "collaborationScore": <number from 0 to 100 based on project completion success>,
-    "consistencyScore": <number from 0 to 100 based on activity>,
-    "overallScore": <number from 0 to 100 overall assessment>,
-    "phaseProgress": <number from 0 to 100 representing readiness to move to next curriculum phase (Learning the basics -> Advanced Concepts -> Project Development, etc.)>
+    "problemSolving": "Analysis focus: Algorithmic efficiency at current level.",
+    "codeQuality": "Analysis focus: Syntax and clean code for current level.",
+    "debuggingSkills": "Analysis focus: Proficiency in identifying errors during Bug Hunt.",
+    "projectMastery": "Analysis focus: Technical implementation success relative to Level.",
+    "consistency": "Analysis focus: Engagement frequency at the current level.",
+    "overall": "Mastery summary for the current level.",
+    "weaknessAnalysis": "Identification of technical areas for growth to reach next level.",
+    "recommendation": "Next step to reach 100% of current level goals.",
+    "javaProficiency": <0-100 based on level + scores>,
+    "pythonProficiency": <0-100 based on level + scores>,
+    "problemSolvingScore": <0-100>,
+    "codeQualityScore": <0-100>,
+    "debuggingSkillsScore": <0-100>,
+    "projectMasteryScore": <0-100 based on level requirements>,
+    "consistencyScore": <0-100>,
+    "overallScore": <0-100 balanced total>,
+    "phaseProgress": <0-100 readiness for the Next Level>
   }
 }
-Return ONLY the JSON. No markdown backticks.`;
+Return ONLY the JSON.`;
 
     const response = await generateWithRetry(prompt, { temperature: 0.4, num_predict: 1200 });
     const content = response.message.content;
@@ -1191,35 +1264,71 @@ Return ONLY the JSON. No markdown backticks.`;
     
     if (analysisData) {
       analysisData.generatedAt = new Date();
-      // save to the progress records
+      analysisData.activitySnapshot = {
+        executions: totalCodeExecutions,
+        assignments: totalAssignments,
+        projects: submittedTasks.length,
+        bugHunts: bugHuntParticipated
+      };
+      
+      // Identify classrooms that already have a progress record
+      const existingClassroomIds = progressRecords.map(p => p.classroom.toString());
+      
+      // Find all classrooms the student is enrolled in
+      const Classroom = (await import('../models/Classroom.js')).default;
+      const allStudentClassrooms = await Classroom.find({
+        $or: [
+          { 'students.studentId': userId },
+          { isDefault: true }
+        ]
+      });
+
+      console.log(`[Progress] User ${userId} is in ${allStudentClassrooms.length} classrooms. Updating existing and creating missing records.`);
+
+      // 1. Update existing records
       if (progressRecords.length > 0) {
-        console.log(`[Progress] Saving AI analysis to ${progressRecords.length} records for user ${userId}`);
         for (let p of progressRecords) {
+          // Save old analysis to previousAiAnalysis before updating
+          if (p.detailedAiAnalysis && p.detailedAiAnalysis.generatedAt) {
+            p.previousAiAnalysis = p.detailedAiAnalysis;
+            p.markModified('previousAiAnalysis');
+          } else if (p.jobReadiness) {
+            p.previousAiAnalysis = {
+              problemSolving: "Initial baseline assessment.",
+              codeQuality: "Initial baseline assessment.",
+              debuggingSkills: "Initial baseline assessment.",
+              projectMastery: "Initial baseline assessment.",
+              consistency: "Initial baseline assessment.",
+              overall: "Initial baseline assessment.",
+              problemSolvingScore: p.jobReadiness.problemSolving || 0,
+              codeQualityScore: p.jobReadiness.codeQuality || 0,
+              debuggingSkillsScore: p.jobReadiness.efficiency || 0,
+              projectMasteryScore: p.jobReadiness.collaboration || 0,
+              consistencyScore: p.jobReadiness.consistency || 0,
+              overallScore: p.jobReadiness.overallScore || 0,
+              generatedAt: new Date()
+            };
+            p.markModified('previousAiAnalysis');
+          }
+          
           p.detailedAiAnalysis = analysisData;
           p.markModified('detailedAiAnalysis');
           await p.save();
         }
-      } else {
-        console.warn(`[Progress] No progress records found for user ${userId}. Creating default record in available classroom.`);
-        // Try to find any classroom the student is in
-        const userClassrooms = await Classroom.find({
-          $or: [
-            { students: userId },
-            { isDefault: true }
-          ]
-        });
+      }
 
-        if (userClassrooms.length > 0) {
+      // 2. Create records for classrooms that don't have one yet
+      const missingClassrooms = allStudentClassrooms.filter(c => !existingClassroomIds.includes(c._id.toString()));
+      if (missingClassrooms.length > 0) {
+        console.log(`[Progress] Creating ${missingClassrooms.length} new records for missing classrooms.`);
+        for (const classroom of missingClassrooms) {
           const newProgress = new Progress({
             student: userId,
-            classroom: userClassrooms[0]._id,
+            classroom: classroom._id,
             detailedAiAnalysis: analysisData
           });
           newProgress.markModified('detailedAiAnalysis');
           await newProgress.save();
-          console.log(`[Progress] Created new progress record in classroom ${userClassrooms[0].name} specifically to store AI analysis.`);
-        } else {
-          console.error(`[Progress] Student ${userId} is not in any classrooms. AI analysis cannot be persisted.`);
         }
       }
     } else {
@@ -1229,6 +1338,7 @@ Return ONLY the JSON. No markdown backticks.`;
     res.json({
       success: true,
       analysis: analysisData,
+      previousAnalysis: progressRecords[0]?.previousAiAnalysis || null,
       generatedAt: analysisData.generatedAt
     });
   } catch (error) {
@@ -1244,7 +1354,13 @@ Return ONLY the JSON. No markdown backticks.`;
 // Advance to the next curriculum phase
 router.post('/next-phase', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    let userId = req.user.userId;
+
+    // Allow teachers to advance a student's phase
+    if (req.user.role === 'teacher' && req.body.studentId) {
+      userId = req.body.studentId;
+    }
+
     const MiniProject = (await import('../models/MiniProject.js')).default;
     
     // Find MiniProject and increment phase
@@ -1255,6 +1371,14 @@ router.post('/next-phase', authenticateToken, async (req, res) => {
     
     const oldPhase = miniProject.currentPhase || 1;
     miniProject.currentPhase = oldPhase + 1;
+    
+    // Increment User Level as well (manual advancement basis)
+    const User = (await import('../models/User.js')).default;
+    const user = await User.findById(userId);
+    if (user) {
+      user.level = (user.level || 1) + 1;
+      await user.save();
+    }
     
     // Increment week number to ensure we start a fresh "Current Week" in the history
     miniProject.currentWeekNumber = (miniProject.currentWeekNumber || 0) + 1;
@@ -1268,11 +1392,34 @@ router.post('/next-phase', authenticateToken, async (req, res) => {
     // Update all progress records for this student to reflect the new phase
     const progressRecords = await Progress.find({ student: userId });
     for (const p of progressRecords) {
+      // Archive current analysis before resetting
       if (p.detailedAiAnalysis) {
-        p.detailedAiAnalysis.phaseProgress = 0; // Reset progress for the new phase
-        p.markModified('detailedAiAnalysis');
-        await p.save();
+        p.previousAiAnalysis = p.detailedAiAnalysis;
       }
+      
+      // Reset Detailed AI Analysis for the fresh start in new phase
+      p.detailedAiAnalysis = {
+        problemSolving: "Fresh assessment for the new phase. Complete assignments to see analysis.",
+        codeQuality: "Start coding in the new phase to evaluate quality.",
+        debuggingSkills: "Participate in new Bug Hunts to see debugging metrics.",
+        projectMastery: "Begin Phase " + miniProject.currentPhase + " projects to track mastery.",
+        consistency: "Maintain your streak in this new phase!",
+        overall: "Beginning of Phase " + miniProject.currentPhase + ". Your journey continues.",
+        weaknessAnalysis: "New phase starting. Growth areas will appear as you progress.",
+        recommendation: "Welcome to Phase " + miniProject.currentPhase + "! Start with your new Mini Projects.",
+        problemSolvingScore: 0,
+        codeQualityScore: 0,
+        debuggingSkillsScore: 0,
+        projectMasteryScore: 0,
+        consistencyScore: 0,
+        overallScore: 0,
+        phaseProgress: 0,
+        generatedAt: new Date()
+      };
+      
+      p.markModified('detailedAiAnalysis');
+      p.markModified('previousAiAnalysis');
+      await p.save();
     }
     
     res.json({

@@ -5,6 +5,7 @@ import OnboardingSurveyModal from '../components/OnboardingSurveyModal';
 import { getCachedSettingsProfile, setSettingsProfile, isSettingsCacheValid } from '../utils/settingsStore';
 
 export default function Settings() {
+  const { token } = useAuth();
   const cachedProfile = getCachedSettingsProfile();
   
   const [userData, setUserData] = useState<any>(cachedProfile);
@@ -65,7 +66,7 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: any;
     if (countdown > 0) {
       timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     }
@@ -109,7 +110,6 @@ export default function Settings() {
   };
 
   const handleLanguageSwitch = async () => {
-    const token = localStorage.getItem('token');
     if (!token) return;
 
     const completedLanguages = userData?.surveyCompletedLanguages || [];
@@ -181,7 +181,7 @@ export default function Settings() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ email: userData.email })
       });
@@ -248,7 +248,6 @@ export default function Settings() {
     setOperationLoading({ show: true, message: 'Updating profile...' });
 
     try {
-      const token = localStorage.getItem('token');
       if (!token) {
         setOperationLoading({ show: false, message: '' });
         return;
@@ -328,7 +327,6 @@ export default function Settings() {
     setOperationLoading({ show: true, message: 'Changing password...' });
 
     try {
-      const token = localStorage.getItem('token');
       if (!token) {
         setOperationLoading({ show: false, message: '' });
         return;
