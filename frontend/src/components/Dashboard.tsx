@@ -148,6 +148,13 @@ export default function Dashboard() {
   const [isGameActive, setIsGameActive] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [leveledLevel, setLeveledLevel] = useState(1);
+
+  useEffect(() => {
+    const pendingCode = sessionStorage.getItem('pendingJoinCode');
+    if (pendingCode && user?.role === 'student') {
+      setActiveNav('/classrooms');
+    }
+  }, [user]);
   const [compilerInitialCode, setCompilerInitialCode] = useState<string | null>(null);
   const [compilerInitialLanguage, setCompilerInitialLanguage] = useState<string | null>(null);
 
