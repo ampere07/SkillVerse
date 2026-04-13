@@ -785,37 +785,39 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(
             className="flex gap-3 overflow-x-auto pb-2"
             style={{ scrollbarWidth: "thin" }}
           >
-            {badges.map((badge) => {
+            {(() => {
               const stats = calculateBadgeStats();
+              const badgeData = badges.map((badge, index) => {
+                let progress = 0;
+                if (badge.id === "first_steps")
+                  progress = Math.min((stats.completed / 1) * 100, 100);
+                else if (badge.id === "getting_started")
+                  progress = Math.min((stats.completed / 3) * 100, 100);
+                else if (badge.id === "halfway_hero")
+                  progress = Math.min((stats.completed / 50) * 100, 100);
+                else if (badge.id === "almost_there")
+                  progress = Math.min((stats.completed / 100) * 100, 100);
+                else if (badge.id === "perfectionist")
+                  progress = Math.min((stats.completed / 250) * 100, 100);
+                else if (badge.id === "streak_3")
+                  progress = Math.min((stats.consecutiveDays / 3) * 100, 100);
+                else if (badge.id === "streak_7")
+                  progress = Math.min((stats.consecutiveDays / 7) * 100, 100);
+                else if (badge.id === "streak_30")
+                  progress = Math.min((stats.consecutiveDays / 30) * 100, 100);
+                else if (badge.id === "high_achiever")
+                  progress = Math.min((stats.highScores / 5) * 100, 100);
+                else if (badge.id === "perfect_execution")
+                  progress = Math.min((stats.perfectScores / 1) * 100, 100);
 
-              // Calculate progress
-              let progress = 0;
-              if (badge.id === "first_steps")
-                progress = Math.min((stats.completed / 1) * 100, 100);
-              else if (badge.id === "getting_started")
-                progress = Math.min((stats.completed / 3) * 100, 100);
-              else if (badge.id === "halfway_hero")
-                progress = Math.min((stats.completed / 50) * 100, 100);
-              else if (badge.id === "almost_there")
-                progress = Math.min((stats.completed / 100) * 100, 100);
-              else if (badge.id === "perfectionist")
-                progress = Math.min((stats.completed / 250) * 100, 100);
-              else if (badge.id === "streak_3")
-                progress = Math.min((stats.consecutiveDays / 3) * 100, 100);
-              else if (badge.id === "streak_7")
-                progress = Math.min((stats.consecutiveDays / 7) * 100, 100);
-              else if (badge.id === "streak_30")
-                progress = Math.min((stats.consecutiveDays / 30) * 100, 100);
-              else if (badge.id === "high_achiever")
-                progress = Math.min((stats.highScores / 5) * 100, 100);
-              else if (badge.id === "perfect_execution")
-                progress = Math.min((stats.perfectScores / 1) * 100, 100);
+                const isEarned = earnedBadges.includes(badge.id) || progress >= 100;
+                return { badge, index, progress, isEarned };
+              });
 
-              // Badge is earned if either: backend says so OR local progress is 100%
-              const isEarned =
-                earnedBadges.includes(badge.id) || progress >= 100;
-
-              return (
+              return badgeData.sort((a, b) => {
+                if (a.isEarned === b.isEarned) return a.index - b.index;
+                return a.isEarned ? -1 : 1;
+              }).map(({ badge, progress, isEarned }) => (
                 <div
                   key={badge.id}
                   className={`relative p-4 rounded-xl border-2 transition-all flex-shrink-0 w-44 ${
@@ -889,8 +891,8 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(
                     </div>
                   )}
                 </div>
-              );
-            })}
+              ));
+            })()}
           </div>
 
           {(() => {

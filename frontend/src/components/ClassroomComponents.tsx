@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   BookOpen, X, Plus, Users, Copy, Check, MoreVertical, 
-  Eye, Trash2, Loader2, CheckCircle, XCircle 
+  Eye, Trash2, Loader2, CheckCircle, XCircle, Share2
 } from 'lucide-react';
 import { classroomAPI } from '../utils/api';
 import { Classroom } from '../pages/Classrooms';
@@ -72,6 +72,7 @@ export function ClassroomCard({
   const teacherName = typeof classroom.teacher === 'object' && classroom.teacher !== null 
     ? (classroom.teacher as any).name 
     : 'Unknown Teacher';
+  const [linkCopied, setLinkCopied] = useState(false);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-all flex flex-col h-full cursor-pointer">
@@ -102,18 +103,7 @@ export function ClassroomCard({
                 <div className="absolute right-0 top-8 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
                   {isTeacher ? (
                     <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onView();
-                          setShowMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center space-x-2"
-                        style={{ color: '#212121' }}
-                      >
-                        <Eye className="w-4 h-4" strokeWidth={1.5} />
-                        <span>View Details</span>
-                      </button>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -154,13 +144,13 @@ export function ClassroomCard({
           </p>
         )}
 
-        <div className="mb-4">
+        <div className="flex items-center gap-2 mb-4">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onCopyCode(classroom.code);
             }}
-            className="flex items-center space-x-2 w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+            className="flex-1 flex items-center space-x-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {copiedCode === classroom.code ? (
               <Check className="w-4 h-4" style={{ color: '#1B5E20' }} strokeWidth={1.5} />
@@ -168,11 +158,33 @@ export function ClassroomCard({
               <Copy className="w-4 h-4" style={{ color: '#757575' }} strokeWidth={1.5} />
             )}
             <div className="flex-1 text-left">
-              <p className="text-xs" style={{ color: '#757575' }}>Classroom Code</p>
+              <p className="text-xs" style={{ color: '#757575' }}>Code</p>
               <p className="text-sm font-mono font-semibold" style={{ color: '#212121' }}>
                 {classroom.code}
               </p>
             </div>
+          </button>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const shareUrl = `${window.location.origin}/join?code=${classroom.code}`;
+              navigator.clipboard.writeText(shareUrl);
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 2000);
+            }}
+            className={`p-3 rounded-lg border transition-all ${
+              linkCopied 
+                ? 'bg-green-50 border-green-200 text-green-600' 
+                : 'bg-[#1B5E20]/5 border-[#1B5E20]/10 text-[#1B5E20] hover:bg-[#1B5E20]/10'
+            }`}
+            title="Copy Share Link"
+          >
+            {linkCopied ? (
+              <Check className="w-4 h-4" strokeWidth={2} />
+            ) : (
+              <Share2 className="w-4 h-4" strokeWidth={2} />
+            )}
           </button>
         </div>
 
@@ -357,10 +369,17 @@ export function CreateClassroomModal({ onSuccess, onClose }: { onSuccess: () => 
   );
 }
 
-export function JoinClassroomModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: () => void }) {
-  const [classCode, setClassCode] = useState('');
+export function JoinClassroomModal({ initialCode = '', onSuccess, onClose }: { initialCode?: string; onSuccess: () => void; onClose: () => void }) {
+  const [classCode, setClassCode] = useState(initialCode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Handle case where initialCode might change while modal is open (rare but good for robustness)
+  useEffect(() => {
+    if (initialCode) {
+      setClassCode(initialCode);
+    }
+  }, [initialCode]);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -707,6 +707,20 @@ export default function Dashboard() {
                 setCreatePostClassroomName(classroomName);
                 setActiveNav("/create-post");
               }}
+              onNavigateToTracking={(studentId?: string, studentName?: string) => {
+                if (studentId && studentName) {
+                    sessionStorage.setItem('viewingStudent', 'true');
+                    sessionStorage.setItem('studentId', studentId);
+                    sessionStorage.setItem('studentName', studentName);
+                    setViewingStudent(true);
+                } else {
+                    sessionStorage.removeItem('viewingStudent');
+                    sessionStorage.removeItem('studentId');
+                    sessionStorage.removeItem('studentName');
+                    setViewingStudent(false);
+                }
+                setActiveNav("/progress-tracking");
+              }}
             />
           ) : (
             <StudentDashboardContent

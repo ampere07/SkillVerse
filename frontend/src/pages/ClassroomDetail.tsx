@@ -9,12 +9,14 @@ import {
   Trash2,
   CheckCircle,
   AlertCircle,
-  Settings
+  Settings,
+  Download
 } from 'lucide-react';
 import { classroomAPI, activityAPI, moduleAPI, uploadAPI } from '../utils/api';
 import PostDetails from './PostDetails';
 import ClassroomDetailsSettings from './ClassroomDetailsSettings';
 import CreatePost from './CreatePost';
+import * as XLSX from 'xlsx';
 
 interface Post {
   _id: string;
@@ -142,6 +144,83 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
     setShowDeleteModal(true);
   };
 
+  const handleExportExcel = () => {
+    if (!classroom || posts.length === 0) return;
+
+    // Filter only activities
+    const activities = posts.filter(p => p.postType === 'activity');
+    if (activities.length === 0) {
+      alert('No activities found in this classroom to export.');
+      return;
+    }
+
+    // Build Data Array for SheetJS
+    const headers = ['Name'];
+    activities.forEach((activity, index) => {
+      headers.push(`Activity ${index + 1} (${activity.title})`);
+    });
+    headers.push('Total Average');
+
+    const data = [headers];
+
+    // Sort students alphabetically by name
+    const sortedStudents = [...classroom.students].sort((a, b) => {
+      const nameA = (a.studentId.name || `${a.studentId.firstName} ${a.studentId.lastName}`.trim()).toLowerCase();
+      const nameB = (b.studentId.name || `${b.studentId.firstName} ${b.studentId.lastName}`.trim()).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    sortedStudents.forEach((studentItem: any) => {
+      const student = studentItem.studentId;
+      const rowData: any[] = [student.name || (`${student.firstName} ${student.lastName}`.trim())];
+      
+      let totalScore = 0;
+      let activitiesCount = 0;
+
+      activities.forEach((activity) => {
+        const submission = activity.submissions?.find((s: any) => 
+          (s.student?._id || s.student) === student._id
+        );
+        
+        const score = submission?.grade ?? 0;
+        rowData.push(score);
+        
+        totalScore += score;
+        activitiesCount++;
+      });
+
+      const average = activitiesCount > 0 ? (totalScore / activitiesCount).toFixed(2) : '0.00';
+      rowData.push(parseFloat(average));
+      
+      data.push(rowData);
+    });
+
+    // Create Worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Auto-fit column widths
+    const colWidths = data[0].map((_, colIndex) => {
+      return {
+        wch: Math.max(
+          ...data.map(row => {
+            const val = row[colIndex];
+            if (val === null || val === undefined) return 0;
+            return String(val).length + 2; // +2 for some padding
+          })
+        )
+      };
+    });
+    ws['!cols'] = colWidths;
+
+    // Create Workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Progress Report");
+
+    // Save File
+    const fileName = `${classroom.name.replace(/\s+/g, '_')}_Progress_Report.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
   const confirmDelete = async () => {
     if (!postToDelete) return;
     
@@ -213,18 +292,30 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setShowSettings(true)}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors mt-[-24px]"
               title="Classroom Settings"
             >
               <Settings className="w-5 h-5" />
             </button>
+            
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-sm font-medium whitespace-nowrap">New Post</span>
+              </button>
+              
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              onClick={handleExportExcel}
+              className="flex items-center justify-center space-x-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+              title="Export Progress to Excel"
             >
-              <Plus className="w-4 h-4" />
-              <span className="text-sm font-medium">New Post</span>
+              <Download className="w-4 h-4" />
+              <span className="text-sm font-medium whitespace-nowrap">Export Excel</span>
             </button>
+            </div>
           </div>
         </div>
       </div>

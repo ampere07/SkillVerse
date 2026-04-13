@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Register from './components/Register';
@@ -9,6 +9,18 @@ import Dashboard from './components/Dashboard';
 function App() {
   const [view, setView] = useState<'login' | 'register' | 'forgot-password'>('login');
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    
+    if (code) {
+      sessionStorage.setItem('pendingJoinCode', code);
+      if (!user) {
+        setView('register');
+      }
+    }
+  }, [user]);
 
   if (loading) {
     return (

@@ -50,6 +50,7 @@ export default function Classrooms({ selectedClassroomId: propSelectedClassroomI
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [assignmentCounts, setAssignmentCounts] = useState<Record<string, number>>(cachedData?.assignmentCounts || {});
+  const [initialJoinCode, setInitialJoinCode] = useState<string>('');
 
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
     show: boolean;
@@ -94,6 +95,25 @@ export default function Classrooms({ selectedClassroomId: propSelectedClassroomI
       socket.off('classroom-update', handleUpdate);
       socket.off('assignment-update', handleUpdate);
     };
+  }, [isTeacher]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = params.get('code');
+    const storedCode = sessionStorage.getItem('pendingJoinCode');
+    const code = urlCode || storedCode;
+
+    if (code && !isTeacher) {
+      setInitialJoinCode(code);
+      setShowModal(true);
+      
+      // Clean up
+      if (urlCode) {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+      sessionStorage.removeItem('pendingJoinCode');
+    }
   }, [isTeacher]);
 
   useEffect(() => {
@@ -289,8 +309,12 @@ export default function Classrooms({ selectedClassroomId: propSelectedClassroomI
           />
         ) : (
           <JoinClassroomModal
+            initialCode={initialJoinCode}
             onSuccess={handleModalSuccess}
-            onClose={() => setShowModal(false)}
+            onClose={() => {
+              setShowModal(false);
+              setInitialJoinCode('');
+            }}
           />
         )
       )}
