@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   BookOpen, X, Plus, Users, Copy, Check, MoreVertical, 
   Eye, Trash2, Loader2, CheckCircle, XCircle, Share2
