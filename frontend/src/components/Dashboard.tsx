@@ -576,8 +576,9 @@ export default function Dashboard() {
             </div>
 
             <button
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors"
+              onClick={() => !isGameActive && logout()}
+              disabled={isGameActive}
+              className={`w-full flex items-center gap-3 px-3 py-[10px] rounded-lg text-[#757575] hover:bg-[#F5F5F5] transition-colors ${isGameActive ? "opacity-40 cursor-not-allowed filter grayscale" : ""}`}
             >
               <span className="text-sm font-semibold flex-1 text-left">
                 Logout
