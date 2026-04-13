@@ -168,7 +168,7 @@ export function ClassroomCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const shareUrl = `${window.location.origin}/join?code=${classroom.code}`;
+              const shareUrl = `${window.location.origin}/?code=${classroom.code}`;
               navigator.clipboard.writeText(shareUrl);
               setLinkCopied(true);
               setTimeout(() => setLinkCopied(false), 2000);
