@@ -3,7 +3,7 @@ import axios from 'axios';
 import { RefreshCw, Users, Filter, Download } from 'lucide-react';
 
 interface StudentTrackingProps {
-  onNavigate?: (path: string) => void;
+  onNavigate?: (path: string, state?: { code?: string; language?: string }) => void;
   setViewingStudent?: (value: boolean) => void;
 }
 

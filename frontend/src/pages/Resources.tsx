@@ -732,7 +732,7 @@ const categories: Category[] = [
 const allTopics = categories.flatMap(c => c.topics);
 
 interface ResourcesProps {
-  onNavigate: (href: string) => void;
+  onNavigate: (href: string, state?: { code?: string; language?: string }) => void;
 }
 
 export default function Resources({ onNavigate }: ResourcesProps) {
@@ -976,7 +976,10 @@ export default function Resources({ onNavigate }: ResourcesProps) {
                     <code>{selectedTopic.content.codeExample}</code>
                   </pre>
                   <button
-                    onClick={() => onNavigate('/compiler')}
+                    onClick={() => onNavigate('/compiler', { 
+                      code: selectedTopic.content.codeExample,
+                      language: selectedTopic.content.codeLanguage
+                    })}
                     className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-[#1B5E20] text-white text-[11px] font-bold px-3 py-1.5 rounded shadow-lg hover:bg-[#2E7D32]"
                   >
                     Try it in Compiler

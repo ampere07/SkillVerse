@@ -65,6 +65,8 @@ interface CompilerProps {
   isActivityMode?: boolean;
   readOnly?: boolean;
   onSubmitSuccess?: () => void;
+  initialCode?: string | null;
+  initialLanguage?: string | null;
 }
 
 const Compiler = forwardRef<any, CompilerProps>(
@@ -76,12 +78,14 @@ const Compiler = forwardRef<any, CompilerProps>(
       onHasUnsavedChanges,
       isActivityMode = false,
       onSubmitSuccess,
+      initialCode,
+      initialLanguage,
     },
     ref,
   ) => {
     const { user } = useAuth();
-    const [language, setLanguage] = useState("java");
-    const [code, setCode] = useState(DEFAULT_CODE.java);
+    const [language, setLanguage] = useState(initialLanguage || "java");
+    const [code, setCode] = useState(initialCode || DEFAULT_CODE[initialLanguage || "java"]);
     const [showSurveyModal, setShowSurveyModal] = useState(false);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
     const [pendingLanguage, setPendingLanguage] = useState<string | null>(null);
@@ -163,6 +167,15 @@ const Compiler = forwardRef<any, CompilerProps>(
         hasLoadedRef.current = true;
       }
     }, [projectDetails]);
+
+    useEffect(() => {
+      if (initialCode !== null && initialCode !== undefined) {
+        setCode(initialCode);
+      }
+      if (initialLanguage !== null && initialLanguage !== undefined) {
+        setLanguage(initialLanguage);
+      }
+    }, [initialCode, initialLanguage]);
 
     useEffect(() => {
       if (isActivityMode && projectDetails && !timerStarted) {

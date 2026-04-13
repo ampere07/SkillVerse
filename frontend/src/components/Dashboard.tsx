@@ -148,6 +148,8 @@ export default function Dashboard() {
   const [isGameActive, setIsGameActive] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [leveledLevel, setLeveledLevel] = useState(1);
+  const [compilerInitialCode, setCompilerInitialCode] = useState<string | null>(null);
+  const [compilerInitialLanguage, setCompilerInitialLanguage] = useState<string | null>(null);
 
   useEffect(() => {
     const handleLevelUp = (event: any) => {
@@ -424,7 +426,7 @@ export default function Dashboard() {
     item.roles.includes(user.role),
   );
 
-  const handleNavigation = (href: string) => {
+  const handleNavigation = (href: string, state?: { code?: string; language?: string }) => {
     // Clear viewing student data when navigating away from progress-tracking
     if (activeNav === "/progress-tracking" && href !== "/progress-tracking") {
       setViewingStudent(false);
@@ -448,6 +450,15 @@ export default function Dashboard() {
           (window as any).clearViewingStudent();
         }
       }
+
+      if (href === "/compiler" && state) {
+        setCompilerInitialCode(state.code || null);
+        setCompilerInitialLanguage(state.language || null);
+      } else if (href !== "/compiler") {
+        setCompilerInitialCode(null);
+        setCompilerInitialLanguage(null);
+      }
+
       setActiveNav(href);
       setHasUnsavedChanges(false);
       // Close sidebar on mobile after navigation
@@ -617,7 +628,11 @@ export default function Dashboard() {
           className={`flex-1 overflow-auto ${activeNav === "/compiler" || activeNav === "/bug-hunt" || activeNav === "/resources" ? "" : "p-6"}`}
         >
           {activeNav === "/compiler" ? (
-            <Compiler onMenuClick={() => setSidebarOpen(true)} />
+            <Compiler 
+              onMenuClick={() => setSidebarOpen(true)} 
+              initialCode={compilerInitialCode}
+              initialLanguage={compilerInitialLanguage}
+            />
           ) : activeNav === "/classrooms" ? (
             <Classrooms
               selectedClassroomId={selectedClassroomId}

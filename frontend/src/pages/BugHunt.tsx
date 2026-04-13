@@ -11,7 +11,11 @@ import {
     SkipForward,
     Lightbulb,
     AlertCircle,
-    Flag
+    Flag,
+    HelpCircle,
+    Info,
+    ChevronRight,
+    ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
@@ -58,6 +62,9 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const [showSurrenderModal, setShowSurrenderModal] = useState(false);
     const [isProcessingSurrender, setIsProcessingSurrender] = useState(false);
     const [compilationErrors, setCompilationErrors] = useState<any[]>([]);
+    const [isHintHovered, setIsHintHovered] = useState(false);
+    const [showTutorial, setShowTutorial] = useState(false);
+    const [tutorialStep, setTutorialStep] = useState(0);
 
     const socketRef = useRef<Socket | null>(null);
     const timerRef = useRef<any>(null);
@@ -255,6 +262,13 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 }
                 
                 setScore(data.totalScore || score);
+                setChallenges(prev => {
+                    const newChallenges = [...prev];
+                    if (newChallenges[currentIndex]) {
+                        newChallenges[currentIndex] = { ...newChallenges[currentIndex], isFixed: true };
+                    }
+                    return newChallenges;
+                });
                 setIsLastFixSuccessful(true);
                 setFeedback(data.feedback || "Bug Caught! Excellent work.");
 
@@ -399,24 +413,37 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                             </div>
                         </div>
 
-                        <button
-                            onClick={startSession}
-                            disabled={gameState === 'loading'}
-                            className="w-full py-5 bg-gradient-to-r from-[#2E7D32] to-[#1B5E20] hover:from-[#388E3C] hover:to-[#2E7D32] rounded-2xl text-xl font-bold text-white shadow-[0_10px_30px_rgba(27,94,32,0.4)] transform transition hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group flex items-center justify-center gap-3 overflow-hidden relative"
-                        >
-                            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                            {gameState === 'loading' ? (
-                                <>
-                                    <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    LOADING MISSIONS...
-                                </>
-                            ) : (
-                                <>
-                                    START MISSION
-                                    <SkipForward className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                                </>
-                            )}
-                        </button>
+                        <div className="flex flex-col gap-4">
+                            <button
+                                onClick={startSession}
+                                disabled={gameState === 'loading'}
+                                className="w-full py-5 bg-gradient-to-r from-[#2E7D32] to-[#1B5E20] hover:from-[#388E3C] hover:to-[#2E7D32] rounded-2xl text-xl font-bold text-white shadow-[0_10px_30px_rgba(27,94,32,0.4)] transform transition hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group flex items-center justify-center gap-3 overflow-hidden relative"
+                            >
+                                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                                {gameState === 'loading' ? (
+                                    <>
+                                        <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        LOADING MISSIONS...
+                                    </>
+                                ) : (
+                                    <>
+                                        START MISSION
+                                        <SkipForward className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setTutorialStep(0);
+                                    setShowTutorial(true);
+                                }}
+                                className="w-full py-4 bg-white hover:bg-[#F5F5F5] border-2 border-[#E0E0E0] rounded-2xl text-sm font-black text-[#666] uppercase tracking-widest transition-all flex items-center justify-center gap-2 group shadow-sm active:scale-95"
+                            >
+                                <HelpCircle className="w-5 h-5 text-[#2E7D32] group-hover:rotate-12 transition-transform" />
+                                How to Play
+                            </button>
+                        </div>
                     </div>
 
                     {/* Leaderboard Column */}
@@ -471,16 +498,144 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                                 )}
                             </div>
 
-                            <div className="mt-8 pt-8 border-t border-[#E0E0E0]">
-                                <p className="text-[10px] text-[#AAA] font-medium leading-relaxed italic text-center">
-                                    "Students are ranked by total extracted intel points across all missions."
-                                </p>
                             </div>
                         </div>
                     </div>
+
+                    {/* Tutorial Modal (Start Screen) */}
+                    {showTutorial && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                            <div className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row animate-in zoom-in slide-in-from-bottom-10 duration-500">
+                                {/* Visual Side */}
+                                <div className="w-full md:w-1/2 bg-gradient-to-br from-[#1B5E20] to-[#2E7D32] p-8 text-white flex flex-col justify-center items-center relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-full h-full opacity-10">
+                                        <Bug className="w-64 h-64 -ml-20 -mt-20 rotate-12" />
+                                        <div className="absolute bottom-0 right-0 -mr-10 -mb-10 -rotate-12">
+                                            <div className="w-48 h-48 bg-white/10 rounded-full flex items-center justify-center">
+                                                <HelpCircle className="w-24 h-24" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="relative z-10 w-full aspect-square bg-black/20 rounded-2xl border border-white/20 p-4 shadow-inner flex items-center justify-center">
+                                        {tutorialStep === 0 && <Bug className="w-32 h-32 animate-bounce" />}
+                                        {tutorialStep === 1 && (
+                                            <div className="w-full space-y-2 font-mono text-[10px] opacity-80 text-white">
+                                                <div className="h-3 w-[80%] bg-white/30 rounded"></div>
+                                                <div className="h-3 w-[60%] bg-white/30 rounded"></div>
+                                                <div className="h-3 w-[90%] bg-red-400/50 rounded flex items-center px-2">BUG DETECTED at Line 12</div>
+                                                <div className="h-3 w-[70%] bg-white/30 rounded"></div>
+                                            </div>
+                                        )}
+                                        {tutorialStep === 2 && (
+                                            <div className="w-full h-full flex flex-col gap-2">
+                                                <div className="flex-1 bg-white/10 rounded-lg flex items-center justify-center"><Play className="w-12 h-12 opacity-50 text-white" /></div>
+                                                <div className="h-12 bg-black/40 rounded-lg flex items-center px-4 font-mono text-[10px] text-white/70">&gt; Signals detected...</div>
+                                            </div>
+                                        )}
+                                        {tutorialStep === 3 && <Trophy className="w-32 h-32 animate-pulse text-yellow-400" />}
+                                    </div>
+                                    
+                                    <div className="mt-8 text-center relative z-10">
+                                        <div className="flex gap-2 justify-center mb-4">
+                                            {[0, 1, 2, 3].map(i => (
+                                                <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${tutorialStep === i ? 'w-8 bg-white' : 'w-2 bg-white/30'}`}></div>
+                                            ))}
+                                        </div>
+                                        <h4 className="text-sm font-black uppercase tracking-[0.3em]">Module 0{tutorialStep + 1}</h4>
+                                    </div>
+                                </div>
+
+                                {/* Content Side */}
+                                <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col">
+                                    <div className="flex-1 space-y-6">
+                                        {tutorialStep === 0 && (
+                                            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                                                <h3 className="text-2xl font-black text-[#212121]">The Mission</h3>
+                                                <p className="text-[#666] leading-relaxed">
+                                                    The SkillVerse codebase is under attack by legacy bugs. Your objective is to identify and patch vulnerabilities in 3 critical projects before time runs out.
+                                                </p>
+                                                <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]">
+                                                    <Zap className="w-5 h-5 text-[#F57C00]" />
+                                                    <span className="text-xs font-bold text-[#444]">Speed increases your Score Multiplier!</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {tutorialStep === 1 && (
+                                            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                                                <h3 className="text-2xl font-black text-[#212121]">Where to Code?</h3>
+                                                <p className="text-[#666] leading-relaxed">
+                                                    The **Left Panel** is your development terminal. Analyze the buggy source code and apply your fixes directly in the editor.
+                                                </p>
+                                                <ul className="space-y-2 text-sm text-[#757575] font-medium">
+                                                    <li className="flex gap-2"><span className="text-[#2E7D32]">✔</span> Full syntax highlighting</li>
+                                                    <li className="flex gap-2"><span className="text-[#2E7D32]">✔</span> Real-time error detection</li>
+                                                    <li className="flex gap-2"><span className="text-[#2E7D32]">✔</span> Smart auto-indentation</li>
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {tutorialStep === 2 && (
+                                            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                                                <h3 className="text-2xl font-black text-[#212121]">Execution & Intel</h3>
+                                                <p className="text-[#666] leading-relaxed">
+                                                    The **Right Panel** contains your Mission Control.
+                                                </p>
+                                                <div className="space-y-3">
+                                                    <div className="flex items-start gap-3">
+                                                        <Play className="w-5 h-5 text-[#2E7D32] mt-1 shrink-0" />
+                                                        <p className="text-sm text-[#666]"><span className="font-bold text-[#212121]">Execute:</span> Run your code to see results and errors in the console.</p>
+                                                    </div>
+                                                    <div className="flex items-start gap-3">
+                                                        <Lightbulb className="w-5 h-5 text-[#F57C00] mt-1 shrink-0" />
+                                                        <p className="text-sm text-[#666]"><span className="font-bold text-[#212121]">Hints:</span> Stuck? Request AI intel for a slight point cost.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {tutorialStep === 3 && (
+                                            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                                                <h3 className="text-2xl font-black text-[#212121]">Final Submission</h3>
+                                                <p className="text-[#666] leading-relaxed">
+                                                    When your fix is ready, click **Patch Code**. Our system will validate your solution against the correct implementation.
+                                                </p>
+                                                <div className="p-4 bg-[#E8F5E9] border border-[#C8E6C9] rounded-xl text-xs font-bold text-[#2E7D32] flex items-center gap-3">
+                                                    <Info className="w-5 h-5" />
+                                                    Level up your profile by conquering difficult missions!
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-10 flex items-center justify-between border-t border-[#E0E0E0] pt-6">
+                                        <button
+                                            onClick={() => tutorialStep > 0 ? setTutorialStep(prev => prev - 1) : setShowTutorial(false)}
+                                            className="flex items-center gap-2 text-sm font-bold text-[#999] hover:text-[#212121] transition-colors"
+                                        >
+                                            {tutorialStep === 0 ? "Dismiss" : <><ChevronLeft className="w-4 h-4" /> Back</>}
+                                        </button>
+                                        
+                                        {tutorialStep < 3 ? (
+                                            <button
+                                                onClick={() => setTutorialStep(prev => prev + 1)}
+                                                className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-6 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg active:scale-95"
+                                            >
+                                                Next <ChevronRight className="w-4 h-4" />
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowTutorial(false)}
+                                                className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white px-8 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                                            >
+                                                GOT IT!
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            </div>
-        );
+            );
     }
 
     if (gameState === 'completed') {
@@ -543,6 +698,7 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                             setHintsCount(0);
                             setScore(0);
                             setTimer(0);
+                            setChallenges([]);
                         }}
                         className="w-full py-5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95"
                     >
@@ -624,18 +780,45 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                     </div>
 
                     <div className="h-20 flex items-center justify-between px-8 bg-[#F8F9FA] border-t border-[#E0E0E0]">
-                        <button
-                            onClick={requestHint}
-                            disabled={isRequestingHint || showHint || score < 0}
-                            className={`flex items-center gap-2 text-xs font-black tracking-widest transition-all ${showHint ? 'text-[#F57C00] cursor-default' : (score < 0 ? 'text-[#D32F2F] opacity-50 cursor-not-allowed' : 'text-[#999] hover:text-[#F57C00] disabled:opacity-50')}`}
-                        >
-                            {isRequestingHint ? (
-                                <div className="w-5 h-5 border-2 border-[#F57C00] border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                                <Lightbulb className={`w-5 h-5 ${showHint ? 'text-[#F57C00]' : ''}`} />
+                        <div className="relative">
+                            <button
+                                onClick={requestHint}
+                                onMouseEnter={() => setIsHintHovered(true)}
+                                onMouseLeave={() => setIsHintHovered(false)}
+                                disabled={isRequestingHint || showHint || score < 0}
+                                className={`flex items-center gap-2 text-xs font-black tracking-widest transition-all ${showHint ? 'text-[#F57C00] cursor-default' : (score < 0 ? 'text-[#D32F2F] opacity-50 cursor-not-allowed' : 'text-[#999] hover:text-[#F57C00] disabled:opacity-50')}`}
+                            >
+                                {isRequestingHint ? (
+                                    <div className="w-5 h-5 border-2 border-[#F57C00] border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <Lightbulb className={`w-5 h-5 ${showHint ? 'text-[#F57C00]' : ''}`} />
+                                )}
+                                {showHint ? 'INTEL RECEIVED' : 'REQUEST HINT (-10 PTS)'}
+                            </button>
+
+                            {/* Mini Modal / Tooltip */}
+                            {isHintHovered && !showHint && (
+                                <div className="absolute bottom-full left-0 mb-4 w-60 p-4 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-[#E0E0E0] animate-in fade-in slide-in-from-bottom-2 duration-200 z-[100]">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-1 p-2 bg-[#FFF9C4] rounded-xl text-[#F57C00]">
+                                            <Lightbulb className="w-4 h-4" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[11px] font-black tracking-widest text-[#212121] uppercase">Intelligence Report</p>
+                                            <p className="text-[13px] text-[#666] leading-relaxed font-medium">
+                                                Receive a strategic hint to help identify the code defects.
+                                            </p>
+                                            <div className="pt-2 flex items-center gap-2">
+                                                <div className="px-2 py-0.5 bg-[#FFEBEE] text-[#D32F2F] text-[9px] font-black rounded-md uppercase tracking-tighter">
+                                                    Cost: 10 PTS
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="absolute -bottom-2 left-6 w-4 h-4 bg-white rotate-45 border-r border-b border-[#E0E0E0]"></div>
+                                </div>
                             )}
-                            {showHint ? 'INTEL RECEIVED' : 'REQUEST HINT (-10 PTS)'}
-                        </button>
+                        </div>
 
                         <div className="flex gap-4">
                             <button

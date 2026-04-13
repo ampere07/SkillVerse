@@ -1040,6 +1040,22 @@ router.post('/skill-weakness-analysis', authenticateToken, async (req, res) => {
     // Build aggregated stats
     const submittedTasks = (miniProjectDoc?.completedTasks || []).filter(t => t.status !== 'paused');
 
+    const Activity = (await import('../models/Activity.js')).default;
+    const mongoose = (await import('mongoose')).default;
+
+    // Count actual pending assignments
+    const pendingActivities = await Activity.find({
+      $or: [
+        { 'students.studentId': userId },
+        { 
+          classroom: { $in: (await Classroom.find({ 'students.studentId': userId })).map(c => c._id) }
+        }
+      ],
+      isPublished: true,
+      'submissions.student': { $nin: [userId] }
+    });
+    const pendingAssignmentsCount = pendingActivities.length;
+
     // Gather technical context from AI feedback
     const technicalFeedback = submittedTasks
       .map(t => t.aiAnalyization)
@@ -1091,6 +1107,7 @@ SKILLS ASSESSMENT SCORES:
 - Efficiency: ${Math.round(jobReadiness.efficiency)}%
 - Collaboration/Logic: ${Math.round(jobReadiness.collaboration)}%
 - Consistency: ${Math.round(jobReadiness.consistency)}%
+- Pending Assignments: ${pendingAssignmentsCount}
 
 PAST AI CODING FEEDBACK SAMPLES:
 ${technicalFeedback.length > 0 ? technicalFeedback.join('\n---\n') : 'No feedback samples available yet.'}
@@ -1178,11 +1195,28 @@ router.post('/detailed-ai-analysis', authenticateToken, async (req, res) => {
     const userDoc = await User.findById(userId).select('xp level name firstName lastName primaryLanguage');
     const miniProjectDoc = await MiniProject.findOne({ userId });
 
+    const Activity = (await import('../models/Activity.js')).default;
+    const mongoose = (await import('mongoose')).default;
+
     // Build aggregated stats
     const submittedTasks = (miniProjectDoc?.completedTasks || []).filter(t => t.status !== 'paused');
     const avgProjectScore = submittedTasks.length > 0
       ? submittedTasks.reduce((sum, t) => sum + (t.score || 0), 0) / submittedTasks.length
       : 0;
+
+    // Count actual pending assignments from Activity model
+    const pendingActivities = await Activity.find({
+      $or: [
+        { 'students.studentId': userId },
+        { 
+          // Also check if assigned via classroom (if students array is empty or this student is in the classroom)
+          classroom: { $in: (await Classroom.find({ 'students.studentId': userId })).map(c => c._id) }
+        }
+      ],
+      isPublished: true,
+      'submissions.student': { $ne: userId }
+    });
+    const pendingAssignmentsCount = pendingActivities.length;
 
     let jobReadiness = { overallScore: 0, problemSolving: 0, codeQuality: 0, efficiency: 0, collaboration: 0, consistency: 0 };
     let totalCodeExecutions = 0;
@@ -1267,9 +1301,10 @@ LEVEL: ${userDoc?.level || 1} (XP: ${userDoc?.xp || 0}) (Phase: ${
 })
 MINI PROJECT PHASE: Phase ${miniProjectDoc?.currentPhase || 1}
 
-ACTIVITY DATA:
+- Activity Data:
 - Code Executions: ${totalCodeExecutions}
-- Assignments: ${totalAssignments} (${assignmentsOnTime} on time)
+- Assignments Submitted: ${totalAssignments} (${assignmentsOnTime} on time)
+- Pending Assignments: ${pendingAssignmentsCount}
 - Mini Projects: ${submittedTasks.length} (Avg Score: ${Math.round(avgProjectScore)}%)
 - Bug Hunt: ${bugHuntParticipated} participations, ${bugsFound} bugs found
 
@@ -1288,7 +1323,7 @@ Respond in STRICT JSON format ONLY:
     "consistency": "Analysis focus: Engagement frequency at the current level.",
     "overall": "Mastery summary for the current level.",
     "weaknessAnalysis": "Identification of technical areas for growth to reach next level.",
-    "recommendation": "Next step to reach 100% of current level goals.",
+    "recommendation": "Next step to reach 100% of current level goals (e.g., 'Complete your ${pendingAssignmentsCount} pending assignments').",
     "javaProficiency": <0-100 based on level + scores>,
     "pythonProficiency": <0-100 based on level + scores>,
     "problemSolvingScore": <0-100>,
