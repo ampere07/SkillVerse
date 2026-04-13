@@ -17,7 +17,7 @@ function App() {
     if (code) {
       sessionStorage.setItem('pendingJoinCode', code);
       if (!user) {
-        setView('register');
+        setView('login');
       }
     }
   }, [user]);
