@@ -15,7 +15,7 @@ import {
   RefreshCw,
   ShieldAlert,
   Lightbulb,
-  Info,
+
   ChevronRight,
   ChevronLeft,
   X
@@ -207,7 +207,7 @@ export default function ProgressTracking() {
 
   // Detailed AI Analysis state
   const [detailedAiLoading, setDetailedAiLoading] = useState(false);
-  const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'noChange'>('idle');
+  const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   // Instructor-only states
@@ -420,10 +420,7 @@ export default function ProgressTracking() {
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (response.data.noChange) {
-        setAiStatus('noChange');
-        return;
-      }
+
 
       if (response.data.success && progressData) {
         setProgressData({
@@ -539,8 +536,8 @@ export default function ProgressTracking() {
           </h1>
           <p className="text-[14px] lg:text-[15px] text-[#757575]">
             {isViewingStudent
-              ? `Monitoring ${viewingStudentName}'s learning journey and job readiness`
-              : 'Monitor your learning journey and job readiness'
+              ? `Monitoring ${viewingStudentName}'s learning journey`
+              : 'Monitor your learning journey'
             }
           </p>
         </div>
@@ -570,12 +567,12 @@ export default function ProgressTracking() {
         {/* Left Column: Hexagon */}
         <div className="w-full lg:w-[420px] lg:sticky lg:top-4 order-1 lg:order-none">
           <div className="bg-white border border-[#E0E0E0] lg:rounded-xl p-4 lg:p-6 shadow-sm rounded-none border-x-0 lg:border-x">
-            <LevelHexagon 
-              level={progressData.level || user?.level || 1} 
+            <LevelHexagon
+              level={progressData.level || user?.level || 1}
               xp={progressData.totalXp || user?.xp || 0}
-              jobReadiness={progressData.jobReadiness} 
+              jobReadiness={progressData.jobReadiness}
               progressData={progressData}
-              onNextPhase={handleNextPhase} 
+              onNextPhase={handleNextPhase}
             />
           </div>
         </div>
@@ -687,12 +684,6 @@ export default function ProgressTracking() {
                           value={progressData.activities.bugHunt.participated}
                           detail={`${progressData.activities.bugHunt.bugsFound} bugs found`}
                         />
-                        <ActivityRow
-                          icon={TrendingUp}
-                          label="AI Interactions"
-                          value={(progressData.aiInteractions?.hintsRequested || 0) + (progressData.aiInteractions?.feedbackReceived || 0)}
-                          detail={`${progressData.aiInteractions?.hintsRequested || 0} hints, ${progressData.aiInteractions?.feedbackReceived || 0} feedback`}
-                        />
                       </div>
                     </div>
 
@@ -701,14 +692,10 @@ export default function ProgressTracking() {
                       <div className="grid grid-cols-1 gap-4">
                         <LanguageProgress
                           language="Java"
-                          exercises={progressData.skills.java.exercisesCompleted}
-                          projects={progressData.skills.java.projectsCompleted}
                           score={progressData.detailedAiAnalysis?.javaProficiency !== undefined ? progressData.detailedAiAnalysis.javaProficiency : progressData.skills.java.averageScore}
                         />
                         <LanguageProgress
                           language="Python"
-                          exercises={progressData.skills.python.exercisesCompleted}
-                          projects={progressData.skills.python.projectsCompleted}
                           score={progressData.detailedAiAnalysis?.pythonProficiency !== undefined ? progressData.detailedAiAnalysis.pythonProficiency : progressData.skills.python.averageScore}
                         />
                       </div>
@@ -1018,17 +1005,7 @@ export default function ProgressTracking() {
                 </p>
               </div>
             )}
-            {aiStatus === 'noChange' && (
-              <div className="animate-in fade-in zoom-in duration-300">
-                <div className="w-24 h-24 mx-auto mb-6 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
-                  <Info className="w-12 h-12" />
-                </div>
-                <h3 className="text-xl font-bold text-blue-700 mb-2">No New Activity Found</h3>
-                <p className="text-[#757575] text-sm">
-                  The AI didn't detect any new work since your last analysis. Complete more projects or bug hunts to see updated insights!
-                </p>
-              </div>
-            )}
+
           </div>
         </div>
       )}
@@ -1429,7 +1406,7 @@ function LevelHexagon({ level, xp, jobReadiness, progressData, onNextPhase }: an
     // Use the overall skill assessment score as the "Accurate" basis for level progression
     // This ensures skills like Debugging and Logic are the primary drivers of advancement.
     const overallSkillScore = progressData?.jobReadiness?.overallScore || 0;
-    
+
     const aiProgress = progressData?.detailedAiAnalysis?.phaseProgress;
     const currentProgress = aiProgress !== undefined ? aiProgress : overallSkillScore;
 
@@ -1473,7 +1450,7 @@ function LevelHexagon({ level, xp, jobReadiness, progressData, onNextPhase }: an
   };
 
   const phaseInfo = getPhaseInfo(level, jobReadiness);
-  
+
   // Per Level progression: button appears when 100% level mastery is reached
   const isLevelComplete = phaseInfo.currentProgress >= 100;
 
@@ -1712,7 +1689,7 @@ function ActivityRow({ icon: Icon, label, value, detail }: any) {
   );
 }
 
-function LanguageProgress({ language, exercises, projects, score }: any) {
+function LanguageProgress({ language, score }: any) {
   return (
     <div className="bg-[#F9FAFB] p-4 rounded-xl border border-[#F3F4F6]">
       <div className="flex items-center justify-between mb-2">
@@ -1724,22 +1701,12 @@ function LanguageProgress({ language, exercises, projects, score }: any) {
           {Math.round(score)}%
         </span>
       </div>
-      <div className="w-full bg-[#E5E7EB] rounded-full h-2 mb-3">
+      <div className="w-full bg-[#E5E7EB] rounded-full h-2">
         <div
           className={`h-2 rounded-full transition-all ${score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
             }`}
           style={{ width: `${score}%` }}
         />
-      </div>
-      <div className="flex justify-between text-[11px] text-[#6B7280] font-medium">
-        <span className="flex items-center gap-1">
-          <BookOpen className="w-3 h-3" />
-          {exercises} exercises
-        </span>
-        <span className="flex items-center gap-1">
-          <Target className="w-3 h-3" />
-          {projects} projects
-        </span>
       </div>
     </div>
   );
@@ -1765,16 +1732,7 @@ function SkillDetails({ language, data, aiProficiency }: any) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#F3F4F6]">
-            <p className="text-[#757575] text-xs mb-1">Exercises</p>
-            <p className="font-semibold text-lg">{data.exercisesCompleted}</p>
-          </div>
-          <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#F3F4F6]">
-            <p className="text-[#757575] text-xs mb-1">Projects</p>
-            <p className="font-semibold text-lg">{data.projectsCompleted}</p>
-          </div>
-        </div>
+
 
         {data.concepts && data.concepts.length > 0 && (
           <div>
@@ -2017,44 +1975,44 @@ function ComparisonModal({ isOpen, onClose, currentAnalysis, previousAnalysis }:
   const hasPrevious = !!previousAnalysis?.generatedAt;
 
   const skills = [
-    { 
-      name: 'Problem Solving', 
-      scoreKey: 'problemSolvingScore', 
+    {
+      name: 'Problem Solving',
+      scoreKey: 'problemSolvingScore',
       descKey: 'problemSolving',
       fallbackScoreKeys: ['problemSolvingScore'],
       fallbackDescKeys: ['problemSolving']
     },
-    { 
-      name: 'Code Quality', 
-      scoreKey: 'codeQualityScore', 
+    {
+      name: 'Code Quality',
+      scoreKey: 'codeQualityScore',
       descKey: 'codeQuality',
       fallbackScoreKeys: ['codeQualityScore'],
       fallbackDescKeys: ['codeQuality']
     },
-    { 
-      name: 'Debugging Skills', 
-      scoreKey: 'debuggingSkillsScore', 
+    {
+      name: 'Debugging Skills',
+      scoreKey: 'debuggingSkillsScore',
       descKey: 'debuggingSkills',
-      fallbackScoreKeys: ['efficiencyScore', 'efficiency'],
-      fallbackDescKeys: ['efficiency']
+      fallbackScoreKeys: ['efficiencyScore', 'efficiency', 'debuggingScore'],
+      fallbackDescKeys: ['efficiency', 'debugging']
     },
-    { 
-      name: 'Logic & Implementation', 
-      scoreKey: 'projectMasteryScore', 
+    {
+      name: 'Logic & Implementation',
+      scoreKey: 'projectMasteryScore',
       descKey: 'projectMastery',
-      fallbackScoreKeys: ['collaborationScore', 'collaboration'],
-      fallbackDescKeys: ['collaboration']
+      fallbackScoreKeys: ['collaborationScore', 'collaboration', 'logicScore'],
+      fallbackDescKeys: ['collaboration', 'logic']
     },
-    { 
-      name: 'Consistency', 
-      scoreKey: 'consistencyScore', 
+    {
+      name: 'Consistency',
+      scoreKey: 'consistencyScore',
       descKey: 'consistency',
       fallbackScoreKeys: ['consistencyScore'],
       fallbackDescKeys: ['consistency']
     },
-    { 
-      name: 'Overall Score', 
-      scoreKey: 'overallScore', 
+    {
+      name: 'Overall Score',
+      scoreKey: 'overallScore',
       descKey: 'overall',
       fallbackScoreKeys: ['overallScore'],
       fallbackDescKeys: ['overall']
@@ -2069,15 +2027,15 @@ function ComparisonModal({ isOpen, onClose, currentAnalysis, previousAnalysis }:
   // Accessing values with fallbacks for older data structures
   const getValueWithFallback = (obj: any, keys: string[]) => {
     for (const key of keys) {
-      if (obj && obj[key] !== undefined) return obj[key];
+      if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return obj[key];
     }
     return undefined;
   };
 
   const oldScore = hasPrevious ? (getValueWithFallback(previousAnalysis, [skill.scoreKey, ...(skill.fallbackScoreKeys || [])]) || 0) : 0;
   const newScore = getValueWithFallback(currentAnalysis, [skill.scoreKey, ...(skill.fallbackScoreKeys || [])]) || 0;
-  
-  const oldDesc = hasPrevious ? (getValueWithFallback(previousAnalysis, [skill.descKey, ...(skill.fallbackDescKeys || [])]) || "") : "This is your starting point. Generate future analyses to see how your scores and skills evolve from this baseline!";
+
+  const oldDesc = hasPrevious ? (getValueWithFallback(previousAnalysis, [skill.descKey, ...(skill.fallbackDescKeys || [])]) || "No detailed assessment text was recorded for this period.") : "This is your starting point. Generate future analyses to see how your scores and skills evolve from this baseline!";
   const newDesc = getValueWithFallback(currentAnalysis, [skill.descKey, ...(skill.fallbackDescKeys || [])]) || "";
 
   const prevDate = hasPrevious ? new Date(previousAnalysis.generatedAt).toLocaleDateString() : "Initial Baseline";

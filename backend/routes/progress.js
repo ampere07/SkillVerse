@@ -177,21 +177,27 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     // Teachers can view their own progress or their students' progress
 
     // Import models to read real data
+    const mongoose = (await import('mongoose')).default;
     const MiniProject = (await import('../models/MiniProject.js')).default;
     const BugHuntSession = (await import('../models/BugHuntSession.js')).default;
+    const Assignment = (await import('../models/Assignment.js')).default;
+    const Activity = (await import('../models/Activity.js')).default;
 
     // Get all progress records for the student across all classrooms
     const progressRecords = await Progress.find({ student: studentId })
       .populate('student', 'name email')
       .populate('classroom', 'name code');
 
+    // Get current student ObjectId for queries
+    const studentObjectId = new mongoose.Types.ObjectId(studentId);
+
     // Get real mini-project data directly from MiniProject model
-    const miniProjectDoc = await MiniProject.findOne({ userId: studentId });
+    const miniProjectDoc = await MiniProject.findOne({ userId: studentObjectId });
     const completedTasks = miniProjectDoc?.completedTasks || [];
 
     // Get real bug hunt data by aggregating sessions
     const bugHuntSessions = await BugHuntSession.find({ 
-      userId: studentId,
+      userId: studentObjectId,
       status: { $in: ['completed', 'surrendered'] }
     });
     
@@ -206,6 +212,58 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
         ? bugHuntSessions.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0].startedAt 
         : null
     };
+
+    // Get real assignment data - use already declared studentObjectId for nested field query
+    
+    // Fetch from both Assignment and Activity models (frontend uses both for 'Assignments' metrics)
+    const [allAssignments, allActivities] = await Promise.all([
+      Assignment.find({ 'submissions.student': studentObjectId }),
+      Activity.find({ 'submissions.student': studentObjectId })
+    ]);
+
+    console.log(`[Progress] Found ${allAssignments.length} assignments and ${allActivities.length} activities with submissions for user ${studentId}`);
+    
+    let totalAssignmentsSubmitted = 0;
+    let assignmentsOnTime = 0;
+    let assignmentsLate = 0;
+    let totalAssignmentScore = 0;
+    let assignmentsWithGrades = 0;
+    let lastAssignmentSubmissionAt = null;
+
+    // Helper to process submissions from both models
+    const processSubmissions = (items) => {
+      items.forEach(item => {
+        const submission = item.submissions.find(s => s?.student && s.student.toString() === studentId.toString());
+        if (submission) {
+          totalAssignmentsSubmitted++;
+          
+          // Check if on time - if no due date, it's on time
+          if (!item.dueDate || new Date(submission.submittedAt) <= new Date(item.dueDate)) {
+            assignmentsOnTime++;
+          } else {
+            assignmentsLate++;
+          }
+          
+          // Count score if graded
+          if (submission.grade !== undefined && submission.grade !== null) {
+            totalAssignmentScore += submission.grade;
+            assignmentsWithGrades++;
+          }
+          
+          // Track last submission
+          if (!lastAssignmentSubmissionAt || new Date(submission.submittedAt) > new Date(lastAssignmentSubmissionAt)) {
+            lastAssignmentSubmissionAt = submission.submittedAt;
+          }
+        }
+      });
+    };
+
+    processSubmissions(allAssignments);
+    processSubmissions(allActivities);
+
+    console.log(`[Progress] Combined stats calculated: total=${totalAssignmentsSubmitted}, onTime=${assignmentsOnTime}, late=${assignmentsLate}`);
+
+    const avgAssignmentScoreFromModel = assignmentsWithGrades > 0 ? totalAssignmentScore / assignmentsWithGrades : 0;
 
 
     // Accept any non-paused task as completed
@@ -237,7 +295,7 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     const avgProjectScore = submittedTasks.length > 0 ? totalProjectScore / submittedTasks.length : 0;
 
     // Get real user XP and level
-    const userDoc = await User.findById(studentId).select('xp level');
+    const userDoc = await User.findById(studentObjectId).select('xp level enrolledCourses');
     const totalXp = userDoc?.xp || 0;
 
     // Calculate per-language average scores
@@ -271,7 +329,13 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
         },
         activities: {
           codeExecutions: { total: 0, java: 0, python: 0, lastExecution: null },
-          assignments: { totalSubmitted: 0, onTime: 0, late: 0, averageScore: 0, lastSubmission: null },
+          assignments: { 
+            totalSubmitted: totalAssignmentsSubmitted, 
+            onTime: assignmentsOnTime, 
+            late: assignmentsLate, 
+            averageScore: avgAssignmentScoreFromModel, 
+            lastSubmission: lastAssignmentSubmissionAt 
+          },
           miniProjects: { completed: submittedTasks.length, inProgress: 0, averageScore: avgProjectScore, lastCompleted: submittedTasks[submittedTasks.length - 1]?.completedAt || null },
           bugHunt: { 
             participated: bugHuntStats.participated, 
@@ -358,13 +422,6 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       aggregatedProgress.activities.codeExecutions.java += progress.activities.codeExecutions.java;
       aggregatedProgress.activities.codeExecutions.python += progress.activities.codeExecutions.python;
 
-      aggregatedProgress.activities.assignments.totalSubmitted += progress.activities.assignments.totalSubmitted;
-      aggregatedProgress.activities.assignments.onTime += progress.activities.assignments.onTime;
-      aggregatedProgress.activities.assignments.late += progress.activities.assignments.late;
-
-      aggregatedProgress.activities.miniProjects.completed += progress.activities.miniProjects.completed;
-      aggregatedProgress.activities.miniProjects.inProgress += progress.activities.miniProjects.inProgress;
-
       // Use real bug hunt data from specialized model instead of just aggregating classroom records
       aggregatedProgress.activities.bugHunt.participated = bugHuntStats.participated;
       aggregatedProgress.activities.bugHunt.bugsFound = bugHuntStats.bugsFound;
@@ -424,7 +481,21 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       if (progress.detailedAiAnalysis?.generatedAt &&
         (!aggregatedProgress.detailedAiAnalysis?.generatedAt ||
           new Date(progress.detailedAiAnalysis.generatedAt) > new Date(aggregatedProgress.detailedAiAnalysis.generatedAt))) {
-        aggregatedProgress.detailedAiAnalysis = progress.detailedAiAnalysis;
+        
+        const data = progress.detailedAiAnalysis.toObject ? progress.detailedAiAnalysis.toObject() : { ...progress.detailedAiAnalysis };
+        // Ensure debugging and logic keys exist for old records or records using old schema names
+        if (data.debuggingSkillsScore === undefined) data.debuggingSkillsScore = data.efficiencyScore || progress.jobReadiness?.efficiency || 0;
+        if (data.projectMasteryScore === undefined) data.projectMasteryScore = data.collaborationScore || progress.jobReadiness?.collaboration || 0;
+        
+        // Handle descriptions - check multiple possible historical keys
+        if (!data.debuggingSkills) {
+          data.debuggingSkills = data.debugging || data.efficiency || "";
+        }
+        if (!data.projectMastery) {
+          data.projectMastery = data.logic || data.collaboration || "";
+        }
+        
+        aggregatedProgress.detailedAiAnalysis = data;
       }
       
       // Keep latest previous AI analysis
@@ -432,12 +503,21 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
         (!aggregatedProgress.previousAiAnalysis?.generatedAt ||
           new Date(progress.previousAiAnalysis.generatedAt) > new Date(aggregatedProgress.previousAiAnalysis.generatedAt))) {
         
-        const prev = progress.previousAiAnalysis;
+        const prev = progress.previousAiAnalysis.toObject ? progress.previousAiAnalysis.toObject() : { ...progress.previousAiAnalysis };
         // Ensure debugging and logic keys exist for old records
         if (prev.debuggingSkillsScore === undefined) prev.debuggingSkillsScore = prev.efficiencyScore || progress.jobReadiness?.efficiency || 0;
         if (prev.projectMasteryScore === undefined) prev.projectMasteryScore = prev.collaborationScore || progress.jobReadiness?.collaboration || 0;
-        if (!prev.debuggingSkills) prev.debuggingSkills = prev.efficiency || "Baseline debugging assessment.";
-        if (!prev.projectMastery) prev.projectMastery = prev.collaboration || "Baseline logic implementation assessment.";
+        
+        // Handle descriptions - check multiple possible historical keys
+        if (!prev.debuggingSkills) {
+          // If the fallback (efficiency) is a string, use it. If it's likely a score record, use baseline text.
+          const fallback = prev.debugging || prev.efficiency;
+          prev.debuggingSkills = (typeof fallback === 'string' && fallback.length > 5) ? fallback : "Initial baseline assessment.";
+        }
+        if (!prev.projectMastery) {
+          const fallback = prev.logic || prev.collaboration;
+          prev.projectMastery = (typeof fallback === 'string' && fallback.length > 5) ? fallback : "Initial baseline assessment.";
+        }
         
         aggregatedProgress.previousAiAnalysis = prev;
       }
@@ -478,22 +558,10 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       }
     });
 
-    if (aggregatedProgress.activities.assignments.totalSubmitted > 0) {
-      let totalScore = 0;
-      progressRecords.forEach(progress => {
-        totalScore += progress.activities.assignments.averageScore * progress.activities.assignments.totalSubmitted;
-      });
-      aggregatedProgress.activities.assignments.averageScore =
-        totalScore / aggregatedProgress.activities.assignments.totalSubmitted;
-    }
-
-    if (aggregatedProgress.activities.miniProjects.completed > 0) {
-      let totalScore = 0;
-      progressRecords.forEach(progress => {
-        totalScore += progress.activities.miniProjects.averageScore * progress.activities.miniProjects.completed;
-      });
-      aggregatedProgress.activities.miniProjects.averageScore =
-        totalScore / aggregatedProgress.activities.miniProjects.completed;
+    // Average day calculation already done
+    if (aggregatedProgress.streaks.totalActiveDays > 0) {
+      aggregatedProgress.timeSpent.averagePerDay =
+        aggregatedProgress.timeSpent.totalMinutes / aggregatedProgress.streaks.totalActiveDays;
     }
 
     // Calculate average per day
@@ -524,6 +592,13 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     if (pythonProjectsCompleted > 0) {
       aggregatedProgress.skills.python.averageScore = pythonAvgScore;
     }
+
+    // Explicitly set real assignment activity data
+    aggregatedProgress.activities.assignments.totalSubmitted = totalAssignmentsSubmitted;
+    aggregatedProgress.activities.assignments.onTime = assignmentsOnTime;
+    aggregatedProgress.activities.assignments.late = assignmentsLate;
+    aggregatedProgress.activities.assignments.averageScore = avgAssignmentScoreFromModel;
+    aggregatedProgress.activities.assignments.lastSubmission = lastAssignmentSubmissionAt;
 
     // Add real XP, level, and enrollment from User model for accurate scaling
     aggregatedProgress.totalXp = totalXp;
@@ -964,6 +1039,13 @@ router.post('/skill-weakness-analysis', authenticateToken, async (req, res) => {
 
     // Build aggregated stats
     const submittedTasks = (miniProjectDoc?.completedTasks || []).filter(t => t.status !== 'paused');
+
+    // Gather technical context from AI feedback
+    const technicalFeedback = submittedTasks
+      .map(t => t.aiAnalyization)
+      .filter(f => f && f.length > 10)
+      .slice(-5); // Use last 5 feedbacks for context
+
     const avgProjectScore = submittedTasks.length > 0
       ? submittedTasks.reduce((sum, t) => sum + (t.score || 0), 0) / submittedTasks.length
       : 0;
@@ -1001,46 +1083,47 @@ router.post('/skill-weakness-analysis', authenticateToken, async (req, res) => {
 
 STUDENT: ${studentName}
 PRIMARY LANGUAGE: ${userDoc?.primaryLanguage || 'Not set'}
-LEVEL: ${userDoc?.level || 1} (XP: ${userDoc?.xp || 0})
+LEVEL: ${userDoc?.level || 1}
 
 SKILLS ASSESSMENT SCORES:
 - Problem Solving: ${Math.round(jobReadiness.problemSolving)}%
 - Code Quality: ${Math.round(jobReadiness.codeQuality)}%
 - Efficiency: ${Math.round(jobReadiness.efficiency)}%
-- Collaboration: ${Math.round(jobReadiness.collaboration)}%
+- Collaboration/Logic: ${Math.round(jobReadiness.collaboration)}%
 - Consistency: ${Math.round(jobReadiness.consistency)}%
-- Overall Score: ${Math.round(jobReadiness.overallScore)}%
 
-ACTIVITY DATA:
-- Code Executions: ${totalCodeExecutions}
-- Assignments Submitted: ${totalAssignments} (${assignmentsOnTime} on time)
-- Mini Projects Completed: ${submittedTasks.length} (Avg Score: ${Math.round(avgProjectScore)}%)
-- Bug Hunt Participated: ${bugHuntParticipated} (Bugs Found: ${bugsFound})
-- Current Streak: ${currentStreak} days
-- Total Active Days: ${totalActiveDays}
-- Total Time Spent: ${totalMinutes} minutes
+PAST AI CODING FEEDBACK SAMPLES:
+${technicalFeedback.length > 0 ? technicalFeedback.join('\n---\n') : 'No feedback samples available yet.'}
 
 Respond in STRICT JSON format ONLY:
 {
   "weaknesses": [
     {
-      "area": "Short name of weakness area",
+      "area": "Specific technical concept (e.g. Recursion, Error Handling, Loop Efficiency)",
       "severity": "High" or "Medium" or "Low",
-      "description": "1-2 sentence description of the weakness"
+      "description": "A technical description of why their code logic is struggling (e.g., 'Student frequently misses edge cases in conditional logic')"
     }
   ],
   "improvements": [
     {
-      "title": "Short actionable title",
-      "description": "Specific 1-2 sentence advice on how to improve",
+      "title": "Technical drill or conceptual study",
+      "description": "Logic-based advice (e.g., 'Practice dry-running loops with corner cases')",
       "priority": "High" or "Medium" or "Low",
-      "estimatedTime": "e.g., 30 mins/day, 1 week"
+      "estimatedTime": "e.g., 30 mins/day"
     }
   ],
-  "summary": "A 2-3 sentence overall analysis summary"
+  "summary": "Overall technical proficiency summary"
 }
 
-Return 3-5 weaknesses and 3-5 improvements. Focus on the LOWEST scoring areas. Be specific and encouraging. Return ONLY the JSON.`;
+Return 3-5 weaknesses and 3-5 improvements. 
+
+CRITICAL CONSTRAINTS:
+1. DO NOT identify 'lack of engagement' or 'not enough activity' as a weakness. Assume the student is active.
+2. DO NOT recommend 'completing more assignments' or 'increasing activity frequency' as a way to improve scores.
+3. THE WEAKNESSES MUST BE CODING-SPECIFIC (e.g., memory management, syntactic precision, logic flow, modularity).
+4. THE RECOMMENDATIONS MUST BE CONCEPTUAL OR LOGIC-BASED (e.g., study a specific pattern, refactor a certain type of logic).
+5. Focus on identifying specific conceptual hurdles inferred from their scores and feedback samples.
+Return ONLY the JSON.`;
 
     const response = await generateWithRetry(prompt, { temperature: 0.4, num_predict: 800 });
     const content = response.message.content;
@@ -1140,23 +1223,6 @@ router.post('/detailed-ai-analysis', authenticateToken, async (req, res) => {
       }
     }
     const latestAnalysis = progressRecords.find(p => p.detailedAiAnalysis?.overallScore > 0)?.detailedAiAnalysis;
-    
-    // Check for "No New Activity" (Volume-based)
-    if (latestAnalysis?.activitySnapshot) {
-      const { executions, assignments, projects, bugHunts } = latestAnalysis.activitySnapshot;
-      if (
-        totalCodeExecutions <= executions &&
-        totalAssignments <= assignments &&
-        submittedTasks.length <= projects &&
-        bugHuntParticipated <= bugHunts
-      ) {
-        return res.json({
-          success: true,
-          noChange: true,
-          message: "No new activity found since last analysis."
-        });
-      }
-    }
 
     const stabilityReference = latestAnalysis ? `
 STABILITY REFERENCE (CURRENT SCORES):
@@ -1304,6 +1370,8 @@ Return ONLY the JSON.`;
               codeQualityScore: p.jobReadiness.codeQuality || 0,
               debuggingSkillsScore: p.jobReadiness.efficiency || 0,
               projectMasteryScore: p.jobReadiness.collaboration || 0,
+              efficiencyScore: p.jobReadiness.efficiency || 0,
+              collaborationScore: p.jobReadiness.collaboration || 0,
               consistencyScore: p.jobReadiness.consistency || 0,
               overallScore: p.jobReadiness.overallScore || 0,
               generatedAt: new Date()
