@@ -150,11 +150,16 @@ export default function Dashboard() {
   const [leveledLevel, setLeveledLevel] = useState(1);
 
   useEffect(() => {
-    const pendingCode = sessionStorage.getItem('pendingJoinCode');
-    if (pendingCode && user?.role === 'student') {
+    const params = new URLSearchParams(window.location.search);
+    const urlCode = params.get('code');
+    const storedCode = sessionStorage.getItem('pendingJoinCode');
+    const code = urlCode || storedCode;
+
+    if (code && user?.role === 'student' && activeNav !== '/classrooms') {
+      if (urlCode) sessionStorage.setItem('pendingJoinCode', urlCode);
       setActiveNav('/classrooms');
     }
-  }, [user]);
+  }, [user, activeNav]);
   const [compilerInitialCode, setCompilerInitialCode] = useState<string | null>(null);
   const [compilerInitialLanguage, setCompilerInitialLanguage] = useState<string | null>(null);
 
