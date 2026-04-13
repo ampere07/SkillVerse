@@ -19,9 +19,8 @@ function App() {
       if (!user) {
         setView('login');
       }
-      // Clean up the URL instantly to keep it "normal"
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+      // Force reset to the base root URL to remove any "/join" or parameters
+      window.history.replaceState({}, '', '/');
     }
   }, [user]);
 
