@@ -144,7 +144,7 @@ export function ClassroomCard({
           </p>
         )}
 
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-stretch gap-2 mb-4">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -173,7 +173,7 @@ export function ClassroomCard({
               setLinkCopied(true);
               setTimeout(() => setLinkCopied(false), 2000);
             }}
-            className={`p-3 rounded-lg border transition-all ${
+            className={`px-3 flex items-center justify-center rounded-lg border transition-all ${
               linkCopied 
                 ? 'bg-green-50 border-green-200 text-green-600' 
                 : 'bg-[#1B5E20]/5 border-[#1B5E20]/10 text-[#1B5E20] hover:bg-[#1B5E20]/10'

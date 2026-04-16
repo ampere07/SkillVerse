@@ -649,7 +649,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(
                 const level = currentLevel;
                 const getXpRequiredForLevel = (lvl: number) => {
                   if (lvl <= 1) return 0;
-                  return (lvl - 1) * 1000;
+                  return (lvl - 1) * 500;
                 };
 
                 const currentLevelXp = getXpRequiredForLevel(level);
@@ -684,7 +684,7 @@ const MiniProjects = forwardRef<any, MiniProjectsProps>(
                     const level = currentLevel;
                     const getXpRequiredForLevel = (lvl: number) => {
                       if (lvl <= 1) return 0;
-                      return (lvl - 1) * 1000;
+                      return (lvl - 1) * 500;
                     };
                     const currentLevelXp = getXpRequiredForLevel(level);
                     const nextLevelTotalXp = getXpRequiredForLevel(level + 1);

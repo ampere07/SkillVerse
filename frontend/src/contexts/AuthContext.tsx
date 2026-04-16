@@ -99,7 +99,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     };
 
+    const handleRefreshUser = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        try {
+          const response = await fetch(`${getBaseUrl()}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${storedToken}` }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const refreshedUser = healUser(data.user);
+            setUser(refreshedUser);
+            localStorage.setItem('user', JSON.stringify(refreshedUser));
+          }
+        } catch (error) {
+          console.error('Error refreshing user data via event:', error);
+        }
+      }
+    };
+
     initializeAuth();
+    window.addEventListener('refresh-user', handleRefreshUser);
+
+    return () => {
+        window.removeEventListener('refresh-user', handleRefreshUser);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

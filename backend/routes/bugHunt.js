@@ -80,7 +80,7 @@ router.post('/validate', authenticateToken, async (req, res) => {
         );
 
         // 3. Update session if fixed
-        if (result.fixed) {
+        if (result.fixed && !challenge.isFixed) {
             challenge.isFixed = true;
             challenge.timeToFix = timeTaken || 0;
 
@@ -93,24 +93,24 @@ router.post('/validate', authenticateToken, async (req, res) => {
             session.totalScore += challengeScore;
             session.totalTime += (timeTaken || 0);
 
+            // Award 50 XP for this successful debug directly per fixed bug
+            user = await User.findById(req.user.userId);
+            if (user) {
+                const totalXp = (user.xp || 0) + 50;
+                newLevel = Math.floor(totalXp / 500) + 1;
+                leveledUp = newLevel > (user.level || 1);
+                
+                await User.findByIdAndUpdate(req.user.userId, {
+                    $inc: { xp: 50 },
+                    $set: { level: newLevel }
+                });
+            }
+
             // Check if all challenges are fixed
             const allFixed = session.challenges.every(c => c.isFixed);
             if (allFixed) {
                 session.status = 'completed';
                 session.completedAt = new Date();
-
-                // Reward XP to user
-                user = await User.findById(req.user.userId);
-                if (user) {
-                    const xpReward = Math.floor(session.totalScore / 5);
-                    const totalXp = (user.xp || 0) + xpReward;
-                    newLevel = Math.floor(totalXp / 500) + 1;
-                    leveledUp = newLevel > user.level;
-                    await User.findByIdAndUpdate(req.user.userId, {
-                        $inc: { xp: xpReward },
-                        $set: { level: newLevel }
-                    });
-                }
 
                 // Update BugHuntLeaderboard
                 const bugsFixed = session.challenges.filter(c => c.isFixed).length;

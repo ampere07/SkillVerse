@@ -149,10 +149,10 @@ export function setupCompilerSocket(io) {
 
         // Check if JDoodle should be used
         if (jdClientId && jdClientSecret && jdClientId.trim() !== '' && jdClientSecret.trim() !== '') {
-          socket.emit('output', { type: 'info', data: 'Compiling and Running online with JDoodle...\n' });
+          socket.emit('output', { type: 'info', data: `Compiling and Running online with JDoodle (${language || 'java'})...\n` });
           
           try {
-            const result = await jdoodleService.execute(code, 'java', data.input || '');
+            const result = await jdoodleService.execute(code, language || 'java', data.input || '');
             if (result.success) {
               socket.emit('output', { type: 'stdout', data: result.output });
               socket.emit('output', { 
@@ -160,10 +160,11 @@ export function setupCompilerSocket(io) {
                 data: `\nExecution complete (Memory: ${result.memory}KB, CPU: ${result.cpuTime}s)\n` 
               });
             } else {
-              socket.emit('output', { type: 'error', data: `JDoodle Error: ${result.error}` });
+              socket.emit('output', { type: 'error', data: `Compiler Error: ${result.error}` });
             }
           } catch (error) {
-            socket.emit('output', { type: 'error', data: `Error calling JDoodle: ${error.message}` });
+            console.error('[JDoodle Socket Error]', error);
+            socket.emit('output', { type: 'error', data: `Internal Compiler Error: ${error.message}` });
           }
           
           socket.emit('execution-complete');

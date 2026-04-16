@@ -16,7 +16,8 @@ class JDoodleService {
     const clientSecret = process.env.JDOODLE_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      throw new Error('JDoodle API credentials are not configured in .env file.');
+      console.error('[JDoodle] API credentials missing in environment variables');
+      return { success: false, error: 'Compiler API credentials not configured.' };
     }
 
     // Map common names to JDoodle-specific language identifiers and version indexes.
@@ -28,10 +29,12 @@ class JDoodleService {
 
     const config = languageConfig[language.toLowerCase()];
     if (!config) {
-      throw new Error(`Unsupported language for JDoodle: ${language}`);
+      console.error(`[JDoodle] Unsupported language: ${language}`);
+      return { success: false, error: `Unsupported language: ${language}` };
     }
 
     try {
+      console.log(`[JDoodle] Sending request for ${language}...`);
       const response = await axios.post('https://api.jdoodle.com/v1/execute', {
         clientId: clientId,
         clientSecret: clientSecret,
@@ -39,8 +42,19 @@ class JDoodleService {
         stdin: stdin,
         language: config.language,
         versionIndex: config.versionIndex,
+      }, {
+        timeout: 15000 // 15 second timeout for production
       });
 
+      if (response.data.error) {
+        console.error(`[JDoodle API Result Error] ${response.data.error}`);
+        return {
+          success: false,
+          error: response.data.error
+        };
+      }
+
+      console.log(`[JDoodle] Execution successful for ${language}`);
       return {
         success: true,
         output: response.data.output,
@@ -49,10 +63,21 @@ class JDoodleService {
         cpuTime: response.data.cpuTime,
       };
     } catch (error) {
-      console.error('JDoodle API error:', error.response?.data || error.message);
+      const errorDetail = error.response?.data?.error || error.message;
+      console.error(`[JDoodle Connection Error] ${errorDetail}`);
+      
+      let friendlyError = 'An error occurred while connecting to the online compiler.';
+      if (error.code === 'ECONNABORTED') {
+        friendlyError = 'The online compiler took too long to respond. Please try again.';
+      } else if (errorDetail.includes('Unauthorized')) {
+        friendlyError = 'Invalid API credentials. Please check server configuration.';
+      } else if (errorDetail.includes('Daily limit reached')) {
+        friendlyError = 'Daily compiler limit reached. Please try again tomorrow.';
+      }
+      
       return {
         success: false,
-        error: error.response?.data?.error || error.message,
+        error: friendlyError,
       };
     }
   }

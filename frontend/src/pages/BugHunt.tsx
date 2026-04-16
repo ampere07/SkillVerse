@@ -20,8 +20,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
-import { highlightJavaCode } from '../utils/javaUtils';
-import { highlightPythonCode } from '../utils/pythonUtils';
+import { highlightJavaCode, findMissingImports, findLinesWithMissingImports, findUnusedImports, MissingImport, JAVA_SUGGESTIONS } from '../utils/javaUtils';
+import { highlightPythonCode, PYTHON_SUGGESTIONS } from '../utils/pythonUtils';
+import { highlightCode } from '../utils/compilerUtils';
+import { MissingImportsBanner } from '../components/CompilerComponents';
 
 interface BugHuntChallenge {
     _id?: string;
@@ -33,6 +35,13 @@ interface BugHuntChallenge {
     difficulty: string;
     language: string;
     isFixed?: boolean;
+}
+
+interface Suggestion {
+    text: string;
+    type: "import" | "keyword" | "method" | "auto-import";
+    description?: string;
+    className?: string;
 }
 
 interface BugHuntProps {
@@ -95,13 +104,26 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     const [showSurrenderModal, setShowSurrenderModal] = useState(false);
     const [isProcessingSurrender, setIsProcessingSurrender] = useState(false);
     const [compilationErrors, setCompilationErrors] = useState<any[]>([]);
+    const [missingImports, setMissingImports] = useState<MissingImport[]>([]);
+    const [lineNumbers, setLineNumbers] = useState<number[]>([]);
     const [isHintHovered, setIsHintHovered] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
     const [tutorialStep, setTutorialStep] = useState(0);
-    const tutorialAudioRef = useRef<HTMLAudioElement | null>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+    const [cursorPosition, setCursorPosition] = useState({ top: 0, left: 0 });
+    const [currentLine, setCurrentLine] = useState(0);
+    const [lineSuggestions, setLineSuggestions] = useState<Map<number, { suggestions: Suggestion[]; cursorPos: { top: number; left: number } }>>(new Map());
 
+    const tutorialAudioRef = useRef<HTMLAudioElement | null>(null);
     const socketRef = useRef<Socket | null>(null);
     const timerRef = useRef<any>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const lineNumbersRef = useRef<HTMLDivElement>(null);
+    const highlightRef = useRef<HTMLDivElement>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null);
 
     const fetchLeaderboard = useCallback(async () => {
         try {
@@ -183,6 +205,282 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
     }, []);
+
+    useEffect(() => {
+        const linesCount = code.split('\n').length;
+        setLineNumbers(Array.from({ length: linesCount }, (_, i) => i + 1));
+
+        if (challenges[currentIndex]?.language === 'java') {
+            const missing = findMissingImports(code);
+            setMissingImports(missing);
+        } else {
+            setMissingImports([]);
+        }
+    }, [code, challenges, currentIndex]);
+
+    const addMissingImport = (missing: MissingImport) => {
+        const importText = missing.importStatement;
+        
+        if (code.includes(importText)) {
+            setMissingImports(prev => prev.filter(imp => imp.className !== missing.className));
+            return;
+        }
+
+        const lines = code.split('\n');
+        const packageLineIndex = lines.findIndex(line => line.trim().startsWith('package '));
+        const newCode = lines.slice();
+
+        if (packageLineIndex !== -1) {
+            newCode.splice(packageLineIndex + 1, 0, importText);
+        } else {
+            newCode.unshift(importText);
+        }
+
+        setCode(newCode.join('\n'));
+    };
+
+    const getSuggestions = (text: string, cursorPos: number): Suggestion[] => {
+        const language = challenges[currentIndex]?.language || 'java';
+        const beforeCursor = text.substring(0, cursorPos);
+        const currentLineStr = beforeCursor.split('\n').pop() || '';
+
+        const allSuggestions: Suggestion[] = [];
+        const langSuggestions = language === 'java' ? JAVA_SUGGESTIONS : PYTHON_SUGGESTIONS;
+
+        if (currentLineStr.trim().startsWith('import ') || currentLineStr.includes('import ') || currentLineStr.includes('from ')) {
+            const importText = currentLineStr.includes('import ') ? currentLineStr.substring(currentLineStr.lastIndexOf('import ') + 7) : currentLineStr.substring(currentLineStr.lastIndexOf('from ') + 5);
+            langSuggestions.imports.forEach(imp => {
+                if (imp.toLowerCase().includes(importText.toLowerCase())) {
+                    allSuggestions.push({ text: imp, type: 'import', description: 'Import statement' });
+                }
+            });
+        }
+
+        const lastWord = currentLineStr.split(/[\s(){}[\];,:]/).pop() || '';
+        if (lastWord.length >= 2) {
+            langSuggestions.keywords.forEach(keyword => {
+                if (keyword.toLowerCase().startsWith(lastWord.toLowerCase())) {
+                    allSuggestions.push({ text: keyword, type: 'keyword', description: 'Keyword' });
+                }
+            });
+            langSuggestions.methods.forEach(method => {
+                if (method.toLowerCase().startsWith(lastWord.toLowerCase())) {
+                    allSuggestions.push({ text: method, type: 'method', description: 'Method' });
+                }
+            });
+        }
+        return allSuggestions.slice(0, 10);
+    };
+
+    const updateCursorPosition = () => {
+        if (!textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const cursorPos = textarea.selectionStart;
+        const textBeforeCursor = textarea.value.substring(0, cursorPos);
+        const lines = textBeforeCursor.split('\n');
+        const currentLineNumber = lines.length;
+        const currentLineText = lines[lines.length - 1];
+
+        const lineHeight = 24;
+        const charWidth = 8;
+        const top = (currentLineNumber - 1) * lineHeight + 30; // approx padding
+        const left = currentLineText.length * charWidth + 30;
+
+        setCursorPosition({ top, left });
+        setCurrentLine(currentLineNumber);
+    };
+
+    const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const newCode = e.target.value;
+        setCode(newCode);
+
+        const cursorPos = e.target.selectionStart;
+        const textBeforeCursor = newCode.substring(0, cursorPos);
+        const lines = textBeforeCursor.split('\n');
+        const newLineNumber = lines.length;
+
+        if (newLineNumber !== currentLine) {
+            setShowSuggestions(false);
+            setCurrentLine(newLineNumber);
+
+            const cachedData = lineSuggestions.get(newLineNumber);
+            if (cachedData && cachedData.suggestions.length > 0) {
+                setSuggestions(cachedData.suggestions);
+                setCursorPosition(cachedData.cursorPos);
+                setShowSuggestions(true);
+                setSelectedSuggestion(0);
+            }
+            return;
+        }
+
+        const newSuggestions = getSuggestions(newCode, cursorPos);
+
+        if (newSuggestions.length > 0) {
+            updateCursorPosition();
+            const pos = { top: 0, left: 0 };
+            if (textareaRef.current) {
+                const textarea = textareaRef.current;
+                const textBeforeCur = textarea.value.substring(0, textarea.selectionStart);
+                const lns = textBeforeCur.split('\n');
+                const curLineNum = lns.length;
+                const curLineText = lns[lns.length - 1];
+
+                const lineHeight = 24;
+                const charWidth = 8;
+                pos.top = (curLineNum - 1) * lineHeight + 30;
+                pos.left = curLineText.length * charWidth + 30;
+            }
+
+            const newLineSuggestions = new Map(lineSuggestions);
+            newLineSuggestions.set(newLineNumber, { suggestions: newSuggestions, cursorPos: pos });
+            setLineSuggestions(newLineSuggestions);
+
+            setSuggestions(newSuggestions);
+            setShowSuggestions(true);
+            setSelectedSuggestion(0);
+            setCursorPosition(pos);
+        } else {
+            setShowSuggestions(false);
+            const newLineSuggestions = new Map(lineSuggestions);
+            newLineSuggestions.delete(newLineNumber);
+            setLineSuggestions(newLineSuggestions);
+        }
+    };
+
+    const insertSuggestion = (suggestion: Suggestion) => {
+        if (!textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const cursorPos = textarea.selectionStart;
+        const textBefore = code.substring(0, cursorPos);
+        const textAfter = code.substring(cursorPos);
+
+        let newText = '';
+        let newCursorPos = cursorPos;
+
+        if (suggestion.type === 'import') {
+            const lines = textBefore.split('\n');
+            const curLine = lines[lines.length - 1];
+            const beforeImport = textBefore.substring(0, textBefore.length - curLine.length);
+            newText = beforeImport + suggestion.text + textAfter;
+            newCursorPos = beforeImport.length + suggestion.text.length;
+        } else {
+            const lastWord = textBefore.split(/[\s(){}[\];,]/).pop() || '';
+            const beforeWord = textBefore.substring(0, textBefore.length - lastWord.length);
+            
+            const suggestionLower = suggestion.text.toLowerCase();
+            const lastWordLower = lastWord.toLowerCase();
+
+            if (suggestionLower.startsWith(lastWordLower)) {
+                newText = beforeWord + suggestion.text + textAfter;
+                newCursorPos = beforeWord.length + suggestion.text.length;
+            } else {
+                newText = textBefore + suggestion.text + textAfter;
+                newCursorPos = textBefore.length + suggestion.text.length;
+            }
+        }
+
+        setCode(newText);
+        setShowSuggestions(false);
+
+        const newLineSuggestions = new Map(lineSuggestions);
+        newLineSuggestions.delete(currentLine);
+        setLineSuggestions(newLineSuggestions);
+
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (!textareaRef.current) return;
+
+        const textarea = textareaRef.current;
+        const cursorPos = textarea.selectionStart;
+        const textBefore = code.substring(0, cursorPos);
+        const textAfter = code.substring(cursorPos);
+        const nextChar = textAfter[0];
+
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            if (showSuggestions) {
+                insertSuggestion(suggestions[selectedSuggestion]);
+            } else {
+                const spaces = '  ';
+                const newCode = textBefore + spaces + textAfter;
+                setCode(newCode);
+                setTimeout(() => {
+                    textarea.setSelectionRange(cursorPos + spaces.length, cursorPos + spaces.length);
+                }, 0);
+            }
+            return;
+        }
+
+        const closingPairs: Record<string, string> = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
+        if (closingPairs[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            const closing = closingPairs[e.key];
+            const newCode = textBefore + e.key + closing + textAfter;
+            setCode(newCode);
+            setTimeout(() => {
+                textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
+            }, 0);
+            return;
+        }
+
+        if ((e.key === ')' || e.key === ']' || e.key === '}' || e.key === '"' || e.key === "'") && nextChar === e.key) {
+            e.preventDefault();
+            textarea.setSelectionRange(cursorPos + 1, cursorPos + 1);
+            return;
+        }
+
+        if (showSuggestions) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedSuggestion(prev => (prev + 1) % suggestions.length);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedSuggestion(prev => (prev - 1 + suggestions.length) % suggestions.length);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                insertSuggestion(suggestions[selectedSuggestion]);
+            } else if (e.key === 'Escape') {
+                setShowSuggestions(false);
+            }
+        }
+    };
+
+    const handleCursorMove = () => {
+        if (!textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const cursorPos = textarea.selectionStart;
+        const textBeforeCursor = code.substring(0, cursorPos);
+        const lines = textBeforeCursor.split('\n');
+        const newLineNumber = lines.length;
+
+        if (newLineNumber !== currentLine) {
+            setShowSuggestions(false);
+            setCurrentLine(newLineNumber);
+
+            const cachedData = lineSuggestions.get(newLineNumber);
+            if (cachedData && cachedData.suggestions.length > 0) {
+                setSuggestions(cachedData.suggestions);
+                setCursorPosition(cachedData.cursorPos);
+                setShowSuggestions(true);
+                setSelectedSuggestion(0);
+            }
+        }
+    };
+
+    const handleScroll = () => {
+        if (textareaRef.current && lineNumbersRef.current && highlightRef.current) {
+            const scrollTop = textareaRef.current.scrollTop;
+            const scrollLeft = textareaRef.current.scrollLeft;
+            lineNumbersRef.current.scrollTop = scrollTop;
+            highlightRef.current.scrollTop = scrollTop;
+            highlightRef.current.scrollLeft = scrollLeft;
+        }
+    };
 
     useEffect(() => {
         const stepTargets = [
@@ -397,30 +695,8 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                 });
                 setIsLastFixSuccessful(true);
                 setFeedback(data.feedback || "Bug Caught! Excellent work.");
-
-                setTimeout(() => {
-                    if (currentIndex < challenges.length - 1) {
-                        const nextIndex = currentIndex + 1;
-                        setCurrentIndex(nextIndex);
-                        const nextCode = challenges[nextIndex].buggyCode;
-
-                        let finalNextCode = typeof nextCode === 'string' ? nextCode : JSON.stringify(nextCode, null, 2);
-                        finalNextCode = finalNextCode
-                            .replace(/\\n/g, '\n')
-                            .replace(/\\r/g, '')
-                            .replace(/\\"/g, '"');
-
-                        setCode(finalNextCode);
-                        setCompilationErrors([]);
-                        setFeedback(null);
-                        setIsLastFixSuccessful(false);
-                        setShowHint(false);
-                        setAiHint(null);
-                    } else {
-                        setGameState('completed');
-                        if (timerRef.current) clearInterval(timerRef.current);
-                    }
-                }, 2000);
+                window.dispatchEvent(new CustomEvent('refresh-user'));
+                setShowSuccessModal(true);
             } else {
                 setFeedback(data.feedback || "Not quite. The bugs are still hiding! Keep looking.");
             }
@@ -428,6 +704,31 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
             setFeedback("Something went wrong testing your code.");
         } finally {
             setIsValidating(false);
+        }
+    };
+
+    const handleNextPhase = () => {
+        setShowSuccessModal(false);
+        if (currentIndex < challenges.length - 1) {
+            const nextIndex = currentIndex + 1;
+            setCurrentIndex(nextIndex);
+            const nextCode = challenges[nextIndex].buggyCode;
+
+            let finalNextCode = typeof nextCode === 'string' ? nextCode : JSON.stringify(nextCode, null, 2);
+            finalNextCode = finalNextCode
+                .replace(/\\n/g, '\n')
+                .replace(/\\r/g, '')
+                .replace(/\\"/g, '"');
+
+            setCode(finalNextCode);
+            setCompilationErrors([]);
+            setFeedback(null);
+            setIsLastFixSuccessful(false);
+            setShowHint(false);
+            setAiHint(null);
+        } else {
+            setGameState('completed');
+            if (timerRef.current) clearInterval(timerRef.current);
         }
     };
 
@@ -766,20 +1067,94 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
                                             )}
                                         </div>
 
-                                        <div id="tutorial-editor" className="flex-1 relative font-mono text-[15px] overflow-hidden bg-white">
-                                            <textarea
-                                                value={code}
-                                                onChange={(e) => setCode(e.target.value)}
-                                                disabled={showTutorial}
-                                                className="absolute inset-0 w-full h-full p-8 bg-transparent text-transparent caret-[#212121] resize-none outline-none z-10 whitespace-pre overflow-auto leading-relaxed disabled:cursor-not-allowed"
-                                                spellCheck={false}
-                                                wrap="off"
-                                            />
-                                            <div className="absolute inset-0 w-full h-full p-8 whitespace-pre overflow-auto pointer-events-none leading-relaxed">
-                                                {currentChallenge?.language === 'java'
-                                                    ? highlightJavaCode(code, compilationErrors)
-                                                    : highlightPythonCode(code, compilationErrors)
-                                                }
+                                        <MissingImportsBanner
+                                            language={currentChallenge?.language || 'java'}
+                                            missingImports={missingImports}
+                                            onAddImport={addMissingImport}
+                                        />
+
+                                        <div id="tutorial-editor" className="flex-1 relative font-mono text-[14px] overflow-hidden bg-white flex">
+                                            {/* Line Numbers */}
+                                            <div ref={lineNumbersRef} className="bg-[#F8F9FA] border-r border-[#E0E0E0] select-none flex-shrink-0 overflow-hidden" style={{ width: '50px' }}>
+                                                <div className="py-8 pr-2 text-right">
+                                                    {(() => {
+                                                        const linesWithMissingImports = findLinesWithMissingImports(code, missingImports);
+                                                        const unusedImports = findUnusedImports(code);
+                                                        
+                                                        return lineNumbers.map(num => {
+                                                            const hasError = compilationErrors.some(err => err.line === num);
+                                                            const error = compilationErrors.find(err => err.line === num);
+                                                            const hasMissingImport = !hasError && linesWithMissingImports.has(num);
+                                                            const hasUnusedImport = !hasError && !hasMissingImport && unusedImports.has(num);
+                                                            const hasWarning = hasMissingImport || hasUnusedImport;
+
+                                                            return (
+                                                                <div key={num} className={`text-xs font-mono flex items-center justify-end space-x-1 ${hasError ? "text-red-600 font-bold" : hasWarning ? "text-yellow-600 font-bold" : "text-[#999]"}`} style={{ height: "24px", minHeight: "24px", lineHeight: "24px" }} title={hasError ? error?.message : (hasMissingImport ? "Missing import" : (hasUnusedImport ? "Unused import" : ""))}>
+                                                                    <span>{num}</span>
+                                                                </div>
+                                                            );
+                                                        });
+                                                    })()}
+                                                </div>
+                                            </div>
+
+                                            {/* Editor Code Area */}
+                                            <div className="flex-1 relative overflow-hidden">
+                                                <textarea
+                                                    ref={textareaRef}
+                                                    value={code}
+                                                    onChange={handleCodeChange}
+                                                    onKeyDown={handleKeyDown}
+                                                    onKeyUp={handleCursorMove}
+                                                    onScroll={handleScroll}
+                                                    onClick={() => {
+                                                        handleCursorMove();
+                                                        updateCursorPosition();
+                                                        setShowSuggestions(false);
+                                                    }}
+                                                    disabled={showTutorial}
+                                                    className="absolute inset-0 w-full h-full p-8 pt-8 bg-transparent text-transparent caret-[#212121] resize-none outline-none z-10 whitespace-pre overflow-auto leading-relaxed disabled:cursor-not-allowed"
+                                                    spellCheck={false}
+                                                    wrap="off"
+                                                    style={{ lineHeight: "24px" }}
+                                                />
+                                                <div ref={highlightRef} className="absolute inset-0 w-full h-full p-8 pt-8 whitespace-pre overflow-auto pointer-events-none leading-relaxed" style={{ lineHeight: "24px" }}>
+                                                    {highlightCode(
+                                                        code,
+                                                        currentChallenge?.language || 'java',
+                                                        compilationErrors,
+                                                        new Set([...findLinesWithMissingImports(code, missingImports), ...findUnusedImports(code)])
+                                                    )}
+                                                </div>
+
+                                                {/* Suggestions Dropdown */}
+                                                {showSuggestions && suggestions.length > 0 && (
+                                                    <div
+                                                        ref={suggestionsRef}
+                                                        className="absolute bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-64 overflow-auto"
+                                                        style={{
+                                                            top: `${cursorPosition.top}px`,
+                                                            left: `${cursorPosition.left}px`,
+                                                            minWidth: "300px",
+                                                        }}
+                                                    >
+                                                        {suggestions.map((suggestion, index) => (
+                                                            <div
+                                                                key={index}
+                                                                className={`px-3 py-2 cursor-pointer flex items-center justify-between ${index === selectedSuggestion ? "bg-blue-100" : "hover:bg-gray-100"}`}
+                                                                onClick={() => insertSuggestion(suggestion)}
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-mono text-gray-900">{suggestion.text}</span>
+                                                                    <span className="text-xs text-gray-500">{suggestion.description}</span>
+                                                                </div>
+                                                                <span className={`text-xs px-2 py-1 rounded ml-4 ${suggestion.type === "import" ? "bg-purple-100 text-purple-700" : suggestion.type === "keyword" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>
+                                                                    {suggestion.type}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1026,6 +1401,29 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
             )}
 
             <audio ref={tutorialAudioRef} src="/assets/tutorial.mp3" />
+            {showSuccessModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200 text-center border border-[#E0E0E0]">
+                        <div className="w-16 h-16 bg-[#C8E6C9] text-[#2E7D32] rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h2 className="text-2xl font-black mb-2 text-[#212121]">BUG SQUASHED!</h2>
+                        <p className="text-[#666] mb-6 font-medium">{feedback}</p>
+                        <div className="flex bg-[#F8F9FA] border border-[#E0E0E0] rounded-lg p-3 justify-center items-center mb-6">
+                            <span className="text-[#F57C00] font-bold mr-2">+50 XP</span>
+                            <span className="text-[#888] text-sm font-medium">Earned for this fix</span>
+                        </div>
+                        <button 
+                            onClick={handleNextPhase}
+                            className="w-full py-3 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl font-bold uppercase tracking-wider transition-colors shadow-md transform hover:-translate-y-0.5 active:translate-y-0"
+                        >
+                            {currentIndex < challenges.length - 1 ? 'Continue Mission' : 'Complete Mission'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
