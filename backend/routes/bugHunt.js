@@ -4,6 +4,7 @@ import { generateBugHuntChallenge, validateBugHuntFix, generateSubtleHint } from
 import BugHuntSession from '../models/BugHuntSession.js';
 import BugHuntLeaderboard from '../models/BugHuntLeaderboard.js';
 import User from '../models/User.js';
+import { calculateLevel } from '../services/xpService.js';
 
 const router = express.Router();
 
@@ -97,7 +98,7 @@ router.post('/validate', authenticateToken, async (req, res) => {
             user = await User.findById(req.user.userId);
             if (user) {
                 const totalXp = (user.xp || 0) + 50;
-                newLevel = Math.floor(totalXp / 500) + 1;
+                newLevel = calculateLevel(totalXp);
                 leveledUp = newLevel > (user.level || 1);
                 
                 await User.findByIdAndUpdate(req.user.userId, {

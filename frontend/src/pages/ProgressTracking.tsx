@@ -15,7 +15,9 @@ import {
   RefreshCw,
   ShieldAlert,
   Lightbulb,
-
+} from 'lucide-react';
+import { getXpProgressForLevel } from '../utils/xpCalc';
+import {
   ChevronRight,
   ChevronLeft,
   X
@@ -616,13 +618,22 @@ export default function ProgressTracking() {
                       color="text-blue-600"
                       bgColor="bg-blue-100"
                     />
-                    <MetricCard
-                      icon={Award}
-                      label="Total XP"
-                      value={progressData.totalXp ?? user?.xp ?? 0}
-                      color="text-purple-600"
-                      bgColor="bg-purple-100"
-                    />
+                    {(() => {
+                      const xp = progressData.totalXp ?? user?.xp ?? 0;
+                      const level = progressData.level ?? user?.level ?? 1;
+                      const xpProgress = getXpProgressForLevel(xp, level);
+                      return (
+                        <MetricCard
+                          icon={Award}
+                          label="Total XP"
+                          value={xp}
+                          color="text-purple-600"
+                          bgColor="bg-purple-100"
+                          progress={xpProgress.percent}
+                          progressText={`${xpProgress.toNext} to Level ${level + 1}`}
+                        />
+                      );
+                    })()}
                   </div>
 
                   {/* AI Insights */}
@@ -1660,18 +1671,31 @@ function LevelHexagon({ level, xp, jobReadiness, progressData, onNextPhase }: an
 }
 
 // Helper Components
-function MetricCard({ icon: Icon, label, value, color, bgColor }: any) {
+function MetricCard({ icon: Icon, label, value, color, bgColor, progress, progressText }: any) {
   return (
-    <div className={`${bgColor} border border-[#E0E0E0] rounded-xl p-4`}>
+    <div className={`${bgColor} border border-[#E0E0E0] rounded-xl p-4 transition-all hover:shadow-md`}>
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${bgColor}`}>
           <Icon className={`w-5 h-5 ${color}`} />
         </div>
-        <div>
-          <p className="text-[13px] text-[#757575]">{label}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] text-[#757575] truncate">{label}</p>
           <p className={`text-[20px] font-semibold ${color}`}>{value}</p>
         </div>
       </div>
+      {progress !== undefined && (
+        <div className="mt-3">
+          <div className="w-full bg-black/5 rounded-full h-1.5 overflow-hidden">
+            <div 
+              className={`h-full opacity-70 transition-all duration-1000`} 
+              style={{ width: `${progress}%`, backgroundColor: 'currentColor' }}
+            />
+          </div>
+          {progressText && (
+            <p className="text-[10px] mt-1 text-right opacity-70">{progressText}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

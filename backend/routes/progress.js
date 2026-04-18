@@ -47,6 +47,8 @@ router.get('/stats', authenticateToken, async (req, res) => {
 });
 
 // Add XP to user (called when completing projects)
+import { calculateLevel } from '../services/xpService.js';
+
 router.post('/add-xp', authenticateToken, async (req, res) => {
   try {
     const { amount } = req.body;
@@ -62,7 +64,7 @@ router.post('/add-xp', authenticateToken, async (req, res) => {
 
     user.xp += Number(amount);
 
-    const newLevel = Math.floor(user.xp / 500) + 1;
+    const newLevel = calculateLevel(user.xp);
     const leveledUp = newLevel > user.level;
     
     if (leveledUp) {
