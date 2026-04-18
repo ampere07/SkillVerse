@@ -276,8 +276,13 @@ const Compiler = forwardRef<any, CompilerProps>(
     }, []);
 
     useEffect(() => {
-      const baseUrl = import.meta.env.VITE_API_URL?.replace("/api", "") ||
-          "https://skillverse-ogv1.onrender.com";
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      // If we are in production but the baked-in URL is localhost, use the production fallback
+      const baseUrl = (apiUrl && (isLocalhost || !apiUrl.includes('localhost')))
+          ? apiUrl.replace("/api", "")
+          : "https://skillverse-ogv1.onrender.com";
       
       console.log(`[Compiler] Connecting to socket at: ${baseUrl}`);
 
@@ -539,8 +544,16 @@ const Compiler = forwardRef<any, CompilerProps>(
     };
 
     const handleRun = () => {
-      if (!socket) {
-        setOutput("Error: Not connected to server");
+      console.log("[Compiler] Run clicked. Socket status:", socket?.connected ? "Connected" : "Disconnected", "ID:", socket?.id);
+      
+      if (!socket || !socket.connected) {
+        setOutput("Error: Not connected to execution server. Please refresh or check your internet connection.");
+        if (!socket) {
+          console.error("[Compiler] Socket object is null");
+        } else {
+          console.warn("[Compiler] Socket exists but is not connected. Attempting to connect...");
+          socket.connect();
+        }
         return;
       }
 

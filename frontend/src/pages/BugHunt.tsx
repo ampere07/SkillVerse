@@ -156,7 +156,12 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
     useEffect(() => {
         // Setup socket for code execution
-        const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-ogv1.onrender.com';
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        const baseUrl = (apiUrl && (isLocalhost || !apiUrl.includes('localhost')))
+            ? apiUrl.replace('/api', '')
+            : 'https://skillverse-ogv1.onrender.com';
         
         console.log(`[BugHunt] Connecting to socket at: ${baseUrl}`);
 
@@ -653,6 +658,16 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
 
     const runCode = () => {
         if (!socketRef.current || !challenges[currentIndex]) return;
+        
+        console.log("[BugHunt] Run clicked. Socket status:", socketRef.current?.connected ? "Connected" : "Disconnected", "ID:", socketRef.current?.id);
+
+        if (!socketRef.current.connected) {
+            setOutput(prev => prev + "\n[System] Error: Not connected to execution server. Attempting to reconnect...\n");
+            socketRef.current.connect();
+            setIsCompiling(false);
+            return;
+        }
+
         setOutput('');
         setCompilationErrors([]);
         setIsCompiling(true);

@@ -73,6 +73,9 @@ export function setupPythonCompilerSocket(io) {
     const handlePythonCompile = async (data) => {
       const { code, sessionId, token, language } = data;
 
+      console.log(`[Python Compiler] Received execution request for session ${sessionId}.`);
+      socket.emit('output', { type: 'info', data: 'Starting Python execution...\n' });
+
       // Authenticate user and get userId
       let userId = null;
       try {
@@ -93,9 +96,9 @@ export function setupPythonCompilerSocket(io) {
         }
       }
 
-      try {
-        // Track code execution in progress
-        if (userId && (language === 'python' || !language)) {
+      // Track code execution and award XP - Non-blocking
+      if (userId && (language === 'python' || !language)) {
+        (async () => {
           try {
             // Find all progress records for this student
             const Progress = (await import('../models/Progress.js')).default;
@@ -131,12 +134,12 @@ export function setupPythonCompilerSocket(io) {
               'codeExecutions'
             );
           } catch (progressError) {
-            console.error('Error updating progress:', progressError);
+            console.error('Error updating progress (non-blocking):', progressError);
           }
-        }
+        })();
+      }
 
-        console.log(`[Python Compiler] Starting execution for session ${sessionId}.`);
-        
+      try {
         const jdClientId = process.env.JDOODLE_CLIENT_ID;
         const jdClientSecret = process.env.JDOODLE_CLIENT_SECRET;
 

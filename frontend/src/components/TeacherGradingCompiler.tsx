@@ -69,7 +69,12 @@ export default function TeacherGradingCompiler({
   }, [code]);
 
   useEffect(() => {
-    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-ogv1.onrender.com';
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    const baseUrl = (apiUrl && (isLocalhost || !apiUrl.includes('localhost')))
+        ? apiUrl.replace('/api', '')
+        : 'https://skillverse-ogv1.onrender.com';
     
     console.log(`[TeacherGradingCompiler] Connecting to socket at: ${baseUrl}`);
 

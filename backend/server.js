@@ -43,8 +43,16 @@ const allowedOrigins = [
 
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST']
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`[CORS] Rejected socket connection from origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 

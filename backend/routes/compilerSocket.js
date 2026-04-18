@@ -78,6 +78,9 @@ export function setupCompilerSocket(io) {
   io.on('connection', (socket) => {
     const handleJavaCompile = async (data) => {
       const { code, sessionId, token, language } = data;
+      
+      console.log(`[Compiler] Received execution request for session ${sessionId}. Language: ${language || 'java'}`);
+      socket.emit('output', { type: 'info', data: `Starting execution (${language || 'java'})...\n` });
 
       // Authenticate user and get userId
       let userId = null;
@@ -100,9 +103,9 @@ export function setupCompilerSocket(io) {
         }
       }
 
-      try {
-        // Track code execution in progress
-        if (userId && (language === 'java' || !language)) {
+      // Track code execution and award XP - Non-blocking to ensure compiler starts fast
+      if (userId && (language === 'java' || !language)) {
+        (async () => {
           try {
             // Find all progress records for this student
             const Progress = (await import('../models/Progress.js')).default;
@@ -138,18 +141,18 @@ export function setupCompilerSocket(io) {
               'codeExecutions'
             );
           } catch (progressError) {
-            console.error('Error updating progress:', progressError);
+            console.error('Error updating progress (non-blocking):', progressError);
           }
-        }
+        })();
+      }
 
-        console.log(`[Compiler] Starting execution for session ${sessionId}. Language: ${language || 'java'}`);
-        
+      try {
         const jdClientId = process.env.JDOODLE_CLIENT_ID;
         const jdClientSecret = process.env.JDOODLE_CLIENT_SECRET;
 
         // Check if JDoodle should be used
         if (jdClientId && jdClientSecret && jdClientId.trim() !== '' && jdClientSecret.trim() !== '') {
-          socket.emit('output', { type: 'info', data: `Compiling and Running online with JDoodle (${language || 'java'})...\n` });
+          socket.emit('output', { type: 'info', data: `Compiling and Running online with JDoodle...\n` });
           
           try {
             const result = await jdoodleService.execute(code, language || 'java', data.input || '');
