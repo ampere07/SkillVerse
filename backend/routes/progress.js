@@ -188,6 +188,23 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       .populate('student', 'name email')
       .populate('classroom', 'name code');
 
+    // Reset stale streaks
+    const now = new Date();
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayDate = new Date(todayDate);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+
+    for (const p of progressRecords) {
+      if (p.streaks?.lastActiveDate) {
+        const lastActive = new Date(p.streaks.lastActiveDate);
+        const lastActiveDate = new Date(lastActive.getFullYear(), lastActive.getMonth(), lastActive.getDate());
+        if (lastActiveDate < yesterdayDate && p.streaks.currentStreak > 0) {
+          p.streaks.currentStreak = 0;
+          await p.save();
+        }
+      }
+    }
+
     // Get current student ObjectId for queries
     const studentObjectId = new mongoose.Types.ObjectId(studentId);
 
@@ -1256,83 +1273,60 @@ router.post('/detailed-ai-analysis', authenticateToken, async (req, res) => {
         pythonProjects = latestProgress.skills.python?.projectsCompleted || 0;
       }
     }
-    const latestAnalysis = progressRecords.find(p => p.detailedAiAnalysis?.overallScore > 0)?.detailedAiAnalysis;
-
-    const stabilityReference = latestAnalysis ? `
-STABILITY REFERENCE (CURRENT SCORES):
-- Problem Solving: ${latestAnalysis.problemSolvingScore}%
-- Code Quality: ${latestAnalysis.codeQualityScore}%
-- Debugging: ${latestAnalysis.debuggingSkillsScore}%
-- Logic & Implementation: ${latestAnalysis.projectMasteryScore}%
-- Consistency: ${latestAnalysis.consistencyScore}%
-- IMPORTANT: If the ACTIVITY DATA below is significantly similar to when these scores were generated, DO NOT INCREASE THEM. 
-- Only award higher percentages if the student has completed NEW assignments, NEW projects, or NEW bug hunts.
-` : '';
-
     const studentName = userDoc?.name || `${userDoc?.firstName || ''} ${userDoc?.lastName || ''}`.trim() || 'Student';
-    const prompt = `You are an AI learning coach. Perform a deep, data-driven analysis of this student's learning journey. 
-Calculate their "True Proficiency" and "Skill Assessment" scores based STRICTLY on these criteria:
+    const currentPhase = Math.ceil((userDoc?.level || 1) / 3);
+    const phaseStart = (currentPhase - 1) * 3 + 1;
+    const phaseEnd = currentPhase * 3;
+    const phaseName = userDoc?.level <= 3 ? 'Beginner' : userDoc?.level <= 6 ? 'Intermediate' : userDoc?.level <= 9 ? 'Advanced' : 'Expert';
+    const levelInPhase = ((userDoc?.level - 1) % 3) + 1;
 
-TONE AND GUIDELINES:
-- Be encouraging and constructive. Avoid punitive or overly harsh language.
-- NEVER tell the student to "stop using AI" or suggest they should avoid the system's features. This is an AI-assisted learning platform.
-- Recommendations MUST be actionable next steps within the SkillVerse modules.
+    // Define the borders for the AI
+    const minBorder = levelInPhase === 1 ? 0 : levelInPhase === 2 ? 34 : 67;
+    const maxBorder = levelInPhase === 1 ? 33 : levelInPhase === 2 ? 66 : 100;
 
-MASTERY PHASE BRACKETS (Global Cumulative Scoring):
-- Your "javaProficiency" and "pythonProficiency" scores must represent the student's progress through the FULL 4-phase curriculum (Industry Expert = 100%).
-- BRACKET CAPS:
-  * Level 1-3: Beginner (Score Range: 0% - 25%)
-  * Level 4-6: Intermediate (Score Range: 25% - 50%)
-  * Level 7-9: Advanced (Score Range: 50% - 75%)
-  * Level 10+: Expert (Score Range: 75% - 100%)
-- EXPLANATION: If a student is in Level 5 (Intermediate), their proficiency score should be between 25% and 50% based on their performance on level-appropriate tasks. 100% is ONLY for Level 10+ Experts.
+    const prompt = `You are an AI learning coach. Perform a deep analysis of this student's technical progress across the SkillVerse platform.
 
-BASIS FOR PERCENTAGES (TECHNICAL MASTERY):
-- IMPORTANT: Scores must reflect the student's technical performance on their current tasks.
-- PHASE PROGRESS: For current level mastery only (0-100%). When the student hits 100% in their current level, they are ready to advance.
-${stabilityReference}
+PHASE-LEVEL MASTERY BORDERS:
+- We use a Phase-Relative scoring system. This student is in Phase ${currentPhase} (${phaseName}).
+- Each level within this phase has a strictly defined mastery border:
+  * LEVEL 1 (Start of Phase): Mastery Range 0% - 33%
+  * LEVEL 2 (Middle of Phase): Mastery Range 34% - 66%
+  * LEVEL 3 (End of Phase): Mastery Range 67% - 100%
+- CURRENT STATUS: This student is Level ${userDoc.level}. This means their mastery is at Level ${levelInPhase} of 3 in this phase.
+- MANDATORY: All skill scores you generate MUST fall within the ${minBorder}% to ${maxBorder}% range.
 
-STUDENT: ${studentName}
-PRIMARY LANGUAGE: ${userDoc?.primaryLanguage || 'Not set'}
-LEVEL: ${userDoc?.level || 1} (XP: ${userDoc?.xp || 0}) (Phase: ${
-  userDoc?.level <= 3 ? 'Beginner' : 
-  userDoc?.level <= 6 ? 'Intermediate' : 
-  userDoc?.level <= 9 ? 'Advanced' : 'Expert'
-})
-MINI PROJECT PHASE: Phase ${miniProjectDoc?.currentPhase || 1}
+YOUR TASK:
+Determine the exact percentage within the ${minBorder}%-${maxBorder}% range based on their overall progress:
+- High End of Range (e.g., ${maxBorder}%): Outstanding accuracy, high assignment volume, consistent streak.
+- Middle of Range: Steady progress, some pending tasks, average accuracy.
+- Low End of Range (e.g., ${minBorder}%): Just started this level, low accuracy, or high number of pending assignments.
 
-- Activity Data:
-- Code Executions: ${totalCodeExecutions}
-- Assignments Submitted: ${totalAssignments} (${assignmentsOnTime} on time)
-- Pending Assignments: ${pendingAssignmentsCount}
-- Mini Projects: ${submittedTasks.length} (Avg Score: ${Math.round(avgProjectScore)}%)
-- Bug Hunt: ${bugHuntParticipated} participations, ${bugsFound} bugs found
-
-OVERVIEW DATA:
-- Streak: ${currentStreak} days
-- Active Days: ${totalActiveDays}
-- Time Spent: ${totalMinutes} minutes
+STUDENT DATA:
+- Assignments: ${totalAssignments} submitted (${assignmentsOnTime} on-time), ${pendingAssignmentsCount} pending.
+- Code Quality: Based on Average Score (${Math.round(avgProjectScore)}%) and AI code feedback samples:
+${technicalFeedback.length > 0 ? technicalFeedback.join('\n---\n') : 'No feedback samples available yet.'}
+- Engagement: ${totalCodeExecutions} code runs, ${bugHuntParticipated} bug hunts, ${totalMinutes} total minutes.
 
 Respond in STRICT JSON format ONLY:
 {
   "detailedAiAnalysis": {
-    "problemSolving": "Analysis focus: Algorithmic efficiency at current level.",
-    "codeQuality": "Analysis focus: Syntax and clean code for current level.",
-    "debuggingSkills": "Analysis focus: Proficiency in identifying errors during Bug Hunt.",
-    "projectMastery": "Analysis focus: Technical implementation success relative to Level.",
-    "consistency": "Analysis focus: Engagement frequency at the current level.",
-    "overall": "Mastery summary for the current level.",
-    "weaknessAnalysis": "Identification of technical areas for growth to reach next level.",
-    "recommendation": "Next step to reach 100% of current level goals (e.g., 'Complete your ${pendingAssignmentsCount} pending assignments').",
-    "javaProficiency": <0-100 based on level + scores>,
-    "pythonProficiency": <0-100 based on level + scores>,
-    "problemSolvingScore": <0-100>,
-    "codeQualityScore": <0-100>,
-    "debuggingSkillsScore": <0-100>,
-    "projectMasteryScore": <0-100 based on level requirements>,
-    "consistencyScore": <0-100>,
-    "overallScore": <0-100 balanced total>,
-    "phaseProgress": <0-100 readiness for the Next Level>
+    "problemSolving": "Analyze logic proficiency relative to Phase ${currentPhase} goals.",
+    "codeQuality": "Analyze syntax and style samples provided.",
+    "debuggingSkills": "Analyze Bug Hunt performance and error handling.",
+    "projectMastery": "Analyze completion and accuracy of Mini Projects.",
+    "consistency": "Analyze streaks and submission timing.",
+    "overall": "Mastery summary for this phase.",
+    "weaknessAnalysis": "Technical concepts needing work.",
+    "recommendation": "Specific coding practice to reach ${maxBorder}% mastery.",
+    "javaProficiency": <Score in ${minBorder}-${maxBorder} range>,
+    "pythonProficiency": <Score in ${minBorder}-${maxBorder} range>,
+    "problemSolvingScore": <Score in ${minBorder}-${maxBorder} range>,
+    "codeQualityScore": <Score in ${minBorder}-${maxBorder} range>,
+    "debuggingSkillsScore": <Score in ${minBorder}-${maxBorder} range>,
+    "projectMasteryScore": <Score in ${minBorder}-${maxBorder} range>,
+    "consistencyScore": <Score in ${minBorder}-${maxBorder} range>,
+    "overallScore": <Balanced score in ${minBorder}-${maxBorder} range>,
+    "phaseProgress": <Progress through current phase toward Level ${phaseEnd + 1}>
   }
 }
 Return ONLY the JSON.`;
