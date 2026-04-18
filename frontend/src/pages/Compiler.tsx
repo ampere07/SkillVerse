@@ -134,6 +134,7 @@ const Compiler = forwardRef<any, CompilerProps>(
     const [streamingText, setStreamingText] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
     const streamingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const socketRef = useRef<Socket | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
     const [timerStarted, setTimerStarted] = useState(false);
@@ -327,9 +328,11 @@ const Compiler = forwardRef<any, CompilerProps>(
       );
 
       setSocket(newSocket);
+      socketRef.current = newSocket;
 
       return () => {
         newSocket.close();
+        socketRef.current = null;
       };
     }, []);
 
@@ -543,18 +546,25 @@ const Compiler = forwardRef<any, CompilerProps>(
       setPendingLanguage(null);
     };
 
-    const handleRun = () => {
-      console.log("[Compiler] Run clicked. Socket status:", socket?.connected ? "Connected" : "Disconnected", "ID:", socket?.id);
+    const handleRun = async () => {
+      console.log("[Compiler] Run clicked. Socket status:", socketRef.current?.connected ? "Connected" : "Disconnected", "ID:", socketRef.current?.id);
       
-      if (!socket || !socket.connected) {
-        setOutput("Error: Not connected to execution server. Please refresh or check your internet connection.");
-        if (!socket) {
-          console.error("[Compiler] Socket object is null");
-        } else {
-          console.warn("[Compiler] Socket exists but is not connected. Attempting to connect...");
-          socket.connect();
+      let s = socketRef.current;
+      if (!s || !s.connected) {
+        if (s) {
+          console.warn("[Compiler] Socket exists but is not connected. Attempting to connect and waiting...");
+          s.connect();
+          // Wait up to 1 second for connection
+          for (let i = 0; i < 5; i++) {
+            await new Promise(r => setTimeout(r, 200));
+            if (s.connected) break;
+          }
         }
-        return;
+        
+        if (!s || !s.connected) {
+          setOutput("Error: Not connected to execution server. If this persists, please refresh the page.");
+          return;
+        }
       }
 
       setOutput("");
