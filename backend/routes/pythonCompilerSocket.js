@@ -163,6 +163,11 @@ export function setupPythonCompilerSocket(io) {
           return;
         }
 
+        // If JDoodle is not available, warn the console and try local
+        if (!jdClientId || !jdClientSecret) {
+          console.warn('[Python Compiler] JDoodle credentials missing. Falling back to local python (requires Python installed on server).');
+        }
+
         const timestamp = Date.now();
         const userDir = path.join(TEMP_DIR, `python_session_${sessionId}_${timestamp}`);
         const pythonFilePath = path.join(userDir, 'main.py');
@@ -170,7 +175,7 @@ export function setupPythonCompilerSocket(io) {
         await fs.mkdir(userDir, { recursive: true });
         await fs.writeFile(pythonFilePath, code);
 
-        socket.emit('output', { type: 'info', data: 'Running Python...\n' });
+        socket.emit('output', { type: 'info', data: 'Running Python locally...\n' });
 
         const pythonProcess = spawn('python', ['main.py'], {
           cwd: userDir
@@ -182,6 +187,15 @@ export function setupPythonCompilerSocket(io) {
         });
 
         let errorOutput = '';
+
+        pythonProcess.on('error', (err) => {
+          console.error('[Python Compiler] Failed to start python:', err);
+          socket.emit('output', { 
+            type: 'error', 
+            data: `Failed to start local python: ${err.message}. \nTip: Make sure Python is installed on the server or JDoodle credentials are provided in .env` 
+          });
+          socket.emit('execution-complete');
+        });
 
         pythonProcess.stdout.on('data', (data) => {
           socket.emit('output', { type: 'stdout', data: data.toString() });

@@ -171,6 +171,11 @@ export function setupCompilerSocket(io) {
           return;
         }
 
+        // If JDoodle is not available, warn the console and try local
+        if (!jdClientId || !jdClientSecret) {
+          console.warn('[Compiler] JDoodle credentials missing. Falling back to local javac (requires Java installed on server).');
+        }
+
         const classNameMatch = code.match(/public\s+class\s+(\w+)/);
         if (!classNameMatch) {
           socket.emit('compilation-error', { 
@@ -199,13 +204,22 @@ export function setupCompilerSocket(io) {
 
         const { classpath } = await copyLibrariesAndBuildClasspath(userDir);
 
-        socket.emit('output', { type: 'info', data: 'Compiling...\n' });
+        socket.emit('output', { type: 'info', data: 'Compiling locally...\n' });
 
         const compileProcess = spawn('javac', ['-cp', classpath, `${className}.java`], {
           cwd: userDir
         });
 
         let compileError = '';
+
+        compileProcess.on('error', (err) => {
+          console.error('[Compiler] Failed to start javac:', err);
+          socket.emit('output', { 
+            type: 'error', 
+            data: `Failed to start local compiler: ${err.message}. \nTip: Make sure Java is installed on the server or JDoodle credentials are provided in .env` 
+          });
+          socket.emit('execution-complete');
+        });
 
         compileProcess.stderr.on('data', (data) => {
           compileError += data.toString();

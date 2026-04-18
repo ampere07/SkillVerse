@@ -69,7 +69,24 @@ export default function TeacherGradingCompiler({
   }, [code]);
 
   useEffect(() => {
-    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-ogv1.onrender.com');
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-ogv1.onrender.com';
+    
+    console.log(`[TeacherGradingCompiler] Connecting to socket at: ${baseUrl}`);
+
+    const newSocket = io(baseUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    newSocket.on('connect', () => {
+      console.log('[TeacherGradingCompiler] Socket connected successfully');
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('[TeacherGradingCompiler] Socket connection error:', err.message);
+      setOutput(prev => prev + `\n[System] Connection error: ${err.message}. Retrying...\n`);
+    });
 
     newSocket.on('output', (data: { type: string; data: string }) => {
       setOutput(prev => prev + data.data);

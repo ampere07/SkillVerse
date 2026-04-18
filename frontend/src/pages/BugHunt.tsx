@@ -157,8 +157,25 @@ const BugHunt = ({ onMenuClick, onGameStatusChange }: BugHuntProps) => {
     useEffect(() => {
         // Setup socket for code execution
         const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://skillverse-ogv1.onrender.com';
-        const socket = io(baseUrl);
+        
+        console.log(`[BugHunt] Connecting to socket at: ${baseUrl}`);
+
+        const socket = io(baseUrl, {
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+        });
+        
         socketRef.current = socket;
+
+        socket.on('connect', () => {
+            console.log('[BugHunt] Socket connected successfully');
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('[BugHunt] Socket connection error:', err.message);
+            setOutput(prev => prev + `\n[System] Connection error: ${err.message}. Retrying...\n`);
+        });
 
         socket.on('output', (payload: any) => {
             const data = typeof payload === 'string' ? payload : payload.data;
