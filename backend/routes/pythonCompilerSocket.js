@@ -145,7 +145,7 @@ export function setupPythonCompilerSocket(io) {
 
         // Check if JDoodle should be used
         if (jdClientId && jdClientSecret && jdClientId.trim() !== '' && jdClientSecret.trim() !== '') {
-          socket.emit('output', { type: 'info', data: 'Running online with JDoodle Python...\n' });
+          // socket.emit('output', { type: 'info', data: 'Running online with JDoodle Python...\n' });
           
           try {
             const result = await jdoodleService.execute(code, 'python3', data.input || '');
@@ -153,7 +153,7 @@ export function setupPythonCompilerSocket(io) {
               socket.emit('output', { type: 'stdout', data: result.output });
               socket.emit('output', { 
                 type: 'info', 
-                data: `\nExecution complete (Memory: ${result.memory}KB, CPU: ${result.cpuTime}s)\n` 
+                data: `\nExecution complete\n` 
               });
             } else {
               socket.emit('output', { type: 'error', data: `JDoodle Error: ${result.error}` });
