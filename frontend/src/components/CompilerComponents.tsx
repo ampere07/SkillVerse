@@ -386,6 +386,9 @@ interface OutputConsoleProps {
   isAiThinking: boolean;
   consoleRef: React.RefObject<HTMLDivElement>;
   onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  hintHistory: string[];
+  showHintHistory: boolean;
+  onToggleHintHistory: () => void;
 }
 
 export function OutputConsole({
@@ -399,15 +402,43 @@ export function OutputConsole({
   streamingText,
   isAiThinking,
   consoleRef,
-  onKeyDown
+  onKeyDown,
+  hintHistory,
+  showHintHistory,
+  onToggleHintHistory,
 }: OutputConsoleProps) {
+  const isAssistantMode = projectDetails && !isRunning && !isActivityMode && !output;
+
   return (
     <div className="flex flex-col bg-gray-900 overflow-hidden">
-      <div className="px-2 py-1 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+      <div className="px-2 py-1 bg-gray-800 border-b border-gray-700 flex-shrink-0 flex items-center justify-between">
         <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
-          {projectDetails && !isRunning && !output && !isActivityMode ? "SkillVerse Coding Assistant" : "Interactive Console"}
+          {isAssistantMode ? "SkillVerse Coding Assistant" : "Interactive Console"}
         </h3>
+        {isAssistantMode && hintHistory.length > 0 && (
+          <button
+            onClick={onToggleHintHistory}
+            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            {showHintHistory ? "Hide history" : `Recent hints (${hintHistory.length})`}
+          </button>
+        )}
       </div>
+
+      {isAssistantMode && showHintHistory && hintHistory.length > 0 && (
+        <div className="border-b border-gray-700 max-h-52 overflow-auto bg-gray-800">
+          <div className="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Recent Hints
+          </div>
+          {hintHistory.map((hint, i) => (
+            <div key={i} className="px-3 pb-3 border-t border-gray-700">
+              <div className="text-xs text-gray-500 mb-1 pt-2">Hint #{hintHistory.length - i}</div>
+              <div className="text-xs font-mono text-gray-300 whitespace-pre-wrap">{hint}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div
         ref={consoleRef}
         className="flex-1 overflow-auto min-h-0 focus:outline-none"
@@ -415,7 +446,7 @@ export function OutputConsole({
         onKeyDown={onKeyDown}
         style={{ cursor: isRunning ? "text" : "default" }}
       >
-        {projectDetails && !isRunning && !isActivityMode && !output ? (
+        {isAssistantMode ? (
           <div className="space-y-2 p-2">
             {aiMessages.length === 0 && !isStreaming && !isAiThinking ? (
               <div className="text-sm text-gray-400 font-mono">Waiting for AI hints...</div>

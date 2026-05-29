@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import dns from 'dns';
 dns.setDefaultResultOrder('ipv4first');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -106,20 +105,20 @@ app.use((err, req, res, next) => {
   });
 });
 
-httpServer.listen(PORT, async () => {
+await connectDB();
+
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+  console.log('Created uploads directory');
+}
+
+httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`API Health: http://localhost:${PORT}/api/health`);
   console.log(`AI Status: http://localhost:${PORT}/api/health/ai-status`);
   console.log(`WebSocket server running`);
-
-  const uploadsDir = path.join(process.cwd(), 'uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir);
-    console.log('Created uploads directory');
-  }
-
-  await connectDB();
 
   initializeCronJobs();
 });

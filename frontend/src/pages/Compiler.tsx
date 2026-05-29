@@ -133,7 +133,10 @@ const Compiler = forwardRef<any, CompilerProps>(
     const [lastHintTime, setLastHintTime] = useState<number>(0);
     const [streamingText, setStreamingText] = useState("");
     const [isStreaming, setIsStreaming] = useState(false);
+    const [hintHistory, setHintHistory] = useState<string[]>([]);
+    const [showHintHistory, setShowHintHistory] = useState(false);
     const streamingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const currentHintRef = useRef<string>("");
     const socketRef = useRef<Socket | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -337,6 +340,11 @@ const Compiler = forwardRef<any, CompilerProps>(
     }, []);
 
     const startStreamingMessage = useCallback((message: string) => {
+      if (currentHintRef.current) {
+        const saved = currentHintRef.current;
+        setHintHistory(prev => [saved, ...prev].slice(0, 10));
+        currentHintRef.current = "";
+      }
       setIsStreaming(true);
       setStreamingText("");
       setAiMessages([]);
@@ -357,6 +365,7 @@ const Compiler = forwardRef<any, CompilerProps>(
           }
         } else {
           setIsStreaming(false);
+          currentHintRef.current = message;
           setAiMessages([{ type: "ai", text: message }]);
           setStreamingText("");
 
@@ -432,13 +441,14 @@ const Compiler = forwardRef<any, CompilerProps>(
       return () => clearInterval(interval);
     }, [projectDetails, isRunning, code, lastHintTime, isActivityMode, analyzeCodeAndGiveHint]);
 
-    // AI messages initialization
+    // AI messages initialization - run once when project loads
     useEffect(() => {
       if (projectDetails && !isActivityMode) {
         const greeting = `Hello! I'm your SkillVerse coding assistant. I'll analyze your code and provide hints to help you complete the project. Let me know if you need help!`;
         setAiMessages([{ type: "ai", text: greeting }]);
+        // Don't set currentHintRef - greeting should not appear in hint history
       }
-    }, [projectDetails, isActivityMode, analyzeCodeAndGiveHint]);
+    }, [projectDetails, isActivityMode]);
 
     useEffect(() => {
       if (isRunning && consoleRef.current) {
@@ -576,6 +586,11 @@ const Compiler = forwardRef<any, CompilerProps>(
         if (streamingIntervalRef.current) {
           clearInterval(streamingIntervalRef.current);
           streamingIntervalRef.current = null;
+        }
+        if (currentHintRef.current) {
+          const saved = currentHintRef.current;
+          setHintHistory(prev => [saved, ...prev].slice(0, 10));
+          currentHintRef.current = "";
         }
         setAiMessages([]);
         setIsStreaming(false);
@@ -1637,6 +1652,9 @@ const Compiler = forwardRef<any, CompilerProps>(
             isAiThinking={isAiThinking}
             consoleRef={consoleRef}
             onKeyDown={handleConsoleKeyDown}
+            hintHistory={hintHistory}
+            showHintHistory={showHintHistory}
+            onToggleHintHistory={() => setShowHintHistory(prev => !prev)}
           />
         </div>
 
