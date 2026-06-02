@@ -27,7 +27,6 @@ import {
   CompilerHeader, 
   MissingImportsBanner, 
   OutputConsole, 
-  TimeUpModal, 
   SubmitConfirmModal, 
   GradingLoadingModal, 
   GradingResultsModal, 
@@ -1620,16 +1619,6 @@ const Compiler = forwardRef<any, CompilerProps>(
         </div>
 
         {/* Navigation Warning Modal - Removed */}
-
-        {showTimeUpModal && (
-          <TimeUpModal
-            onContinue={async () => {
-              setShowTimeUpModal(false);
-              await handleAutoSubmit();
-              if (onBack) onBack();
-            }}
-          />
-        )}
 
         {showSubmitConfirmModal && (
           <SubmitConfirmModal
