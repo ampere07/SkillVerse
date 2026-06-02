@@ -71,7 +71,7 @@ router.post('/add-xp', authenticateToken, async (req, res) => {
       user.level = newLevel;
     }
 
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     res.json({
       success: true,
@@ -112,7 +112,7 @@ router.post('/unlock-badge', authenticateToken, async (req, res) => {
     }
 
     user.badges.push(badgeId);
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     res.json({
       success: true,
@@ -1476,7 +1476,7 @@ router.post('/next-phase', authenticateToken, async (req, res) => {
     const user = await User.findById(userId);
     if (user) {
       user.level = (user.level || 1) + 1;
-      await user.save();
+      await user.save({ validateModifiedOnly: true });
     }
     
     // Increment week number to ensure we start a fresh "Current Week" in the history

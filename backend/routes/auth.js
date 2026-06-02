@@ -222,7 +222,7 @@ router.post('/reset-password', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log(`Password reset successfully for user: ${user.email}`);
 
@@ -704,7 +704,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log(`Password changed for user: ${user.email}`);
 
@@ -761,7 +761,7 @@ router.put('/change-language', authenticateToken, async (req, res) => {
 
     const oldLanguage = user.primaryLanguage;
     user.primaryLanguage = language;
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log(`[Auth] Language updated from ${oldLanguage} to ${language}`);
     console.log(`[Auth] Saved to database successfully`);
@@ -824,7 +824,7 @@ router.put('/update-language', authenticateToken, async (req, res) => {
 
     const oldLanguage = user.primaryLanguage;
     user.primaryLanguage = primaryLanguage;
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log('[Update Language] User language updated:', {
       oldLanguage,

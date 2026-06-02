@@ -306,12 +306,22 @@ const Compiler = forwardRef<any, CompilerProps>(
       });
 
       newSocket.on("output", (data: { type: string; data: string }) => {
+        if (data.type === 'clear') {
+          // Clear console output — used when JDoodle re-executes with new input
+          setOutput("");
+          return;
+        }
         setOutput((prev) => prev + data.data);
         setTimeout(() => {
           if (consoleRef.current) {
             consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
           }
         }, 0);
+      });
+
+      // JDoodle is waiting for user input — keep isRunning true so user can type
+      newSocket.on("waiting-for-input", () => {
+        setIsRunning(true);
       });
 
       newSocket.on("execution-complete", () => {

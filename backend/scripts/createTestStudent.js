@@ -41,6 +41,8 @@ const createTestStudent = async () => {
       password: hashedPassword,
       role: 'student',
       name: name,
+      firstName: 'Student',
+      lastName: 'Test',
       onboardingSurvey: {
         surveyCompleted: true
       }

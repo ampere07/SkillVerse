@@ -254,7 +254,7 @@ router.post('/submit', async (req, res) => {
       user.surveyCompletedLanguages.push(primaryLanguage);
     }
     
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     let miniProject = await MiniProject.findOne({ userId });
 

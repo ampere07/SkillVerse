@@ -94,12 +94,20 @@ export default function TeacherGradingCompiler({
     });
 
     newSocket.on('output', (data: { type: string; data: string }) => {
+      if (data.type === 'clear') {
+        setOutput('');
+        return;
+      }
       setOutput(prev => prev + data.data);
       setTimeout(() => {
         if (consoleRef.current) {
           consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
         }
       }, 0);
+    });
+
+    newSocket.on('waiting-for-input', () => {
+      setIsRunning(true);
     });
 
     newSocket.on('execution-complete', () => {

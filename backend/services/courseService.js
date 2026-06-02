@@ -63,7 +63,7 @@ export const courseService = {
 
     course.enrolledStudents += 1;
 
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
     await course.save();
 
     return course;

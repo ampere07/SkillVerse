@@ -16,7 +16,38 @@ interface Student {
   classroomName: string;
   classroomCode: string;
   joinedAt?: string;
+  classAverage?: number;
+  overallScore?: number;
 }
+
+const getSummaryBadge = (score: number) => {
+  if (score >= 80) {
+    return (
+      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 border border-green-200">
+        {score}% (Excellent)
+      </span>
+    );
+  }
+  if (score >= 60) {
+    return (
+      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+        {score}% (Good)
+      </span>
+    );
+  }
+  if (score >= 40) {
+    return (
+      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+        {score}% (Satisfactory)
+      </span>
+    );
+  }
+  return (
+    <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
+      {score}% (Needs Attention)
+    </span>
+  );
+};
 
 interface Classroom {
   _id: string;
@@ -40,21 +71,21 @@ export default function StudentTracking({ onNavigate, setViewingStudent }: Stude
     fetchStudentsProgress();
   }, []);
 
-  useEffect(() => {
-    if (classrooms.length > 0 && !selectedClassroom) {
-      setSelectedClassroom(classrooms[0]._id);
-    }
-  }, [classrooms]);
+
 
   useEffect(() => {
-    if (selectedClassroom && classrooms.length > 0) {
-      const filtered = allStudents.filter((s: Student) => {
-        const classroom = classrooms.find((c: Classroom) => c._id === selectedClassroom);
-        return s.classroomName === classroom?.name;
-      });
-      setStudents(filtered);
+    if (classrooms.length > 0) {
+      if (selectedClassroom) {
+        const filtered = allStudents.filter((s: Student) => {
+          const classroom = classrooms.find((c: Classroom) => c._id === selectedClassroom);
+          return s.classroomName === classroom?.name;
+        });
+        setStudents(filtered);
+      } else {
+        setStudents(allStudents);
+      }
     }
-  }, [selectedClassroom]);
+  }, [selectedClassroom, allStudents, classrooms]);
 
   const fetchStudentsProgress = async () => {
     try {
@@ -79,9 +110,21 @@ export default function StudentTracking({ onNavigate, setViewingStudent }: Stude
         }
 
         const allStudentsData: Student[] = [];
+        
+        // Cache to prevent fetching duplicate students multiple times across classrooms
+        const studentProgressCache: Record<string, { overallScore: number; userProfile: any }> = {};
 
         for (const classroom of teacherClassrooms) {
           console.log('Processing classroom:', classroom.name, 'Students:', classroom.students);
+
+          const classroomStudents: Array<{
+            studentEnrollment: any;
+            profile: any;
+            overallScore: number;
+          }> = [];
+          
+          let totalClassScore = 0;
+          const totalEnrolled = classroom.students?.length || 0;
 
           for (const studentEnrollment of classroom.students || []) {
             try {
@@ -89,36 +132,70 @@ export default function StudentTracking({ onNavigate, setViewingStudent }: Stude
                 ? studentEnrollment.studentId
                 : (studentEnrollment.studentId as { _id: string })._id || String(studentEnrollment.studentId);
 
-              console.log('Fetching student:', studentId);
-              const studentResponse = await axios.get(
-                `${import.meta.env.VITE_API_URL}/auth/users/${studentId}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
+              let cached = studentProgressCache[studentId];
+              if (!cached) {
+                console.log('Fetching student profile:', studentId);
+                const studentResponse = await axios.get(
+                  `${import.meta.env.VITE_API_URL}/auth/users/${studentId}`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
 
-              if (studentResponse.data.success) {
-                allStudentsData.push({
-                  _id: studentResponse.data.user._id,
-                  name: studentResponse.data.user.name,
-                  email: studentResponse.data.user.email,
-                  profilePicture: studentResponse.data.user.profilePicture,
-                  level: studentResponse.data.user.level,
-                  classroomName: classroom.name,
-                  classroomCode: classroom.code,
-                  joinedAt: studentEnrollment.joinedAt
+                console.log('Fetching student overall progress:', studentId);
+                const progressResponse = await axios.get(
+                  `${import.meta.env.VITE_API_URL}/progress/student/overall?studentId=${studentId}`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                let overallScore = 0;
+                if (progressResponse.data.success && progressResponse.data.progress) {
+                  const p = progressResponse.data.progress;
+                  overallScore = (p.detailedAiAnalysis?.overallScore !== undefined && p.detailedAiAnalysis?.overallScore !== null)
+                    ? p.detailedAiAnalysis.overallScore
+                    : p.jobReadiness?.overallScore || 0;
+                }
+
+                cached = {
+                  overallScore,
+                  userProfile: studentResponse.data.success ? studentResponse.data.user : null
+                };
+                studentProgressCache[studentId] = cached;
+              }
+
+              if (cached.userProfile) {
+                classroomStudents.push({
+                  studentEnrollment,
+                  profile: cached.userProfile,
+                  overallScore: cached.overallScore
                 });
+                totalClassScore += cached.overallScore;
               }
             } catch (err) {
-              console.error(`Error fetching student ${studentEnrollment.studentId}:`, err);
+              console.error(`Error fetching student progress for enrollment:`, err);
             }
           }
+
+          const classAverage = totalEnrolled > 0 ? Math.round(totalClassScore / totalEnrolled) : 0;
+
+          classroomStudents.forEach(({ studentEnrollment, profile, overallScore }) => {
+            allStudentsData.push({
+              _id: profile._id,
+              name: profile.name,
+              email: profile.email,
+              profilePicture: profile.profilePicture,
+              level: profile.level,
+              classroomName: classroom.name,
+              classroomCode: classroom.code,
+              joinedAt: studentEnrollment.joinedAt,
+              classAverage: classAverage,
+              overallScore: overallScore
+            });
+          });
         }
 
         console.log('All students data:', allStudentsData);
         setAllStudents(allStudentsData);
 
-        if (!selectedClassroom && teacherClassrooms.length > 0) {
-          setSelectedClassroom(teacherClassrooms[0]._id);
-        }
+
 
         if (selectedClassroom) {
           const filtered = allStudentsData.filter((s: Student) => {
@@ -173,8 +250,19 @@ export default function StudentTracking({ onNavigate, setViewingStudent }: Stude
           <button
             onClick={() => {
               const csvContent = [
-                ['Student Name', 'Classroom Name', 'Code'],
-                ...students.map((s: Student) => [s.name, s.classroomName, s.classroomCode])
+                ['Student Name', 'Classroom Name', 'Code', 'Class Overall Average', 'Overall Summary'],
+                ...students.map((s: Student) => {
+                  const summaryText = s.overallScore !== undefined 
+                    ? `${s.overallScore}% (${s.overallScore >= 80 ? 'Excellent' : s.overallScore >= 60 ? 'Good' : s.overallScore >= 40 ? 'Satisfactory' : 'Needs Attention'})`
+                    : 'N/A';
+                  return [
+                    s.name, 
+                    s.classroomName, 
+                    s.classroomCode, 
+                    s.classAverage !== undefined ? `${s.classAverage}%` : 'N/A',
+                    summaryText
+                  ];
+                })
               ].map(row => row.join(',')).join('\n');
 
               const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -234,21 +322,27 @@ export default function StudentTracking({ onNavigate, setViewingStudent }: Stude
           <table className="w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
                   Student Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
                   Classroom Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">
                   Code
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/8">
+                  Class Overall
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
+                  Overall Summary
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {students.map((student: Student) => (
                 <tr
-                  key={student._id}
+                  key={`${student._id}-${student.classroomCode}`}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={() => handleRowClick(student)}
                 >
@@ -282,6 +376,16 @@ export default function StudentTracking({ onNavigate, setViewingStudent }: Stude
                     <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                       {student.classroomCode}
                     </span>
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-semibold text-gray-700">
+                      {student.classAverage !== undefined ? `${student.classAverage}%` : '0%'}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getSummaryBadge(student.overallScore || 0)}
                   </td>
                 </tr>
               ))}

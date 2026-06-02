@@ -14,6 +14,26 @@ const LIBS_DIR = path.join(__dirname, '..', 'libs');
 
 const activeSessions = new Map();
 
+const extractCleanOutput = (output) => {
+  if (!output) return '';
+  const exceptionPatterns = [
+    'Exception in thread',
+    'java.util.NoSuchElementException',
+    'at java.base/',
+    'EOFError',
+    'Traceback (most recent call last):',
+    '  File '
+  ];
+  let minIndex = output.length;
+  for (const pattern of exceptionPatterns) {
+    const idx = output.indexOf(pattern);
+    if (idx !== -1 && idx < minIndex) {
+      minIndex = idx;
+    }
+  }
+  return output.substring(0, minIndex);
+};
+
 async function copyLibrariesAndBuildClasspath(userDir) {
   try {
     const files = await fs.readdir(LIBS_DIR);
@@ -152,25 +172,66 @@ export function setupCompilerSocket(io) {
 
         // Check if JDoodle should be used
         if (jdClientId && jdClientSecret && jdClientId.trim() !== '' && jdClientSecret.trim() !== '') {
-          // socket.emit('output', { type: 'info', data: `Compiling and Running online with JDoodle...\n` });
           
-          try {
-            const result = await jdoodleService.execute(code, language || 'java', data.input || '');
-            if (result.success) {
-              socket.emit('output', { type: 'stdout', data: result.output });
-              socket.emit('output', { 
-                type: 'info', 
-                data: `\nExecution complete\n` 
-              });
-            } else {
-              socket.emit('output', { type: 'error', data: `Compiler Error: ${result.error}` });
+          // Helper: run code on JDoodle with given stdin and handle input buffering
+          const runWithJDoodle = async (stdinInput) => {
+            try {
+              const result = await jdoodleService.execute(code, language || 'java', stdinInput);
+              if (result.success) {
+                // Check if the output contains NoSuchElementException (needs more input)
+                if (result.output && result.output.includes('java.util.NoSuchElementException')) {
+                  // Extract the useful output before the exception
+                  const cleanOutput = extractCleanOutput(result.output);
+                  
+                  // Store the JDoodle input session
+                  activeSessions.set(sessionId, {
+                    type: 'jdoodle',
+                    code: code,
+                    language: language || 'java',
+                    inputBuffer: stdinInput ? stdinInput.split('\n') : [],
+                    lastCleanOutput: cleanOutput,
+                  });
+                  
+                  // Show the partial output and wait for input
+                  if (cleanOutput.trim()) {
+                    socket.emit('output', { type: 'stdout', data: cleanOutput });
+                  }
+                  socket.emit('output', { type: 'info', data: '' });
+                  socket.emit('waiting-for-input');
+                  // Don't emit execution-complete — keep the session running
+                  return;
+                }
+                
+                socket.emit('output', { type: 'stdout', data: result.output });
+                socket.emit('output', { 
+                  type: 'info', 
+                  data: `\nExecution complete\n` 
+                });
+              } else {
+                // Check if it's a Python-style input error
+                if (result.error && (result.error.includes('EOFError') || result.error.includes('NoSuchElementException'))) {
+                  activeSessions.set(sessionId, {
+                    type: 'jdoodle',
+                    code: code,
+                    language: language || 'java',
+                    inputBuffer: stdinInput ? stdinInput.split('\n') : [],
+                    lastCleanOutput: '',
+                  });
+                  socket.emit('waiting-for-input');
+                  return;
+                }
+                socket.emit('output', { type: 'error', data: `Compiler Error: ${result.error}` });
+              }
+            } catch (error) {
+              console.error('[JDoodle Socket Error]', error);
+              socket.emit('output', { type: 'error', data: `Internal Compiler Error: ${error.message}` });
             }
-          } catch (error) {
-            console.error('[JDoodle Socket Error]', error);
-            socket.emit('output', { type: 'error', data: `Internal Compiler Error: ${error.message}` });
-          }
-          
-          socket.emit('execution-complete');
+            
+            activeSessions.delete(sessionId);
+            socket.emit('execution-complete');
+          };
+
+          await runWithJDoodle(data.input || '');
           return;
         }
 
@@ -305,11 +366,68 @@ export function setupCompilerSocket(io) {
     socket.on('compile-and-run', handleJavaCompile);
     socket.on('compile-java', handleJavaCompile);
 
-    socket.on('stdin-input', (data) => {
+    socket.on('stdin-input', async (data) => {
       const { sessionId, input } = data;
       const session = activeSessions.get(sessionId);
       
-      if (session && session.process && !session.process.killed) {
+      if (!session) return;
+
+      // Handle JDoodle input buffering — re-execute with all collected inputs
+      if (session.type === 'jdoodle') {
+        session.inputBuffer.push(input);
+        const allInputs = session.inputBuffer.join('\n');
+        
+        // Clear previous output and re-run (Wait, we do NOT want to clear!)
+        // socket.emit('output', { type: 'clear' });
+        
+        try {
+          const result = await jdoodleService.execute(session.code, session.language, allInputs);
+          if (result.success) {
+            const cleanOutput = extractCleanOutput(result.output);
+            let newToPrint = cleanOutput;
+            if (cleanOutput.startsWith(session.lastCleanOutput)) {
+              newToPrint = cleanOutput.substring(session.lastCleanOutput.length);
+            }
+            
+            // Check if still needs more input
+            if (result.output && result.output.includes('java.util.NoSuchElementException')) {
+              session.lastCleanOutput = cleanOutput;
+              
+              if (newToPrint) {
+                socket.emit('output', { type: 'stdout', data: newToPrint });
+              }
+              socket.emit('waiting-for-input');
+              return;
+            }
+            
+            // Execution completed successfully
+            if (newToPrint) {
+              socket.emit('output', { type: 'stdout', data: newToPrint });
+            }
+            socket.emit('output', { 
+              type: 'info', 
+              data: `\nExecution complete\n` 
+            });
+          } else {
+            // Check if needs more input (Python EOFError)
+            if (result.error && (result.error.includes('EOFError') || result.error.includes('NoSuchElementException'))) {
+              socket.emit('waiting-for-input');
+              return;
+            }
+            socket.emit('output', { type: 'error', data: `Compiler Error: ${result.error}` });
+          }
+        } catch (error) {
+          console.error('[JDoodle Retry Error]', error);
+          socket.emit('output', { type: 'error', data: `Internal Compiler Error: ${error.message}` });
+        }
+        
+        activeSessions.delete(sessionId);
+        socket.emit('execution-complete');
+        return;
+      }
+
+      // Handle local process stdin
+      if (session.process && !session.process.killed) {
         session.process.stdin.write(input + '\n');
       }
     });
@@ -318,13 +436,23 @@ export function setupCompilerSocket(io) {
       const { sessionId } = data;
       const session = activeSessions.get(sessionId);
       
-      if (session && session.process && !session.process.killed) {
-        session.process.kill();
-        socket.emit('output', { 
-          type: 'info', 
-          data: '\n\nProcess terminated by user\n' 
-        });
-        socket.emit('execution-complete');
+      if (session) {
+        if (session.type === 'jdoodle') {
+          // JDoodle session — just clean up the buffered session
+          activeSessions.delete(sessionId);
+          socket.emit('output', { 
+            type: 'info', 
+            data: '\n\nProcess terminated by user\n' 
+          });
+          socket.emit('execution-complete');
+        } else if (session.process && !session.process.killed) {
+          session.process.kill();
+          socket.emit('output', { 
+            type: 'info', 
+            data: '\n\nProcess terminated by user\n' 
+          });
+          socket.emit('execution-complete');
+        }
       }
     });
 

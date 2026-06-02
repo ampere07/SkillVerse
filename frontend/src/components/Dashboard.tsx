@@ -541,7 +541,17 @@ export default function Dashboard() {
               return (
                 <button
                   key={item.href}
-                  onClick={() => !isGameActive && handleNavigation(item.href)}
+                  onClick={() => {
+                    if (!isGameActive) {
+                      if (item.href === "/progress-tracking" && user?.role === "teacher") {
+                        setViewingStudent(false);
+                        sessionStorage.removeItem('viewingStudent');
+                        sessionStorage.removeItem('studentId');
+                        sessionStorage.removeItem('studentName');
+                      }
+                      handleNavigation(item.href);
+                    }
+                  }}
                   disabled={isGameActive}
                   className={`
                     relative z-10 w-full h-[46px] flex items-center gap-3 px-6 transition-all

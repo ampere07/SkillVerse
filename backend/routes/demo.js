@@ -35,7 +35,7 @@ router.post('/add-xp', async (req, res) => {
     user.xp = user.demoXP;
     user.level = user.demoLevel;
 
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log(`✨ Added ${amount} XP to ${user.name}`);
     console.log(`   Current: ${user.xp}/500 XP, Level ${user.level}`);
@@ -75,7 +75,7 @@ router.post('/level-up', async (req, res) => {
     user.level = user.demoLevel;
     user.xp = 0;
 
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log(`🚀 ${user.name} leveled up to ${user.level}!`);
     console.log(`   XP reset to 0/500`);
@@ -146,7 +146,7 @@ router.post('/unlock-badge', async (req, res) => {
       user.badges.push(badgeId);
     }
 
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log(`✅ Badge unlocked for ${user.name}: ${badgeId}`);
     console.log(`   Total badges: ${user.badges.length}`);
@@ -211,7 +211,7 @@ router.post('/reset', async (req, res) => {
     user.demoLevel = 1;
     user.demoBadges = [];
 
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     console.log(`🔄 Reset demo data for ${user.name}`);
 
