@@ -451,11 +451,11 @@ router.post("/complete-task", authenticateToken, async (req, res) => {
 
     await miniProject.save();
 
-    // Award XP based on score
+    // Award flat 100 XP per completed project
     const { awardXp } = await import("../services/xpService.js");
     const xpResult = await awardXp(
       req.user.userId,
-      Math.round(score * 10), // 10 XP per point, so max 1000 XP
+      100, // Flat 100 XP per project completion
       `Mini project completion: ${projectTitle}`,
       "projects",
     );
@@ -466,7 +466,7 @@ router.post("/complete-task", authenticateToken, async (req, res) => {
       message: "Task completed successfully",
       completedThisWeek: newCompletedCount,
       allCompleted: newCompletedCount >= 3,
-      xpAwarded: xpResult.awarded ? Math.round(score * 10) : 0,
+      xpAwarded: xpResult.awarded ? 100 : 0,
       newTotalXp: xpResult.newXp,
       newLevel: xpResult.newLevel,
       leveledUp: xpResult.leveledUp,
