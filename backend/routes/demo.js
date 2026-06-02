@@ -246,10 +246,12 @@ router.post('/bypass-level', async (req, res) => {
     user.level = level;
     user.demoLevel = level;
     
-    // Level up resets XP usually
-    user.xp = 0;
-    user.demoXP = 0;
+    // Level up should set XP to the base requirement for that level
+    const { getXpRequiredForLevel } = await import('../services/xpService.js');
+    const requiredXp = getXpRequiredForLevel(level);
     
+    user.xp = requiredXp;
+    user.demoXP = requiredXp;
     await user.save({ validateModifiedOnly: true });
 
     // Update Progress phase progress to 100

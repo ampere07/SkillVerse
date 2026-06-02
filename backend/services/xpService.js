@@ -99,7 +99,7 @@ export async function awardXp(userId, xpAmount, reason, xpType = 'general') {
       awarded: true,
       newLevel: user.level,
       newXp: user.xp,
-      leveledUp: newLevel > oldLevel
+      leveledUp: newLevelCalculated > oldLevel
     };
   } catch (error) {
     console.error('Error awarding XP:', error);
