@@ -696,7 +696,7 @@ export default function Dashboard() {
                 setViewingStudent={setViewingStudent}
               />
             ) : (
-              <ProgressTracking />
+              <ProgressTracking onBack={() => setViewingStudent(false)} />
             )
           ) : activeNav === "/assignments" ? (
             <Assignments />

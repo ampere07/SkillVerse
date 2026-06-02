@@ -696,13 +696,6 @@ export default function PostDetails({ postId, postType, onBack, selectedStudentI
                   {postType === 'activity' && (
                     <div className="text-sm text-gray-600 pb-6 border-b border-gray-200">
                       {post.points !== undefined && <span>{post.points} points</span>}
-                      {post.points !== undefined && post.duration && (post.duration.hours > 0 || post.duration.minutes > 0) && <span> • </span>}
-                      {post.duration && (post.duration.hours > 0 || post.duration.minutes > 0) && (
-                        <span>
-                          Duration: {post.duration.hours > 0 && `${post.duration.hours}h `}
-                          {post.duration.minutes > 0 && `${post.duration.minutes}m`}
-                        </span>
-                      )}
                     </div>
                   )}
                 </div>

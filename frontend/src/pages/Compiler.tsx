@@ -139,15 +139,11 @@ const Compiler = forwardRef<any, CompilerProps>(
     const currentHintRef = useRef<string>("");
     const socketRef = useRef<Socket | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-    const [timerStarted, setTimerStarted] = useState(false);
-    const [showTimeUpModal, setShowTimeUpModal] = useState(false);
     const [showActivitySubmitModal, setShowActivitySubmitModal] =
       useState(false);
     const [isSubmittingActivity, setIsSubmittingActivity] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useImperativeHandle(ref, () => ({
       saveProgress: () => handleSaveProgress(),
@@ -180,50 +176,6 @@ const Compiler = forwardRef<any, CompilerProps>(
         setLanguage(initialLanguage);
       }
     }, [initialCode, initialLanguage]);
-
-    useEffect(() => {
-      if (isActivityMode && projectDetails && !timerStarted) {
-        const durationHours = projectDetails.duration?.hours || 0;
-        const durationMinutes = projectDetails.duration?.minutes || 0;
-        const totalSeconds = durationHours * 3600 + durationMinutes * 60;
-
-        if (totalSeconds > 0) {
-          setTimeRemaining(totalSeconds);
-          setTimerStarted(true);
-        }
-      }
-    }, [isActivityMode, projectDetails, timerStarted]);
-
-    useEffect(() => {
-      if (timeRemaining !== null && timeRemaining > 0 && isActivityMode) {
-        timerIntervalRef.current = setInterval(() => {
-          setTimeRemaining((prev) => {
-            if (prev === null || prev <= 1) {
-              if (timerIntervalRef.current) {
-                clearInterval(timerIntervalRef.current);
-              }
-              setShowTimeUpModal(true);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-
-        return () => {
-          if (timerIntervalRef.current) {
-            clearInterval(timerIntervalRef.current);
-          }
-        };
-      }
-    }, [timeRemaining, isActivityMode]);
-
-    useEffect(() => {
-      return () => {
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current);
-        }
-      };
-    }, []);
 
     const loadSavedProgress = async (projectLang?: string) => {
       if (!projectDetails) return;
@@ -1387,7 +1339,6 @@ const Compiler = forwardRef<any, CompilerProps>(
           isSaving={isSaving}
           isGrading={isGrading}
           hasUnsavedChanges={hasUnsavedChanges}
-          timeRemaining={timeRemaining}
           saveMessage={saveMessage}
           onLanguageChange={handleLanguageChange}
           onRun={handleRun}

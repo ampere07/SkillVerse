@@ -17,8 +17,6 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
-  const [durationHours, setDurationHours] = useState('0');
-  const [durationMinutes, setDurationMinutes] = useState('0');
   const [dueDate, setDueDate] = useState('');
   const [points, setPoints] = useState('100');
   const [requiresCompiler, setRequiresCompiler] = useState(false);
@@ -40,8 +38,6 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
     setPostType(newType);
     if (newType === 'module') {
       setRequiresCompiler(false);
-      setDurationHours('0');
-      setDurationMinutes('0');
     }
   };
 
@@ -60,8 +56,6 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
     setTitle('');
     setDescription('');
     setInstructions('');
-    setDurationHours('0');
-    setDurationMinutes('0');
     setDueDate('');
     setPoints('100');
     setRequiresCompiler(false);
@@ -81,18 +75,9 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
     }
 
     if (postType === 'activity') {
-      if (!instructions.trim()) {
-        setCreateError('Requirements are required for activities');
+      if (requiresCompiler && !instructions.trim()) {
+        setCreateError('Requirements are required for compiler activities');
         return;
-      }
-
-      if (requiresCompiler) {
-        const hours = parseInt(durationHours) || 0;
-        const minutes = parseInt(durationMinutes) || 0;
-        if (hours === 0 && minutes === 0) {
-          setCreateError('Duration is required for compiler activities');
-          return;
-        }
       }
     }
 
@@ -128,17 +113,13 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
       };
 
       if (postType === 'activity') {
-        const hours = parseInt(durationHours) || 0;
-        const minutes = parseInt(durationMinutes) || 0;
-
         await activityAPI.createActivity({
           ...baseData,
           instructions: instructions.trim(),
           dueDate: dueDate || undefined,
           points: parseInt(points) || 100,
           requiresCompiler,
-          compilerLanguage: requiresCompiler ? compilerLanguage : undefined,
-          duration: requiresCompiler ? hours * 60 + minutes : undefined
+          compilerLanguage: requiresCompiler ? compilerLanguage : undefined
         });
       } else {
         await moduleAPI.createModule(baseData);
@@ -253,7 +234,7 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
               <>
                 <div>
                   <label htmlFor="instructions" className="block text-sm font-medium text-gray-700 mb-2">
-                    Requirements *
+                    Requirements {requiresCompiler ? '*' : '(Optional)'}
                   </label>
                   <textarea
                     id="instructions"
@@ -261,7 +242,7 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
                     onChange={(e) => setInstructions(e.target.value)}
                     placeholder="Detailed requirements for students"
                     rows={4}
-                    required
+                    required={requiresCompiler}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
                   />
                 </div>
@@ -304,38 +285,6 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
                         <option value="java">Java</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">Students will use this language for code submission</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Duration *
-                      </label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <input
-                            type="number"
-                            value={durationHours}
-                            onChange={(e) => setDurationHours(e.target.value)}
-                            min="0"
-                            placeholder="Hours"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">Hours</p>
-                        </div>
-                        <div>
-                          <input
-                            type="number"
-                            value={durationMinutes}
-                            onChange={(e) => setDurationMinutes(e.target.value)}
-                            min="0"
-                            max="59"
-                            placeholder="Minutes"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">Minutes</p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">Time limit for completing the activity</p>
                     </div>
                   </>
                 )}

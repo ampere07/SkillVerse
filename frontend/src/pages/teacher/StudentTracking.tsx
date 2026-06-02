@@ -235,8 +235,65 @@ export default function StudentTracking({ onNavigate, setViewingStudent }: Stude
 
   if (loading && students.length === 0) {
     return (
-      <div className="flex justify-center items-center h-96">
-        <RefreshCw className="animate-spin h-12 w-12 text-blue-500" />
+      <div className="p-6">
+        {/* Header Skeleton */}
+        <div className="mb-6 flex justify-between items-center">
+          <div className="h-9 w-64 bg-gray-200 rounded animate-pulse"></div>
+          <div className="flex gap-2">
+            <div className="h-10 w-32 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Filters Skeleton */}
+        <div className="mb-6 flex gap-4 items-center">
+          <div className="h-10 w-48 bg-gray-200 rounded-lg animate-pulse"></div>
+          <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 w-1/3"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div></th>
+                  <th className="px-6 py-3 w-1/4"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div></th>
+                  <th className="px-6 py-3 w-1/12"><div className="h-4 w-12 bg-gray-200 rounded animate-pulse"></div></th>
+                  <th className="px-6 py-3 w-1/8"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div></th>
+                  <th className="px-6 py-3 w-1/5"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {[...Array(5)].map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse flex-shrink-0"></div>
+                        <div className="ml-4 space-y-2">
+                          <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+                          <div className="h-3 w-40 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-4 w-10 bg-gray-200 rounded animate-pulse"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-6 w-28 bg-gray-200 rounded-full animate-pulse"></div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     );
   }

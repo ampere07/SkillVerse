@@ -190,7 +190,11 @@ interface Classroom {
   code: string;
 }
 
-export default function ProgressTracking() {
+interface ProgressTrackingProps {
+  onBack?: () => void;
+}
+
+export default function ProgressTracking({ onBack }: ProgressTrackingProps = {}) {
   const { user, loading: authLoading } = useAuth();
   const isViewingStudent = sessionStorage.getItem('viewingStudent') === 'true';
   const viewingStudentId = sessionStorage.getItem('studentId');
@@ -271,6 +275,15 @@ export default function ProgressTracking() {
       delete (window as any).clearViewingStudent;
     };
   }, [isViewingStudent]);
+
+  const handleBackToClass = () => {
+    clearViewingStudent();
+    if (onBack) {
+      onBack();
+    } else {
+      window.location.reload();
+    }
+  };
 
   const fetchStudentProgress = async (studentId?: string, isSilent = false) => {
     try {
@@ -533,6 +546,15 @@ export default function ProgressTracking() {
       {/* Header */}
       <div className="mb-6 px-4 lg:px-0 flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="min-w-0 flex-1">
+          {isViewingStudent && (
+            <button
+              onClick={handleBackToClass}
+              className="flex items-center gap-1 text-sm text-[#757575] hover:text-[#212121] mb-2 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back to Students
+            </button>
+          )}
           <h1 className="text-[24px] lg:text-[28px] font-semibold text-[#212121] truncate">
             {isViewingStudent ? `${viewingStudentName}'s Progress` : 'Progress Tracking'}
           </h1>
@@ -543,16 +565,18 @@ export default function ProgressTracking() {
             }
           </p>
         </div>
-        {user?.role === 'student' && progressData && (
+        {(user?.role === 'student' || isViewingStudent) && progressData && (
           <div className="flex flex-col gap-2">
-            <button
-              onClick={generateDetailedAiAnalysis}
-              disabled={detailedAiLoading}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${detailedAiLoading ? 'animate-spin' : ''}`} />
-              {detailedAiLoading ? 'Generating...' : 'Generate AI Analysis'}
-            </button>
+            {user?.role === 'student' && (
+              <button
+                onClick={generateDetailedAiAnalysis}
+                disabled={detailedAiLoading}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[#1B5E20] hover:bg-[#2E7D32] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${detailedAiLoading ? 'animate-spin' : ''}`} />
+                {detailedAiLoading ? 'Generating...' : 'Generate AI Analysis'}
+              </button>
+            )}
             <button
               onClick={() => setShowComparisonModal(true)}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-[#E8F5E9] hover:bg-[#C8E6C9] text-[#1B5E20] text-sm font-medium rounded-lg transition-colors border border-[#1B5E20]"

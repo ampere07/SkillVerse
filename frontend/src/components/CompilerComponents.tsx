@@ -16,7 +16,6 @@ interface CompilerHeaderProps {
   isSaving: boolean;
   isGrading: boolean;
   hasUnsavedChanges: boolean;
-  timeRemaining: number | null;
   saveMessage: string;
   onLanguageChange: (lang: string) => void;
   onRun: () => void;
@@ -37,7 +36,6 @@ export function CompilerHeader({
   isSaving,
   isGrading,
   hasUnsavedChanges,
-  timeRemaining,
   saveMessage,
   onLanguageChange,
   onRun,
@@ -119,12 +117,6 @@ export function CompilerHeader({
         </div>
 
         <div className="flex items-center space-x-2">
-          {isActivityMode && timeRemaining !== null && (
-            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg font-mono text-sm font-semibold ${timeRemaining <= 300 ? "bg-red-100 text-red-700" : timeRemaining <= 600 ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700"}`}>
-              <Clock className="w-4 h-4" />
-              <span>{formatTime(timeRemaining)}</span>
-            </div>
-          )}
           {projectDetails && !isActivityMode && (
             <>
               <button onClick={onSaveProgress} disabled={isSaving} className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50" title="Save Progress">
