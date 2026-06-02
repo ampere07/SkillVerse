@@ -31,7 +31,11 @@ const extractCleanOutput = (output) => {
       minIndex = idx;
     }
   }
-  return output.substring(0, minIndex);
+  let clean = output.substring(0, minIndex);
+  // JDoodle / Python / Java sometimes adds a newline right before the traceback.
+  // We remove trailing newlines to ensure prefix matching works on subsequent runs,
+  // but we keep trailing spaces (e.g. "Enter number: ")
+  return clean.replace(/[\r\n]+$/, '');
 };
 
 async function copyLibrariesAndBuildClasspath(userDir) {

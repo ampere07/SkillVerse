@@ -30,7 +30,11 @@ const extractCleanOutput = (output) => {
       minIndex = idx;
     }
   }
-  return output.substring(0, minIndex);
+  let clean = output.substring(0, minIndex);
+  // JDoodle / Python / Java sometimes adds a newline right before the traceback.
+  // We remove trailing newlines to ensure prefix matching works on subsequent runs,
+  // but we keep trailing spaces (e.g. "Enter number: ")
+  return clean.replace(/[\r\n]+$/, '');
 };
 
 function parsePythonErrors(stderr) {
@@ -332,8 +336,15 @@ export function setupPythonCompilerSocket(io) {
           if (result.success) {
             const cleanOutput = extractCleanOutput(result.output);
             let newToPrint = cleanOutput;
+            
+            console.log('[DEBUG] lastCleanOutput:', JSON.stringify(session.lastCleanOutput));
+            console.log('[DEBUG] cleanOutput:', JSON.stringify(cleanOutput));
+            
             if (cleanOutput.startsWith(session.lastCleanOutput)) {
               newToPrint = cleanOutput.substring(session.lastCleanOutput.length);
+              console.log('[DEBUG] startsWith is TRUE. newToPrint:', JSON.stringify(newToPrint));
+            } else {
+              console.log('[DEBUG] startsWith is FALSE.');
             }
             
             if (result.output && (result.output.includes('EOFError') || result.output.includes('Traceback'))) {
