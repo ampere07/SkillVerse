@@ -357,9 +357,18 @@ export const generateProjectsForLanguage = async (
       primaryLanguage: language,
     };
 
+    const MiniProject = (await import("../models/MiniProject.js")).default;
+    const miniProjectDoc = await MiniProject.findOne({ userId });
+    const completedTasks = miniProjectDoc?.completedTasks || [];
+    const recentProjects = completedTasks
+      .slice(-15)
+      .map(t => t.projectTitle)
+      .join(", ");
+
     const prompt = constructRoadmapBasedPrompt(
       languageSpecificSurvey,
       userPhase,
+      recentProjects
     );
 
     console.log(`[ProjectGen] Prompt length: ${prompt.length} characters`);
@@ -429,7 +438,7 @@ export const generateProjectsForLanguage = async (
   }
 };
 
-const constructRoadmapBasedPrompt = (survey, userPhase = 1) => {
+const constructRoadmapBasedPrompt = (survey, userPhase = 1, recentProjects = "") => {
   const {
     primaryLanguage,
     learningRoadmap,
@@ -461,9 +470,17 @@ const constructRoadmapBasedPrompt = (survey, userPhase = 1) => {
   } else if (userPhase === 2) {
     currentPhaseItems = learningRoadmap.phase2 || [];
     currentPhaseLabel = "Phase 2 - Building Skills";
-  } else {
+  } else if (userPhase === 3) {
     currentPhaseItems = learningRoadmap.phase3 || [];
     currentPhaseLabel = "Phase 3 - Advanced Practice";
+  } else {
+    // For Phase 4 and beyond, we synthesize extremely advanced topics since the roadmap only has 3 phases
+    currentPhaseItems = [
+      "Advanced Design Patterns & Architecture", 
+      "Complex Algorithms & Data Structures",
+      "System Design, Concurrency & Optimization"
+    ];
+    currentPhaseLabel = `Phase ${userPhase} - Expert Mastery`;
   }
 
   // Fallback if the requested phase is empty
@@ -476,10 +493,20 @@ const constructRoadmapBasedPrompt = (survey, userPhase = 1) => {
     ? `\n\nAI ANALYSIS:\n${aiAnalysis}\n\nUse this to tailor difficulty, explanations, focus. Address strengths/weaknesses.`
     : "";
 
+  const progressiveDifficultySection = userPhase > 3
+    ? `\n\nEXTREME DIFFICULTY SCALE UP: The user has reached Phase ${userPhase}. You MUST significantly increase the complexity, problem-solving requirements, and code architecture expectations compared to standard Phase 3 projects.`
+    : `\n\nDIFFICULTY MODIFIER: The user is currently in Phase ${userPhase}. Adjust project complexity accordingly.`;
+
+  const recentProjectsSection = recentProjects 
+    ? `\n\nAVOID THESE RECENTLY COMPLETED PROJECTS: \n${recentProjects}\nEnsure the new generated projects are COMPLETELY UNIQUE and DO NOT duplicate these concepts directly.`
+    : "";
+
   return `Create 3 unique mini projects based on personalized roadmap.
 
 LANGUAGE: ${language} ONLY
 All projects MUST be ${language}. Do not mix languages.
+
+${progressiveDifficultySection}${recentProjectsSection}
 
 LEARNING ROADMAP:
 

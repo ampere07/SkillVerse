@@ -35,13 +35,13 @@ async function bypassProgress() {
     }
 
     console.log(`\nFound student: ${user.firstName || 'Student'} ${user.lastName || ''} (ID: ${user._id})`);
-    
+
     // 1. Update User XP and Level to reach "Intermediate" (Level 4)
-    const targetLevel = 4;
-    const targetXP = 4000;
-    
+    const targetLevel = 3;
+    const targetXP = 3000;
+
     await User.findByIdAndUpdate(user._id, {
-      $set: { 
+      $set: {
         level: targetLevel,
         xp: Math.max(user.xp, targetXP)
       }
@@ -60,12 +60,12 @@ async function bypassProgress() {
     // 3. Update Progress records to show 100% completion for current phase
     const result = await Progress.updateMany(
       { student: user._id },
-      { 
-        $set: { 
+      {
+        $set: {
           'detailedAiAnalysis.phaseProgress': 100,
           'jobReadiness.overallScore': 100,
           'jobReadiness.lastCalculated': new Date()
-        } 
+        }
       }
     );
 

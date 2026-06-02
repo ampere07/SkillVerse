@@ -1,6 +1,8 @@
 import express from 'express';
 import User from '../models/User.js';
 import MiniProject from '../models/MiniProject.js';
+import Progress from '../models/Progress.js';
+import Classroom from '../models/Classroom.js';
 
 const router = express.Router();
 
@@ -222,6 +224,67 @@ router.post('/reset', async (req, res) => {
     });
   } catch (error) {
     console.error('Error resetting demo data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bypass a specific level
+router.post('/bypass-level', async (req, res) => {
+  try {
+    const { email, level } = req.body;
+
+    if (!email || !level) {
+      return res.status(400).json({ error: 'Email and level are required' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Set level in User
+    user.level = level;
+    user.demoLevel = level;
+    
+    // Level up resets XP usually
+    user.xp = 0;
+    user.demoXP = 0;
+    
+    await user.save({ validateModifiedOnly: true });
+
+    // Update Progress phase progress to 100
+    let progress = await Progress.findOne({ student: user._id });
+    if (!progress) {
+      // Create a dummy progress record if none exists (user not in a classroom yet)
+      const anyClassroom = await Classroom.findOne();
+      if (anyClassroom) {
+        progress = new Progress({
+          student: user._id,
+          classroom: anyClassroom._id
+        });
+      }
+    }
+
+    if (progress) {
+      if (!progress.detailedAiAnalysis) {
+        progress.detailedAiAnalysis = {};
+      }
+      progress.detailedAiAnalysis.phaseProgress = 100;
+      progress.detailedAiAnalysis.generatedAt = new Date();
+      // Use full save to insert new doc if needed
+      await progress.save(); 
+    }
+
+    console.log(`🚀 ${user.name} bypassed level ${level}! (Phase progress set to 100%)`);
+
+    res.json({
+      success: true,
+      user: user.name,
+      level: user.level,
+      message: `Bypassed Level ${level}, Move to Level button should now appear!`
+    });
+  } catch (error) {
+    console.error('Error bypassing level:', error);
     res.status(500).json({ error: error.message });
   }
 });

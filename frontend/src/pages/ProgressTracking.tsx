@@ -215,6 +215,7 @@ export default function ProgressTracking({ onBack }: ProgressTrackingProps = {})
   const [detailedAiLoading, setDetailedAiLoading] = useState(false);
   const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [isGeneratingPhase, setIsGeneratingPhase] = useState(false);
 
   // Instructor-only states
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
@@ -461,7 +462,7 @@ export default function ProgressTracking({ onBack }: ProgressTrackingProps = {})
 
   const handleNextPhase = async () => {
     try {
-      setLoading(true);
+      setIsGeneratingPhase(true);
       const token = localStorage.getItem('token');
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/progress/next-phase`,
@@ -477,7 +478,7 @@ export default function ProgressTracking({ onBack }: ProgressTrackingProps = {})
       console.error('Error advancing to next phase:', error);
       alert('Failed to advance phase. Please try again.');
     } finally {
-      setLoading(false);
+      setIsGeneratingPhase(false);
     }
   };
 
@@ -543,6 +544,18 @@ export default function ProgressTracking({ onBack }: ProgressTrackingProps = {})
 
   return (
     <>
+      {isGeneratingPhase && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl flex flex-col items-center animate-in fade-in zoom-in duration-300">
+            <div className="w-16 h-16 border-4 border-[#E8F5E9] border-t-[#1B5E20] rounded-full animate-spin mb-6"></div>
+            <h3 className="text-xl font-bold text-[#212121] mb-2 text-center">Advancing to Next Phase</h3>
+            <p className="text-[#757575] text-center text-sm">
+              Please wait while SkillVerse AI analyzes your progress and generates personalized mini-projects for your new phase. This may take up to 30 seconds.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6 px-4 lg:px-0 flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="min-w-0 flex-1">

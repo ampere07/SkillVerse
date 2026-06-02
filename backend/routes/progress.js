@@ -1487,6 +1487,31 @@ router.post('/next-phase', authenticateToken, async (req, res) => {
     miniProject.generationEnabled = true;
 
     await miniProject.save();
+
+    // Trigger synchronous project generation for the new phase
+    const { generateProjectsForBothLanguages } = await import('../services/projectGenerationService.js');
+    try {
+      const projects = await generateProjectsForBothLanguages(userId);
+      if (projects && projects.length > 0) {
+        const weekStartDate = new Date();
+        const weekEndDate = new Date();
+        weekEndDate.setDate(weekEndDate.getDate() + 7);
+        
+        miniProject.addWeeklyGeneratedProjects(
+          projects,
+          miniProject.currentWeekNumber,
+          weekStartDate,
+          weekEndDate
+        );
+        miniProject.lastGenerationDate = new Date();
+        await miniProject.save();
+        console.log(`Successfully generated projects for Phase ${miniProject.currentPhase}`);
+      }
+    } catch (genError) {
+      console.error('Error generating projects during phase advancement:', genError);
+      // We don't fail the phase advancement if project generation fails, 
+      // the user can try generating them again from the Mini Projects page
+    }
     
     // Update all progress records for this student to reflect the new phase
     const progressRecords = await Progress.find({ student: userId });
