@@ -1251,6 +1251,7 @@ router.post('/detailed-ai-analysis', authenticateToken, async (req, res) => {
     let latestPythonScore = 0;
     let javaProjects = 0;
     let pythonProjects = 0;
+    const technicalFeedback = [];
 
     if (progressRecords.length > 0) {
       progressRecords.forEach(p => {
@@ -1320,15 +1321,15 @@ Respond in STRICT JSON format ONLY:
     "overall": "Mastery summary for this phase.",
     "weaknessAnalysis": "Technical concepts needing work.",
     "recommendation": "Specific coding practice to reach ${maxBorder}% mastery.",
-    "javaProficiency": <Score in ${minBorder}-${maxBorder} range>,
-    "pythonProficiency": <Score in ${minBorder}-${maxBorder} range>,
-    "problemSolvingScore": <Score in ${minBorder}-${maxBorder} range>,
-    "codeQualityScore": <Score in ${minBorder}-${maxBorder} range>,
-    "debuggingSkillsScore": <Score in ${minBorder}-${maxBorder} range>,
-    "projectMasteryScore": <Score in ${minBorder}-${maxBorder} range>,
-    "consistencyScore": <Score in ${minBorder}-${maxBorder} range>,
-    "overallScore": <Balanced score in ${minBorder}-${maxBorder} range>,
-    "phaseProgress": <Progress through current phase toward Level ${phaseEnd + 1}>
+    "javaProficiency": <Score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "pythonProficiency": <Score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "problemSolvingScore": <Score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "codeQualityScore": <Score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "debuggingSkillsScore": <Score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "projectMasteryScore": <Score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "consistencyScore": <Score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "overallScore": <Balanced score in ${minBorder}-${maxBorder} range (NUMBER ONLY)>,
+    "phaseProgress": <Progress through current phase toward Level ${phaseEnd + 1} AS A NUMBER ONLY (e.g. 15)>
   }
 }
 Return ONLY the JSON.`;
@@ -1360,6 +1361,21 @@ Return ONLY the JSON.`;
     }
     
     if (analysisData) {
+      // Ensure numeric fields are actually numbers to prevent Mongoose CastErrors
+      const numericFields = [
+        'javaProficiency', 'pythonProficiency', 'problemSolvingScore', 
+        'codeQualityScore', 'debuggingSkillsScore', 'projectMasteryScore', 
+        'consistencyScore', 'overallScore', 'phaseProgress'
+      ];
+      
+      for (const field of numericFields) {
+        if (typeof analysisData[field] === 'string') {
+          // Remove any non-numeric characters (like '%') and parse
+          const parsed = parseInt(analysisData[field].replace(/[^0-9.-]/g, ''), 10);
+          analysisData[field] = isNaN(parsed) ? 0 : parsed;
+        }
+      }
+
       analysisData.generatedAt = new Date();
       analysisData.activitySnapshot = {
         executions: totalCodeExecutions,
