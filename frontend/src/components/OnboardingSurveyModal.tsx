@@ -709,17 +709,17 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                           <input
                             type="range"
                             min="0"
-                            max="4"
+                            max="2"
                             step="1"
-                            value={['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.javaExpertise) - 1}
+                            value={Math.max(0, ['beginner', 'intermediate', 'expert'].indexOf(formData.javaExpertise))}
                             onChange={(e) => {
-                              const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
+                              const levels = ['beginner', 'intermediate', 'expert'];
                               handleInputChange('javaExpertise', levels[parseInt(e.target.value)]);
                             }}
                             className="w-full h-1 rounded-full appearance-none cursor-pointer java-slider"
                             style={{
                               WebkitAppearance: 'none',
-                              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.javaExpertise) - 1) * 25}%, #e5e7eb ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.javaExpertise) - 1) * 25}%, #e5e7eb 100%)`
+                              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${Math.max(0, ['beginner', 'intermediate', 'expert'].indexOf(formData.javaExpertise)) * 50}%, #e5e7eb ${Math.max(0, ['beginner', 'intermediate', 'expert'].indexOf(formData.javaExpertise)) * 50}%, #e5e7eb 100%)`
                             }}
                           />
                         </div>
@@ -757,19 +757,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                         `}</style>
                         <div className="flex justify-between mt-6 px-1">
                           <div className="flex-1 flex justify-start">
-                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-                              <span className="sm:hidden">No exp</span>
-                              <span className="hidden sm:inline">No experience</span>
-                            </span>
-                          </div>
-                          <div className="flex-1 flex justify-center">
                             <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
                           </div>
                           <div className="flex-1 flex justify-center">
                             <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
-                          </div>
-                          <div className="flex-1 flex justify-center text-center">
-                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
                           </div>
                           <div className="flex-1 flex justify-end">
                             <span className={`text-[10px] sm:text-xs leading-tight ${formData.javaExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>
@@ -791,17 +782,17 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                           <input
                             type="range"
                             min="0"
-                            max="4"
+                            max="2"
                             step="1"
-                            value={['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.pythonExpertise) - 1}
+                            value={Math.max(0, ['beginner', 'intermediate', 'expert'].indexOf(formData.pythonExpertise))}
                             onChange={(e) => {
-                              const levels = ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'];
+                              const levels = ['beginner', 'intermediate', 'expert'];
                               handleInputChange('pythonExpertise', levels[parseInt(e.target.value)]);
                             }}
                             className="w-full h-1 rounded-full appearance-none cursor-pointer python-slider"
                             style={{
                               WebkitAppearance: 'none',
-                              background: `linear-gradient(to right, #eab308 0%, #eab308 ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.pythonExpertise) - 1) * 25}%, #e5e7eb ${(['', 'no-experience', 'beginner', 'intermediate', 'advanced', 'expert'].indexOf(formData.pythonExpertise) - 1) * 25}%, #e5e7eb 100%)`
+                              background: `linear-gradient(to right, #eab308 0%, #eab308 ${Math.max(0, ['beginner', 'intermediate', 'expert'].indexOf(formData.pythonExpertise)) * 50}%, #e5e7eb ${Math.max(0, ['beginner', 'intermediate', 'expert'].indexOf(formData.pythonExpertise)) * 50}%, #e5e7eb 100%)`
                             }}
                           />
                         </div>
@@ -839,19 +830,10 @@ const OnboardingSurveyModal = ({ isOpen, onClose, onCancel, preselectedLanguage 
                         `}</style>
                         <div className="flex justify-between mt-6 px-1">
                           <div className="flex-1 flex justify-start">
-                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'no-experience' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-                              <span className="sm:hidden">No exp</span>
-                              <span className="hidden sm:inline">No experience</span>
-                            </span>
-                          </div>
-                          <div className="flex-1 flex justify-center">
                             <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'beginner' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Beginner</span>
                           </div>
                           <div className="flex-1 flex justify-center">
                             <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'intermediate' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Intermediate</span>
-                          </div>
-                          <div className="flex-1 flex justify-center text-center">
-                            <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'advanced' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Advanced</span>
                           </div>
                           <div className="flex-1 flex justify-end">
                             <span className={`text-[10px] sm:text-xs leading-tight ${formData.pythonExpertise === 'expert' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>Expert</span>

@@ -127,26 +127,35 @@ export default function TeacherDashboardContent({ user, onNavigateToCreatePost, 
 
         if (roomRes.success && activitiesRes.success) {
           const roomData = roomRes.classroom;
-          const activities = activitiesRes.activities.filter((a: any) => a.isPublished);
+          const activities = activitiesRes.activities
+            .filter((a: any) => a.isPublished)
+            .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
           if (activities.length > 0) {
             const headers = ['Name'];
             activities.forEach((activity: any, index: number) => {
-              headers.push(`Activity ${index + 1} (${activity.title})`);
+              headers.push(`Activity ${index + 1} - ${activity.title}`);
             });
             headers.push('Total Average');
 
             const data = [headers];
 
-            const sortedStudents = [...roomData.students].sort((a, b) => {
-              const nameA = (a.studentId.name || `${a.studentId.firstName} ${a.studentId.lastName}`.trim()).toLowerCase();
-              const nameB = (b.studentId.name || `${b.studentId.firstName} ${b.studentId.lastName}`.trim()).toLowerCase();
-              return nameA.localeCompare(nameB);
-            });
+            const getLastName = (s: any) => (s.studentId.lastName || s.studentId.name?.split(' ').pop() || '').toLowerCase();
+            const sortedStudents = [...roomData.students].sort((a, b) =>
+              getLastName(a).localeCompare(getLastName(b))
+            );
+
+            const formatName = (student: any) => {
+              if (student.lastName && student.firstName) {
+                const mi = student.middleInitial ? ` ${student.middleInitial}.` : '';
+                return `${student.lastName}, ${student.firstName}${mi}`;
+              }
+              return student.name || '';
+            };
 
             sortedStudents.forEach((studentItem: any) => {
               const student = studentItem.studentId;
-              const rowData: any[] = [student.name || (`${student.firstName} ${student.lastName}`.trim())];
+              const rowData: any[] = [formatName(student)];
               
               let totalScore = 0;
               let activitiesCount = 0;

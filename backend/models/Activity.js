@@ -25,7 +25,7 @@ const activitySchema = new mongoose.Schema({
   },
   instructions: {
     type: String,
-    required: [true, 'Instructions are required'],
+    required: false,
     trim: true,
     maxlength: [5000, 'Instructions cannot exceed 5000 characters']
   },
@@ -49,6 +49,19 @@ const activitySchema = new mongoose.Schema({
     type: Number,
     default: 100,
     min: [0, 'Points cannot be negative']
+  },
+  checkedRequirements: {
+    type: [String],
+    default: []
+  },
+  isProgrammingRequirements: {
+    type: Boolean,
+    default: false
+  },
+  programmingInstructions: {
+    type: String,
+    trim: true,
+    maxlength: [5000, 'Programming instructions cannot exceed 5000 characters']
   },
   requiresCompiler: {
     type: Boolean,
