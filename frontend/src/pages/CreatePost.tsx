@@ -19,6 +19,8 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
   const [instructions, setInstructions] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [points, setPoints] = useState('100');
+  const [checkedRequirements, setCheckedRequirements] = useState<string[]>([]);
+  const [othersText, setOthersText] = useState('');
   const [requiresCompiler, setRequiresCompiler] = useState(false);
   const [compilerLanguage, setCompilerLanguage] = useState<'java' | 'python'>('python');
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -58,6 +60,8 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
     setInstructions('');
     setDueDate('');
     setPoints('100');
+    setCheckedRequirements([]);
+    setOthersText('');
     setRequiresCompiler(false);
     setCompilerLanguage('python');
     setAttachments([]);
@@ -74,12 +78,14 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
       return;
     }
 
-    if (postType === 'activity') {
-      if (requiresCompiler && !instructions.trim()) {
-        setCreateError('Requirements are required for compiler activities');
-        return;
-      }
+    const nonOthersRequirements = checkedRequirements.filter(r => r !== 'Others');
+    const hasOthers = checkedRequirements.includes('Others') && othersText.trim().length > 0;
+
+    if (postType === 'activity' && nonOthersRequirements.length === 0 && !hasOthers) {
+      setCreateError('Please select at least one requirement');
+      return;
     }
+
 
     setCreateLoading(true);
     setShowLoadingModal(true);
@@ -115,7 +121,10 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
       if (postType === 'activity') {
         await activityAPI.createActivity({
           ...baseData,
-          instructions: instructions.trim(),
+          instructions: (checkedRequirements.includes('Others') && othersText.trim()) ? othersText.trim() : '',
+          checkedRequirements: checkedRequirements.includes('Others') && !othersText.trim()
+            ? checkedRequirements.filter(r => r !== 'Others')
+            : checkedRequirements,
           dueDate: dueDate || undefined,
           points: parseInt(points) || 100,
           requiresCompiler,
@@ -233,18 +242,74 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
             {postType === 'activity' && (
               <>
                 <div>
-                  <label htmlFor="instructions" className="block text-sm font-medium text-gray-700 mb-2">
-                    Requirements {requiresCompiler ? '*' : '(Optional)'}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Requirements <span className="text-red-500">*</span>
                   </label>
-                  <textarea
-                    id="instructions"
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    placeholder="Detailed requirements for students"
-                    rows={4}
-                    required={requiresCompiler}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-                  />
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Select at least one</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        'Include code comments',
+                        'Follow naming conventions',
+                        'Handle edge cases',
+                        'Use proper indentation',
+                        'Include test cases',
+                        'Add documentation',
+                        'Avoid hardcoded values',
+                        'Use meaningful variable names',
+                        'Avoid code duplication (DRY)',
+                        'Use proper error handling',
+                        'Follow OOP principles',
+                        'Use appropriate data structures',
+                        'Break code into functions/methods',
+                        'No unused variables',
+                        'Use proper access modifiers',
+                        'Efficient algorithm/logic',
+                        'Correct program output',
+                        'Follow single responsibility principle',
+                      ].map((req) => (
+                        <label key={req} className="flex items-center space-x-2 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={checkedRequirements.includes(req)}
+                            onChange={(e) => {
+                              setCheckedRequirements(prev =>
+                                e.target.checked ? [...prev, req] : prev.filter(r => r !== req)
+                              );
+                            }}
+                            className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
+                          />
+                          <span className="text-sm text-gray-600 group-hover:text-gray-900">{req}</span>
+                        </label>
+                      ))}
+
+                      {/* Others */}
+                      <label className="flex items-center space-x-2 cursor-pointer group col-span-2">
+                        <input
+                          type="checkbox"
+                          checked={checkedRequirements.includes('Others')}
+                          onChange={(e) => {
+                            setCheckedRequirements(prev =>
+                              e.target.checked ? [...prev, 'Others'] : prev.filter(r => r !== 'Others')
+                            );
+                            if (!e.target.checked) setOthersText('');
+                          }}
+                          className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
+                        />
+                        <span className="text-sm text-gray-600 group-hover:text-gray-900">Others</span>
+                      </label>
+                    </div>
+
+                    {checkedRequirements.includes('Others') && (
+                      <textarea
+                        value={othersText}
+                        onChange={(e) => setOthersText(e.target.value)}
+                        placeholder="Specify other requirements..."
+                        rows={3}
+                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none bg-white"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 <div className="p-4 bg-white border border-gray-200 rounded-lg">

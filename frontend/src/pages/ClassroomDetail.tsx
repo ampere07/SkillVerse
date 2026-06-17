@@ -145,80 +145,80 @@ export default function ClassroomDetail({ classroomId, onBack }: ClassroomDetail
   };
 
   const handleExportExcel = () => {
-    if (!classroom || posts.length === 0) return;
+    try {
+      if (!classroom || posts.length === 0) return;
 
-    // Filter only activities
-    const activities = posts.filter(p => p.postType === 'activity');
-    if (activities.length === 0) {
-      alert('No activities found in this classroom to export.');
-      return;
-    }
+      // Sort activities oldest first so Activity 1 = first created
+      const activities = posts
+        .filter(p => p.postType === 'activity')
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-    // Build Data Array for SheetJS
-    const headers = ['Name'];
-    activities.forEach((activity, index) => {
-      headers.push(`Activity ${index + 1} (${activity.title})`);
-    });
-    headers.push('Total Average');
+      if (activities.length === 0) {
+        alert('No activities found in this classroom to export.');
+        return;
+      }
 
-    const data = [headers];
+      // Headers: Name, Activity 1, Activity 2, ..., Total Average
+      const headers = ['Name'];
+      activities.forEach((activity, index) => {
+        headers.push(`Activity ${index + 1} - ${activity.title}`);
+      });
+      headers.push('Total Average');
 
-    // Sort students alphabetically by name
-    const sortedStudents = [...classroom.students].sort((a, b) => {
-      const nameA = (a.studentId.name || `${a.studentId.firstName} ${a.studentId.lastName}`.trim()).toLowerCase();
-      const nameB = (b.studentId.name || `${b.studentId.firstName} ${b.studentId.lastName}`.trim()).toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
+      const data: any[][] = [headers];
 
-    sortedStudents.forEach((studentItem: any) => {
-      const student = studentItem.studentId;
-      const rowData: any[] = [student.name || (`${student.firstName} ${student.lastName}`.trim())];
-      
-      let totalScore = 0;
-      let activitiesCount = 0;
+      // Format name as "Lastname, Firstname M.I."
+      const formatName = (student: any) => {
+        if (!student) return '';
+        if (student.lastName && student.firstName) {
+          const mi = student.middleInitial ? ` ${student.middleInitial}.` : '';
+          return `${student.lastName}, ${student.firstName}${mi}`;
+        }
+        return student.name || '';
+      };
 
-      activities.forEach((activity) => {
-        const submission = activity.submissions?.find((s: any) => 
-          (s.student?._id || s.student) === student._id
-        );
-        
-        const score = submission?.grade ?? 0;
-        rowData.push(score);
-        
-        totalScore += score;
-        activitiesCount++;
+      // Sort students by last name
+      const validStudents = (classroom.students || []).filter((s: any) => s?.studentId);
+      const sortedStudents = [...validStudents].sort((a: any, b: any) => {
+        const lastA = (a.studentId?.lastName || a.studentId?.name?.split(' ').pop() || '').toLowerCase();
+        const lastB = (b.studentId?.lastName || b.studentId?.name?.split(' ').pop() || '').toLowerCase();
+        return lastA.localeCompare(lastB);
       });
 
-      const average = activitiesCount > 0 ? (totalScore / activitiesCount).toFixed(2) : '0.00';
-      rowData.push(parseFloat(average));
-      
-      data.push(rowData);
-    });
+      sortedStudents.forEach((studentItem: any) => {
+        const student = studentItem.studentId;
+        const rowData: any[] = [formatName(student)];
 
-    // Create Worksheet
-    const ws = XLSX.utils.aoa_to_sheet(data);
+        let totalScore = 0;
+        let activitiesCount = 0;
 
-    // Auto-fit column widths
-    const colWidths = data[0].map((_, colIndex) => {
-      return {
-        wch: Math.max(
-          ...data.map(row => {
-            const val = row[colIndex];
-            if (val === null || val === undefined) return 0;
-            return String(val).length + 2; // +2 for some padding
-          })
-        )
-      };
-    });
-    ws['!cols'] = colWidths;
+        activities.forEach((activity) => {
+          const submission = activity.submissions?.find((s: any) =>
+            (s.student?._id || s.student) === student._id
+          );
+          const score = submission?.grade ?? 0;
+          rowData.push(score);
+          totalScore += score;
+          activitiesCount++;
+        });
 
-    // Create Workbook
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Progress Report");
+        const average = activitiesCount > 0 ? (totalScore / activitiesCount).toFixed(2) : '0.00';
+        rowData.push(parseFloat(average));
+        data.push(rowData);
+      });
 
-    // Save File
-    const fileName = `${classroom.name.replace(/\s+/g, '_')}_Progress_Report.xlsx`;
-    XLSX.writeFile(wb, fileName);
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = data[0].map((_, colIndex) => ({
+        wch: Math.max(...data.map(row => String(row[colIndex] ?? '').length + 2))
+      }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Progress Report');
+      XLSX.writeFile(wb, `${classroom.name.replace(/\s+/g, '_')}_Progress_Report.xlsx`);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Export failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   const confirmDelete = async () => {

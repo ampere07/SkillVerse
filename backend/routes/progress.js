@@ -202,7 +202,11 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
         const lastActiveDate = new Date(lastActive.getFullYear(), lastActive.getMonth(), lastActive.getDate());
         if (lastActiveDate < yesterdayDate && p.streaks.currentStreak > 0) {
           p.streaks.currentStreak = 0;
-          await p.save();
+          try {
+            await p.save({ validateModifiedOnly: true });
+          } catch (saveErr) {
+            console.error('[Progress] Streak reset save failed (non-fatal):', saveErr.message);
+          }
         }
       }
     }
@@ -425,21 +429,23 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     progressRecords.forEach(progress => {
       // Aggregate skills
       ['java', 'python'].forEach(lang => {
-        aggregatedProgress.skills[lang].exercisesCompleted += progress.skills[lang].exercisesCompleted;
-        aggregatedProgress.skills[lang].projectsCompleted += progress.skills[lang].projectsCompleted;
+        const skillData = progress.skills?.[lang];
+        if (!skillData) return;
+        aggregatedProgress.skills[lang].exercisesCompleted += skillData.exercisesCompleted || 0;
+        aggregatedProgress.skills[lang].projectsCompleted += skillData.projectsCompleted || 0;
 
         // Keep the most recent activity
-        if (progress.skills[lang].lastActivity &&
+        if (skillData.lastActivity &&
           (!aggregatedProgress.skills[lang].lastActivity ||
-            new Date(progress.skills[lang].lastActivity) > new Date(aggregatedProgress.skills[lang].lastActivity))) {
-          aggregatedProgress.skills[lang].lastActivity = progress.skills[lang].lastActivity;
+            new Date(skillData.lastActivity) > new Date(aggregatedProgress.skills[lang].lastActivity))) {
+          aggregatedProgress.skills[lang].lastActivity = skillData.lastActivity;
         }
       });
 
       // Aggregate activities
-      aggregatedProgress.activities.codeExecutions.total += progress.activities.codeExecutions.total;
-      aggregatedProgress.activities.codeExecutions.java += progress.activities.codeExecutions.java;
-      aggregatedProgress.activities.codeExecutions.python += progress.activities.codeExecutions.python;
+      aggregatedProgress.activities.codeExecutions.total += progress.activities?.codeExecutions?.total || 0;
+      aggregatedProgress.activities.codeExecutions.java += progress.activities?.codeExecutions?.java || 0;
+      aggregatedProgress.activities.codeExecutions.python += progress.activities?.codeExecutions?.python || 0;
 
       // Use real bug hunt data from specialized model instead of just aggregating classroom records
       aggregatedProgress.activities.bugHunt.participated = bugHuntStats.participated;
@@ -460,41 +466,41 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
       }
 
       // Keep most recent dates
-      if (progress.activities.codeExecutions.lastExecution &&
+      if (progress.activities?.codeExecutions?.lastExecution &&
         (!aggregatedProgress.activities.codeExecutions.lastExecution ||
           new Date(progress.activities.codeExecutions.lastExecution) > new Date(aggregatedProgress.activities.codeExecutions.lastExecution))) {
         aggregatedProgress.activities.codeExecutions.lastExecution = progress.activities.codeExecutions.lastExecution;
       }
 
-      if (progress.activities.assignments.lastSubmission &&
+      if (progress.activities?.assignments?.lastSubmission &&
         (!aggregatedProgress.activities.assignments.lastSubmission ||
           new Date(progress.activities.assignments.lastSubmission) > new Date(aggregatedProgress.activities.assignments.lastSubmission))) {
         aggregatedProgress.activities.assignments.lastSubmission = progress.activities.assignments.lastSubmission;
       }
 
-      if (progress.activities.miniProjects.lastCompleted &&
+      if (progress.activities?.miniProjects?.lastCompleted &&
         (!aggregatedProgress.activities.miniProjects.lastCompleted ||
           new Date(progress.activities.miniProjects.lastCompleted) > new Date(aggregatedProgress.activities.miniProjects.lastCompleted))) {
         aggregatedProgress.activities.miniProjects.lastCompleted = progress.activities.miniProjects.lastCompleted;
       }
 
-      if (progress.activities.bugHunt.lastParticipated &&
+      if (progress.activities?.bugHunt?.lastParticipated &&
         (!aggregatedProgress.activities.bugHunt.lastParticipated ||
           new Date(progress.activities.bugHunt.lastParticipated) > new Date(aggregatedProgress.activities.bugHunt.lastParticipated))) {
         aggregatedProgress.activities.bugHunt.lastParticipated = progress.activities.bugHunt.lastParticipated;
       }
 
       // Update streaks (use the most recent)
-      if (progress.streaks.lastActiveDate &&
+      if (progress.streaks?.lastActiveDate &&
         (!aggregatedProgress.streaks.lastActiveDate ||
           new Date(progress.streaks.lastActiveDate) > new Date(aggregatedProgress.streaks.lastActiveDate))) {
         aggregatedProgress.streaks = { ...progress.streaks };
       }
 
       // Aggregate time spent
-      aggregatedProgress.timeSpent.totalMinutes += progress.timeSpent.totalMinutes;
-      aggregatedProgress.timeSpent.thisWeek += progress.timeSpent.thisWeek;
-      aggregatedProgress.timeSpent.thisMonth += progress.timeSpent.thisMonth;
+      aggregatedProgress.timeSpent.totalMinutes += progress.timeSpent?.totalMinutes || 0;
+      aggregatedProgress.timeSpent.thisWeek += progress.timeSpent?.thisWeek || 0;
+      aggregatedProgress.timeSpent.thisMonth += progress.timeSpent?.thisMonth || 0;
 
       // Keep latest detailed AI analysis
       if (progress.detailedAiAnalysis?.generatedAt &&
@@ -569,11 +575,11 @@ router.get('/student/overall', authenticateToken, async (req, res) => {
     progressRecords.forEach(progress => {
       if (totalJavaExercises > 0) {
         aggregatedProgress.skills.java.averageScore +=
-          (progress.skills.java.averageScore * progress.skills.java.exercisesCompleted) / totalJavaExercises;
+          ((progress.skills?.java?.averageScore || 0) * (progress.skills?.java?.exercisesCompleted || 0)) / totalJavaExercises;
       }
       if (totalPythonExercises > 0) {
         aggregatedProgress.skills.python.averageScore +=
-          (progress.skills.python.averageScore * progress.skills.python.exercisesCompleted) / totalPythonExercises;
+          ((progress.skills?.python?.averageScore || 0) * (progress.skills?.python?.exercisesCompleted || 0)) / totalPythonExercises;
       }
     });
 

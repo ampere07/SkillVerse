@@ -160,15 +160,18 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
       duration,
       requiresCompiler,
       compilerLanguage,
+      checkedRequirements,
+      isProgrammingRequirements,
+      programmingInstructions,
       isPublished,
       allowLateSubmission,
       attachments
     } = req.body;
 
-    if (!classroomId || !title || !description || !instructions) {
-      return res.status(400).json({ 
+    if (!classroomId || !title || !description) {
+      return res.status(400).json({
         success: false,
-        message: 'Classroom ID, title, description, and instructions are required' 
+        message: 'Classroom ID, title, and description are required'
       });
     }
 
@@ -205,6 +208,9 @@ router.post('/', authenticateToken, authorizeRole('teacher'), async (req, res) =
         hours: duration.hours || 0,
         minutes: duration.minutes || 0
       } : { hours: 0, minutes: 0 },
+      checkedRequirements: checkedRequirements || [],
+      isProgrammingRequirements: isProgrammingRequirements || false,
+      programmingInstructions: isProgrammingRequirements ? programmingInstructions : undefined,
       requiresCompiler: requiresCompiler || false,
       compilerLanguage: compilerLanguage || 'python',
       attachments: attachments || [],

@@ -22,13 +22,13 @@ const surveySchema = new mongoose.Schema({
   },
   javaExpertise: {
     type: String,
-    enum: ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'],
+    enum: ['beginner', 'intermediate', 'expert'],
     required: false,
     default: undefined
   },
   pythonExpertise: {
     type: String,
-    enum: ['no-experience', 'beginner', 'intermediate', 'advanced', 'expert'],
+    enum: ['beginner', 'intermediate', 'expert'],
     required: false,
     default: undefined
   },
