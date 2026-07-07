@@ -1,12 +1,11 @@
-import * as geminiService from './geminiService.js';
+import * as ollamaService from './ollamaService.js';
 
-console.log(`AI Service Provider: Gemini AI`);
+console.log(`AI Service Provider: Ollama (local)`);
 
-export const validateLearningInputs = geminiService.validateLearningInputs;
-export const analyzeStudentSkills = geminiService.analyzeStudentSkills;
+export const analyzeStudentSkills = ollamaService.analyzeStudentSkills;
 
-export const getActiveProvider = () => 'gemini';
+export const getActiveProvider = () => 'ollama';
 
 export const checkConnection = async () => {
-  return await geminiService.checkGeminiConnection();
+  return await ollamaService.checkOllamaConnection();
 };

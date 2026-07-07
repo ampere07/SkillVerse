@@ -4,8 +4,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticateToken } from '../middleware/auth.js';
-import GEMINI_CONFIG from '../config/geminiConfig.js';
-import { generateWithRetry } from '../services/geminiService.js';
+import OLLAMA_CONFIG from '../config/ollamaConfig.js';
+import { generateWithRetry } from '../services/ollamaService.js';
 import jdoodleService from '../services/jdoodleService.js';
 
 const router = express.Router();
@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
 const LIBS_DIR = path.join(__dirname, '..', 'libs');
 
-const MODEL_NAME = GEMINI_CONFIG.model;
+const MODEL_NAME = OLLAMA_CONFIG.model;
 
 async function ensureDirectories() {
   try {
@@ -334,7 +334,7 @@ Write one paragraph that:
 - Use simple, easy words
 
 IMPORTANT: Write ONLY one paragraph. Don't show any analysis, lists, or code. Use simple English. No complicated words.`;
-    console.log('[AI Hint] Using centralized Gemini service');
+    console.log('[AI Hint] Using centralized Ollama service');
 
     const response = await generateWithRetry(prompt, {
       temperature: 0.7,

@@ -1,9 +1,9 @@
-import { generateWithRetry } from "./geminiService.js";
-import GEMINI_CONFIG from "../config/geminiConfig.js";
+import { generateWithRetry } from "./ollamaService.js";
+import OLLAMA_CONFIG from "../config/ollamaConfig.js";
 import User from "../models/User.js";
 
 console.log(`Project Generation Service using shared AI service`);
-console.log(`Model: ${GEMINI_CONFIG.model}`);
+console.log(`Model: ${OLLAMA_CONFIG.model}`);
 
 const createFallbackProjects = (language, skillLevel, roadmap) => {
   const isJava = language.toLowerCase() === "java";

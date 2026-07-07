@@ -1,30 +1,17 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import GEMINI_CONFIG from "../config/geminiConfig.js";
+import axios from "axios";
+import OLLAMA_CONFIG from "../config/ollamaConfig.js";
 
-const MODELS = [
-  "gemini-3-flash-preview",
-  "gemini-3.1-flash-lite-preview",
-  "gemini-2.5-flash",
-];
+const MODELS = [OLLAMA_CONFIG.model];
 
-const MAX_RETRIES = GEMINI_CONFIG.maxRetries || 3;
+const MAX_RETRIES = OLLAMA_CONFIG.maxRetries || 3;
 
-let genAI;
+console.log(
+  `Ollama Service Initialized (${OLLAMA_CONFIG.remote ? "remote" : "local"}: ${OLLAMA_CONFIG.baseUrl}, model: ${OLLAMA_CONFIG.model})`,
+);
 
-if (!process.env.GEMINI_API_KEY) {
-  console.warn("WARNING: GEMINI_API_KEY is not set in environment variables");
-} else {
-  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  console.log("Gemini Service Initialized");
-}
-
-export const generateWithRetry = async (prompt, _options = {}) => {
+export const generateWithRetry = async (prompt, options = {}) => {
   let lastError;
   let currentModelIndex = 0;
-
-  if (!genAI) {
-    throw new Error("Gemini API is not configured. Missing GEMINI_API_KEY.");
-  }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const modelName = MODELS[currentModelIndex] || MODELS[0];
@@ -34,12 +21,25 @@ export const generateWithRetry = async (prompt, _options = {}) => {
       );
       const startTime = Date.now();
 
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
+      const result = await axios.post(
+        `${OLLAMA_CONFIG.baseUrl}/api/chat`,
+        {
+          model: modelName,
+          messages: [{ role: "user", content: prompt }],
+          stream: false,
+          options: {
+            temperature: options.temperature,
+            top_p: options.top_p,
+            num_predict: options.num_predict,
+            num_thread: options.num_thread,
+          },
+        },
+        { timeout: OLLAMA_CONFIG.timeout },
+      );
 
       const response = {
         message: {
-          content: result.response.text(),
+          content: result.data?.message?.content || "",
         },
       };
 
@@ -51,28 +51,22 @@ export const generateWithRetry = async (prompt, _options = {}) => {
       return response;
     } catch (error) {
       lastError = error;
-      const errorMessage = error.message.toLowerCase();
+      const errorMessage = (error.message || "").toLowerCase();
       console.error(`Attempt ${attempt} (${modelName}) failed:`, error.message);
 
-      // If it's a quota error (429), exhausted error, or overloaded (503)
-      const isQuotaError =
-        errorMessage.includes("429") ||
-        errorMessage.includes("quota") ||
-        errorMessage.includes("exhausted") ||
+      // Fall back to next configured model on overload/unavailable
+      const isOverloaded =
         errorMessage.includes("overloaded") ||
-        errorMessage.includes("limit") ||
-        error.status === 429 ||
-        (error.response && error.response.status === 429);
+        errorMessage.includes("unavailable") ||
+        error.response?.status === 503;
 
-      if (isQuotaError) {
-        if (currentModelIndex < MODELS.length - 1) {
-          currentModelIndex++;
-          console.log(
-            `Quota reached/Overloaded for ${modelName}. Falling back to ${MODELS[currentModelIndex]}...`,
-          );
-          attempt--;
-          continue;
-        }
+      if (isOverloaded && currentModelIndex < MODELS.length - 1) {
+        currentModelIndex++;
+        console.log(
+          `Model ${modelName} overloaded. Falling back to ${MODELS[currentModelIndex]}...`,
+        );
+        attempt--;
+        continue;
       }
 
       if (attempt < MAX_RETRIES) {
@@ -84,7 +78,7 @@ export const generateWithRetry = async (prompt, _options = {}) => {
   }
 
   throw new Error(
-    `AI generation failed after ${MAX_RETRIES} attempts and model fallbacks: ${lastError.message}`,
+    `AI generation failed after ${MAX_RETRIES} attempts and model fallbacks: ${lastError?.message}`,
   );
 };
 
@@ -391,28 +385,28 @@ export const generateFallbackRoadmap = (primaryLanguage, expertiseLevel) => {
   };
 };
 
-export const checkGeminiConnection = async () => {
+export const checkOllamaConnection = async () => {
   try {
-    if (genAI) {
-      // Just doing a simple fast query to ensure API key is valid using the primary model
-      const model = genAI.getGenerativeModel({ model: MODELS[0] });
-      const result = await model.generateContent("hello");
-      if (result) {
-        return {
-          connected: true,
-          model: MODELS[0],
-          availableModels: MODELS,
-          mode: "Gemini",
-        };
-      }
-    }
-    throw new Error("Unable to connect to Gemini via SDK");
+    // Verify the model is available on the local Ollama server
+    const tags = await axios.get(`${OLLAMA_CONFIG.baseUrl}/api/tags`, {
+      timeout: 10000,
+    });
+    const available = (tags.data?.models || []).map((m) => m.name);
+    const hasModel = available.some((name) => name === OLLAMA_CONFIG.model);
+
+    return {
+      connected: true,
+      model: OLLAMA_CONFIG.model,
+      modelAvailable: hasModel,
+      availableModels: available,
+      mode: OLLAMA_CONFIG.remote ? "Ollama (remote)" : "Ollama (local)",
+    };
   } catch (error) {
     console.error("AI connection failed:", error.message);
     return {
       connected: false,
       error: error.message,
-      mode: "Gemini",
+      mode: OLLAMA_CONFIG.remote ? "Ollama (remote)" : "Ollama (local)",
     };
   }
 };
