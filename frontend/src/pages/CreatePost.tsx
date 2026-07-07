@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, Upload, Trash2, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ChevronRight, Upload, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { activityAPI, moduleAPI, uploadAPI } from '../utils/api';
 
 interface CreatePostProps {
@@ -16,7 +16,6 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
   const [postType, setPostType] = useState<PostType>('activity');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [instructions, setInstructions] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [points, setPoints] = useState('100');
   const [checkedRequirements, setCheckedRequirements] = useState<string[]>([]);
@@ -57,7 +56,6 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setInstructions('');
     setDueDate('');
     setPoints('100');
     setCheckedRequirements([]);
@@ -81,7 +79,7 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
     const nonOthersRequirements = checkedRequirements.filter(r => r !== 'Others');
     const hasOthers = checkedRequirements.includes('Others') && othersText.trim().length > 0;
 
-    if (postType === 'activity' && nonOthersRequirements.length === 0 && !hasOthers) {
+    if (postType === 'activity' && requiresCompiler && nonOthersRequirements.length === 0 && !hasOthers) {
       setCreateError('Please select at least one requirement');
       return;
     }
@@ -241,77 +239,6 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
 
             {postType === 'activity' && (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Requirements <span className="text-red-500">*</span>
-                  </label>
-                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                    <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Select at least one</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        'Include code comments',
-                        'Follow naming conventions',
-                        'Handle edge cases',
-                        'Use proper indentation',
-                        'Include test cases',
-                        'Add documentation',
-                        'Avoid hardcoded values',
-                        'Use meaningful variable names',
-                        'Avoid code duplication (DRY)',
-                        'Use proper error handling',
-                        'Follow OOP principles',
-                        'Use appropriate data structures',
-                        'Break code into functions/methods',
-                        'No unused variables',
-                        'Use proper access modifiers',
-                        'Efficient algorithm/logic',
-                        'Correct program output',
-                        'Follow single responsibility principle',
-                      ].map((req) => (
-                        <label key={req} className="flex items-center space-x-2 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={checkedRequirements.includes(req)}
-                            onChange={(e) => {
-                              setCheckedRequirements(prev =>
-                                e.target.checked ? [...prev, req] : prev.filter(r => r !== req)
-                              );
-                            }}
-                            className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
-                          />
-                          <span className="text-sm text-gray-600 group-hover:text-gray-900">{req}</span>
-                        </label>
-                      ))}
-
-                      {/* Others */}
-                      <label className="flex items-center space-x-2 cursor-pointer group col-span-2">
-                        <input
-                          type="checkbox"
-                          checked={checkedRequirements.includes('Others')}
-                          onChange={(e) => {
-                            setCheckedRequirements(prev =>
-                              e.target.checked ? [...prev, 'Others'] : prev.filter(r => r !== 'Others')
-                            );
-                            if (!e.target.checked) setOthersText('');
-                          }}
-                          className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
-                        />
-                        <span className="text-sm text-gray-600 group-hover:text-gray-900">Others</span>
-                      </label>
-                    </div>
-
-                    {checkedRequirements.includes('Others') && (
-                      <textarea
-                        value={othersText}
-                        onChange={(e) => setOthersText(e.target.value)}
-                        placeholder="Specify other requirements..."
-                        rows={3}
-                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none bg-white"
-                      />
-                    )}
-                  </div>
-                </div>
-
                 <div className="p-4 bg-white border border-gray-200 rounded-lg">
                   <div className="flex items-start space-x-3">
                     <div className="flex items-center h-5">
@@ -319,7 +246,13 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
                         id="requiresCompiler"
                         type="checkbox"
                         checked={requiresCompiler}
-                        onChange={(e) => setRequiresCompiler(e.target.checked)}
+                        onChange={(e) => {
+                          setRequiresCompiler(e.target.checked);
+                          if (!e.target.checked) {
+                            setCheckedRequirements([]);
+                            setOthersText('');
+                          }
+                        }}
                         className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900"
                       />
                     </div>
@@ -350,6 +283,77 @@ export default function CreatePost({ classroomId, classroomName, onBack, onNavig
                         <option value="java">Java</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">Students will use this language for code submission</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Requirements <span className="text-red-500">*</span>
+                      </label>
+                      <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                        <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Select at least one</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            'Include code comments',
+                            'Follow naming conventions',
+                            'Handle edge cases',
+                            'Use proper indentation',
+                            'Include test cases',
+                            'Add documentation',
+                            'Avoid hardcoded values',
+                            'Use meaningful variable names',
+                            'Avoid code duplication (DRY)',
+                            'Use proper error handling',
+                            'Follow OOP principles',
+                            'Use appropriate data structures',
+                            'Break code into functions/methods',
+                            'No unused variables',
+                            'Use proper access modifiers',
+                            'Efficient algorithm/logic',
+                            'Correct program output',
+                            'Follow single responsibility principle',
+                          ].map((req) => (
+                            <label key={req} className="flex items-center space-x-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={checkedRequirements.includes(req)}
+                                onChange={(e) => {
+                                  setCheckedRequirements(prev =>
+                                    e.target.checked ? [...prev, req] : prev.filter(r => r !== req)
+                                  );
+                                }}
+                                className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
+                              />
+                              <span className="text-sm text-gray-600 group-hover:text-gray-900">{req}</span>
+                            </label>
+                          ))}
+
+                          {/* Others */}
+                          <label className="flex items-center space-x-2 cursor-pointer group col-span-2">
+                            <input
+                              type="checkbox"
+                              checked={checkedRequirements.includes('Others')}
+                              onChange={(e) => {
+                                setCheckedRequirements(prev =>
+                                  e.target.checked ? [...prev, 'Others'] : prev.filter(r => r !== 'Others')
+                                );
+                                if (!e.target.checked) setOthersText('');
+                              }}
+                              className="w-4 h-4 border-gray-300 rounded text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
+                            />
+                            <span className="text-sm text-gray-600 group-hover:text-gray-900">Others</span>
+                          </label>
+                        </div>
+
+                        {checkedRequirements.includes('Others') && (
+                          <textarea
+                            value={othersText}
+                            onChange={(e) => setOthersText(e.target.value)}
+                            placeholder="Specify other requirements..."
+                            rows={3}
+                            className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none bg-white"
+                          />
+                        )}
+                      </div>
                     </div>
                   </>
                 )}

@@ -231,6 +231,8 @@ export const activityAPI = {
       minutes: number;
     };
     requiresCompiler?: boolean;
+    compilerLanguage?: 'java' | 'python';
+    checkedRequirements?: string[];
     isPublished?: boolean;
     allowLateSubmission?: boolean;
     attachments?: any[];
